@@ -243,7 +243,7 @@ bind M-X cut main
 ## Set this if your backspace key sends delete most of the time (2.1.3+)
 # bind kdel backspace all
 
-include /home/marcel/.nano/syntax.nanorc
+include ~/.nano/syntax.nanorc
 
 ## Nanorc files
 # include "/usr/share/nano/nanorc.nanorc"
