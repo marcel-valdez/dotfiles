@@ -356,6 +356,7 @@ git_quick_checkout ()
  alias g='git'
  alias webserver='python -m SimpleHTTPServer'
  alias search='find -iregex'
+ alias nano='nano -F'
 
  # PATH modifications
  export PATH=$PATH:/cygdrive/c/static/gwt-2.5.1
