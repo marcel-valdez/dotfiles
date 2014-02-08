@@ -133,6 +133,10 @@ unset env
 # Whenever displaying the prompt, write the previous line to disk
  export PROMPT_COMMAND="history -a"
 
+export HISTSIZE=10000
+export HISTFILESIZE=10000
+shopt -s histappend
+
 # Aliases
 #
 # Some people use a different file for aliases
@@ -260,6 +264,8 @@ git_quick_checkout ()
    return 0
  }
 
+ # Appian development functions
+
  gwt_refresh() {
   cdd "/cygdrive/c/work/ae$1"
   echo 'Deleting previous gwt components SNAPSHOT on ae$1'
@@ -330,6 +336,57 @@ git_quick_checkout ()
   fi
  }
 
+ in_git_repo() {
+   git rev-parse > /dev/null 2>&1 && echo true
+   return 0
+ }
+
+ merge-with-appian() {
+  if [ -z "$1" ]; then
+    echo "This function creates a new branch off of your current branch, and then"
+    echo "merges that branch with a appian/xxx branch, where xxx is the parameter"
+    echo "this function accepts."
+    echo ""
+    echo "Error: No appian branch to merge with was supplied, you must supply one."
+    echo "Example: "
+    echo "merge-with-appian 7.4.0.0-maint"
+
+    return 1;
+  fi
+
+  is_git_repo=`git rev-parse > /dev/null 2>&1 && echo true`
+  if [ "$is_git_repo" != "true" ]; then
+    echo "You are not inside a git repository, cannot proceed."
+    return 1;
+  fi
+
+  appian_exists=`git ls-remote appian > /dev/null 2>&1 && echo true`
+  if [ "$appian_exists" != "true" ]; then
+    echo "The remote repository alias 'appian' does not exist."
+    return 1;
+  fi
+
+  remote_branch=`git ls-remote appian | grep "$1\$"`
+  if [ -z "$remote_branch" ]; then
+    echo "The branch $1 does not exist in remote repository 'appian'"
+    return 1;
+  fi
+
+  current_branch=`git rev-parse --abbrev-ref HEAD`
+  new_branch="$current_branch-$1"
+  echo "Merging branch $current_branch with: appian/$1 on new branch $new_branch"
+  git branch $new_branch && git checkout $new_branch && git merge appian/$1
+
+  return 0;
+ }
+
+ list-files() {
+   sed_expr="s/#\t$1\:\s*//"
+   echo `git status | grep "$1" | sed $sed_expr`
+
+   return 0
+ }
+
  alias cdd=cd_func
 
  # Custom alias
@@ -341,6 +398,9 @@ git_quick_checkout ()
  alias load_bashrc='source $HOME/.bashrc'
  alias gadd='git add'
  alias edit_bashrc=edit_bashrc_func
+ alias current-branch='git rev-parse --abbrev-ref HEAD'
+ alias refresh-projects='ant -Dmaven.quick=true -Dproject.refs=true eclipse-projects-clean eclipse-projects'
+
  # alias edit_bashrc='nano $HOME/.bashrc; source $HOME/.bashrc'
  alias read_log='tail -f -n 3000'
  alias mysql_connect='mysql.exe --host=localhost --password=appian --user=appian --port=3306 --protocol=tcp'
@@ -367,6 +427,7 @@ git_quick_checkout ()
  export PATH=$PATH:/cygdrive/c/static/tools
  export PATH=$PATH:/cygdrive/d/static/tools
  export PATH=$PATH:/cygdrive/c/programs/nodejs
+ export PATH=$PATH:~/bin
 
 # custom environment variables
  export GHI_TOKEN="d14b0b9ba3b1f537036bc2fb3d98100c8a583ec9"

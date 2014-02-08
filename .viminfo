@@ -8,8 +8,8 @@
 # hlsearch on (H) or off (h):
 ~h
 # Command Line History (newest to oldest):
-:q!
 :q
+:q!
 :wq!
 :wq
 :Wq

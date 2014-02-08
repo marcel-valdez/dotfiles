@@ -1,0 +1,127 @@
+#!/bin/bash
+
+function usage ()
+{
+  echo "This function does the following: " 1>&2;
+  echo "1. Checks out a branch from a <common-base>." 1>&2;
+  echo "2. Applies some <commits> to it." 1>&2;
+  echo "3. Checks out branches from <common-base> that will merge to <target-branches>" 1>&2;
+  echo "4. Merges each <common-base> branch with its respective <target-branch>" 1>&2;
+  echo "Usage:" 1>&2;
+  echo "apply-hotix <common-base> -c <commits> -t <target-branch>." 1>&2;
+  echo "" 1>&2;
+  echo "Error: No parameters were supplied." 1>&2;
+  echo "Example: " 1>&2;
+  echo 'apply-hotix 7.3.0.0 -c "999999 888888 777777" -t "appian/7.3.0.0-maint appian/7.4.0.0-maint"' 1>&2;
+  return 1
+}
+
+in_git_repo ()
+{
+  git rev-parse > /dev/null 2>&1 && echo true
+  return 0
+}
+
+
+if [ -z "$1" ]; then
+  usage;
+  exit 1
+fi;
+
+if [ "`in_git_repo`" != "true" ]; then
+  echo "You are not inside a git repository, cannot continue.";
+  exit 1
+fi;
+
+common_path=$1
+common_base_name=`echo "$common_path" | sed 's/.*\///'`
+
+OPTIND=2;
+while getopts ":c:t:" arg; do
+  case $arg in
+    c)
+      echo "Found commits: <$OPTARG>";
+      commits=(${OPTARG});
+      if [ -z "$commits" ]; then
+          usage;
+          exit 1
+      fi
+      ;;
+    t)
+      echo "Found targets: <$OPTARG>";
+      targets=(${OPTARG});
+      if [ -z "$targets" ]; then
+          usage;
+          exit 1
+      fi
+      ;;
+    *)
+      usage;
+      exit 1
+      ;;
+  esac
+done
+
+shift $((OPTIND-2))
+
+common_branch="hotfix-from-$common_base_name"
+
+echo "Branching $common_branch from $common_path"
+(git checkout $common_path && git branch $common_branch ) || exit 1
+
+echo "Checking out branch $common_branch"
+git checkout $common_branch & wait $!
+if [ $? == 1 ]; then
+  exit 1
+fi
+
+for commit in "${commits[@]}"
+do
+  echo "Applying commit $commit to $common_branch"
+  matched=`git rev-parse --quiet --verify $commit`
+  if [ -z "$matched" ]; then
+    echo "Commit $commit does not exist, cancelling."
+    exit 1
+  fi
+
+  git cherry-pick $commit & wait $!
+  if [ $? == 1 ]; then
+    exit 1
+  fi
+done
+
+for target in "${targets[@]}"
+do
+  matched=`git branch --all | grep "$target\$"`;
+  if [ -z "$matched" ]; then
+    echo "Branch $target does not exist, cancelling.";
+    exit 1
+  fi;
+
+  target_name=`echo "$target" | sed 's/.*\///'`;
+  target_branch="$common_branch-to-$target_name";
+  echo "Branching $common_branch as $target_branch for merging";
+  ( git branch $target_branch && git checkout $target_branch ) &
+  wait $!;
+  if [ $? == 1 ]; then
+      exit 1
+  fi
+
+  echo "Merging $target_branch to $target";
+  git merge $target & wait $!;
+  if [ $? == 1 ]; then
+      exit 1
+  fi
+
+  git checkout $common_branch & wait $!;
+  if [ $? == 1 ]; then
+      exit 1
+  fi
+done;
+
+echo "Hotfix applied successfully.";
+echo "Hotfixed branches are:
+hotfixed_branches=`git branch --list | grep "$common_branch-.*"`
+echo "$hotfixed_branches"
+
+exit 0

@@ -11,6 +11,8 @@
 !.viminfo
 !.vimrc
 !.gitignore
+!bin/
+!bin/*
 
 # But do Ignore nano backup files
 .*~
