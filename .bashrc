@@ -16,8 +16,12 @@ HISTCONTROL=ignoreboth
 shopt -s histappend
 
 # for setting history length see HISTSIZE and HISTFILESIZE in bash(1)
-HISTSIZE=1000
-HISTFILESIZE=2000
+HISTSIZE=5000
+HISTFILESIZE=10000
+shopt -s histappend
+
+# Ignore small typos when changing directories
+shopt -s cdspell
 
 # check the window size after each command and, if necessary,
 # update the values of LINES and COLUMNS.
@@ -71,14 +75,16 @@ if [ -f ~/.config/git-prompt.sh ]; then
   unset color_prompt force_color_prompt
 
   # If this is an xterm set the title to user@host:dir
-  case "$TERM" in
-  xterm*|rxvt*)
-      PS1="\[\e]0;${debian_chroot:+($debian_chroot)}\u@\h: \w\a\]$PS1"
-      ;;
-  *)
-      ;;
-  esac
 fi
+
+case "$TERM" in
+xterm*|rxvt*)
+    PS1="\[\e]0;${debian_chroot:+($debian_chroot)}\u@\h: \w\a\]$PS1"
+    ;;
+*)
+    ;;
+esac
+
 
 # enable color support of ls and also add handy aliases
 if [ -x /usr/bin/dircolors ]; then
@@ -127,3 +133,8 @@ if [ -d "$HOME/bin" ]; then
 fi
 
 PATH=$PATH:$HOME/.rvm/bin # Add RVM to PATH for scripting
+export GIT_EDITOR=nano
+
+if [[ "$TERM" != "screen" ]]; then
+  tmux attach
+fi
