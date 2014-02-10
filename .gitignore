@@ -16,4 +16,5 @@
 
 # But do Ignore nano backup files
 .*~
+*~
 

@@ -430,7 +430,8 @@ git_quick_checkout ()
  export PATH=$PATH:~/bin
 
 # custom environment variables
- export GHI_TOKEN="d14b0b9ba3b1f537036bc2fb3d98100c8a583ec9"
+ source .ghi_token
+ export TMPDIR=/tmp
 
  if [ "$(expr substr $(uname) 1 6)" == "CYGWIN" ]; then
   export CYGWIN_ENV=TRUE
@@ -438,6 +439,6 @@ git_quick_checkout ()
   alias apt-get='apt-cyg -m http://mirror.symnds.com/software/cygwin/x86_64/'
   alias multipane='tmux new -s CYGWIN'
   if [[ "$TERM" != "screen" ]]; then
-    tmux attach
+    tmux attach -d
   fi
  fi
