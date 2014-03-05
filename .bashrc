@@ -325,7 +325,7 @@ git_quick_checkout ()
  }
 
  edit_bashrc_func() {
-  subl $HOME/.bashrc
+  nano $HOME/.bashrc
  }
 
  ae() {
@@ -395,13 +395,12 @@ git_quick_checkout ()
  alias rm_merge_files='rm -f `find | grep ".*\.\(REMOTE\|LOCAL\|BASE\).*\.java"`'
  alias gstatus='git status'
  alias gcommit='git commit'
- alias load_bashrc='source $HOME/.bashrc'
+ alias load-bashrc='source $HOME/.bashrc'
  alias gadd='git add'
- alias edit_bashrc=edit_bashrc_func
+ alias edit-bashrc=edit_bashrc_func
  alias current-branch='git rev-parse --abbrev-ref HEAD'
  alias refresh-projects='ant -Dmaven.quick=true -Dproject.refs=true eclipse-projects-clean eclipse-projects'
 
- # alias edit_bashrc='nano $HOME/.bashrc; source $HOME/.bashrc'
  alias read_log='tail -f -n 3000'
  alias mysql_connect='mysql.exe --host=localhost --password=appian --user=appian --port=3306 --protocol=tcp'
  alias c='cd /cygdrive/c/'
@@ -417,6 +416,8 @@ git_quick_checkout ()
  alias webserver='python -m SimpleHTTPServer'
  alias search='find -iregex'
  alias nano='nano -F'
+ alias ant-no-gwt='ant -Dskip.gwt=true'
+ alias cls='clear'
 
  # PATH modifications
  export PATH=$PATH:/cygdrive/c/static/gwt-2.5.1

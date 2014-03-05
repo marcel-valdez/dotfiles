@@ -119,8 +119,8 @@ do
   fi
 done;
 
-echo "Hotfix applied successfully.";
-echo "Hotfixed branches are:
+echo "Hotfix applied successfully."
+echo "Hotfixed branches are:"
 hotfixed_branches=`git branch --list | grep "$common_branch-.*"`
 echo "$hotfixed_branches"
 
