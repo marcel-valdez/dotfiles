@@ -1,0 +1,3 @@
+#!/bin/bash
+
+alert ant -Dmaven.quick=true -Dproject.refs=true $1 $2 $3 $4

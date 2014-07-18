@@ -1,0 +1,10 @@
+#!/usr/bin/ruby
+
+puts ARGV.first.gsub('TypedValue', "")
+            .gsub(/it=[0-9]+/, "")
+            .gsub(',v=', "")
+            .gsub('[', "")
+            .gsub(']', "")
+            .gsub(',', ",\n")
+            .gsub('{', "{\n")
+            .gsub('}', "\n}")

@@ -1,0 +1,17 @@
+#!/usr/bin/env ruby
+if ARGV.empty?
+  puts 'This script returns unpushed non-fixup commits for a file, useful'
+  puts "for creating your fixup commits on the current file changes.\n"
+  puts 'Usage: '
+  puts 'git-file-commit <filename>'
+  puts 'Example: '
+  puts 'git-file-commit ae/src/com/appiancorp/exprdesigner/BaseParseModelHydrator.java'
+end
+
+branch_base = `git merge-base HEAD appian/master`
+fixup_regex=/.*fixup!.*/i
+file = ARGV.first
+
+all_file_commits = `git log --oneline "#{branch_base.chop}"..HEAD -- "#{file}"`
+non_fixup_commits = all_file_commits.lines.reject { | msg | fixup_regex.match(msg) }
+non_fixup_commits.each { |msg| puts msg }

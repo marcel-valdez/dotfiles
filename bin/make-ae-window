@@ -1,0 +1,9 @@
+#!/bin/sh
+
+tmux new-window -n "AE$1"
+# tmux select-window -t todo:0
+tmux send-keys "ae $1 && cls" 'C-m'
+tmux split-window -h
+tmux send-keys "ae $1 && cd build && cls" 'C-m'
+tmux select-layout even-horizontal
+# tmux -2 attach-session -t AE

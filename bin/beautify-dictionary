@@ -1,0 +1,5 @@
+#!/usr/bin/ruby
+
+puts ARGV[0].gsub('[', "{\n")
+            .gsub(']', "\n}")
+            .gsub(',', ",\n")

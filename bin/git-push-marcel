@@ -1,0 +1,6 @@
+#!/bin/bash
+
+branch=`git rev-parse --abbrev-ref HEAD`
+
+
+git push marcel $branch:$branch
