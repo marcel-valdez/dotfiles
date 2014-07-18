@@ -8,6 +8,8 @@
 # hlsearch on (H) or off (h):
 ~h
 # Command Line History (newest to oldest):
+:wq tmp.java
+:i
 :q
 :q!
 :wq!
@@ -18,7 +20,6 @@
 :WQ
 :w!
 :Q
-:i
 :qa!
 
 # Search String History (newest to oldest):
@@ -54,18 +55,20 @@
 	!
 
 # File marks:
-'0  1  0  /cygdrive/c/work/ae/.git/COMMIT_EDITMSG
-'1  1  0  ~/.bashrc
-'2  1  0  ~/.nanorc
-'3  13  46  /cygdrive/c/work/ae73/.git/COMMIT_EDITMSG
-'4  11  0  /cygdrive/c/work/ae73/.git/addp-hunk-edit.diff
-'5  1  7  /cygdrive/c/work/ae73/.git/COMMIT_EDITMSG
-'6  1  48  /cygdrive/c/work/ae_tmp/.git/COMMIT_EDITMSG
-'7  5  12  /cygdrive/c/programs/eclipse/.git/COMMIT_EDITMSG
-'8  6  10  /cygdrive/c/programs/eclipse/.gitignore
-'9  5  0  /cygdrive/c/programs/eclipse/.gitignore
+'0  26  3  /cygdrive/c/work/ae/tmp.java
+'1  1  0  /cygdrive/c/work/ae/.git/COMMIT_EDITMSG
+'2  1  0  ~/.bashrc
+'3  1  0  ~/.nanorc
+'4  13  46  /cygdrive/c/work/ae73/.git/COMMIT_EDITMSG
+'5  11  0  /cygdrive/c/work/ae73/.git/addp-hunk-edit.diff
+'6  1  7  /cygdrive/c/work/ae73/.git/COMMIT_EDITMSG
+'7  1  48  /cygdrive/c/work/ae_tmp/.git/COMMIT_EDITMSG
+'8  5  12  /cygdrive/c/programs/eclipse/.git/COMMIT_EDITMSG
+'9  6  10  /cygdrive/c/programs/eclipse/.gitignore
 
 # Jumplist (newest first):
+-'  26  3  /cygdrive/c/work/ae/tmp.java
+-'  81  0  /cygdrive/c/work/ae/tmp.java
 -'  1  0  /cygdrive/c/work/ae/.git/COMMIT_EDITMSG
 -'  1  0  ~/.bashrc
 -'  1  0  ~/.nanorc

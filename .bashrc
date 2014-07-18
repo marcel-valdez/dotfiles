@@ -267,8 +267,9 @@ git_quick_checkout ()
  # Appian development functions
 
  gwt_refresh() {
+
   cdd "/cygdrive/c/work/ae$1"
-  echo 'Deleting previous gwt components SNAPSHOT on ae$1'
+  echo "Deleting previous gwt components SNAPSHOT on ae$1"
   rm -f `find . -iregex .*appian-gwt-components-0-SNAPSHOT.jar`
   rm -f `find . -iregex .*appian-gwt-components-0-SNAPSHOT-sources.jar`
 
@@ -277,10 +278,10 @@ git_quick_checkout ()
   rm -f `find . -iregex .*appian-gwt-components-0-SNAPSHOT-sources.jar`
 
   cdd "/cygdrive/c/work/ae$1/build"
-  echo 'Recompiling tempo on ae$1'
+  echo "Recompiling tempo on ae$1"
   ant -Dmaven.quick=true -Dproject.refs=true compile-tempo
 
-  echo 'Copying new components SNAPSHOT on ae$1'
+  echo "Copying new components SNAPSHOT on ae$1"
   echo "yes" | cp -f "/cygdrive/c/work/ae$1/gwt/appian-gwt-components/target/appian-gwt-components-0-SNAPSHOT.jar" "/cygdrive/c/work/ae$1/web/maven-lib/"
   echo "yes" | cp -f "/cygdrive/c/work/ae$1/gwt/appian-gwt-components/target/appian-gwt-components-0-SNAPSHOT-sources.jar" "/cygdrive/c/work/ae$1/web/maven-lib-src/"
   echo "yes" | cp -f "/cygdrive/c/work/ae$1/gwt/appian-gwt-components/target/appian-gwt-components-0-SNAPSHOT.jar" "/cygdrive/c/work/ae$1/test/maven-lib/"
@@ -380,28 +381,40 @@ git_quick_checkout ()
   return 0;
  }
 
- list-files() {
-   sed_expr="s/#\t$1\:\s*//"
-   echo `git status | grep "$1" | sed $sed_expr`
+ # list files in git status that are currently staged, not staged and untracked, but removes any prefixes, only gives the list of files.
+ function list-files() {
+   sed_expr='s/#\t$1\:[ ]*//'
+   echo git status | grep "$1" | sed $sed_expr
 
    return 0
  }
 
- alias cdd=cd_func
+ function last() {
+   tailno=$1
+   regex=$2
+   if [ "$regex" = "" ]; then
+     regex=$1
+     tailno="-1"
+   fi
+
+   result=`history | sed 's/^\s*[0-9]*\s*//' | grep -v '^history ' | grep -v '^last ' | grep $regex | tail $tailno | head -1`
+   echo $result
+ }
 
  # Custom alias
+ alias cdd=cd_func
  alias top_ten="history | sed 's/^ \+//;s/  / /' | cut -d' ' -f2- | awk '{ count[\$0]++ } END { for (i in count) print count[i], i }' | sort -rn |head -10"
  alias mgit='/cygdrive/c/Program\ Files\ \(x86\)/Git/bin/git.exe'
  alias rm_merge_files='rm -f `find | grep ".*\.\(REMOTE\|LOCAL\|BASE\).*\.java"`'
- alias gstatus='git status'
- alias gcommit='git commit'
  alias load-bashrc='source $HOME/.bashrc'
- alias gadd='git add'
  alias edit-bashrc=edit_bashrc_func
- alias current-branch='git rev-parse --abbrev-ref HEAD'
- alias refresh-projects='ant -Dmaven.quick=true -Dproject.refs=true eclipse-projects-clean eclipse-projects'
-
- alias read_log='tail -f -n 3000'
+ alias git-current-branch='git rev-parse --abbrev-ref HEAD'
+# alias git-push-marcel='git push marcel `git-current-branch`'
+# alias git-push-f-marcel='git push -f marcel `git-current-branch`'
+ alias ant-refresh-projects='ant -Dmaven.quick=true -Dproject.refs=true eclipse-projects-clean eclipse-projects'
+ alias ant-stop-db='ant stop-k && ant stop-rdbms'
+ alias ant-start-db='ant start-k && ant start-rdbms'
+ alias ant-restart-db='ant-stop-db && ant-start-db'
  alias mysql_connect='mysql.exe --host=localhost --password=appian --user=appian --port=3306 --protocol=tcp'
  alias c='cd /cygdrive/c/'
  alias d='cd /cygdrive/d/'
@@ -409,18 +422,34 @@ git_quick_checkout ()
  alias a='cd /cygdrive/a/'
  alias wget_page='wget -q -O -'
  alias wget_appian='wget_page http://localhost:8080/ae/tempo'
- alias diff_staged='git diff --staged'
- alias unstage='git reset HEAD'
+ alias git-diff-staged='git diff --staged'
+ alias git-unstage='git reset HEAD'
+ alias g-log='git log'
+ alias g-diff-staged='git diff --staged'
+ alias g-unstage='git reset HEAD'
+ alias g-add='git add'
+ alias g-status='git status'
+ alias g-commit='git commit'
+ alias g-amend='git commit --amend'
  alias winpath='cygpath -a -w'
  alias g='git'
  alias webserver='python -m SimpleHTTPServer'
  alias search='find -iregex'
  alias nano='nano -F'
  alias ant-no-gwt='ant -Dskip.gwt=true'
+ alias ant-clean-dev='ant clean dev'
  alias cls='clear'
+ alias search-history='history | grep -v history | grep '
+ alias antt='ant -Dmaven.quick=true -Dproject.refs=true'
+ alias tmux-restart='rm -rf /tmp/tmux* && tmux'
+ alias git-log-one-author='git log --pretty=format:"%H %an %ad" --date=short'
+
+
 
  # PATH modifications
  export PATH=$PATH:/cygdrive/c/static/gwt-2.5.1
+ export PATH=$PATH:/cygdrive/c/static/mpg123
+ # REMOVE ARAXIS MERGE FROM CLASS PATH
  export PATH=$PATH:/cygdrive/c/Program\ Files\ \(x86\)/Araxis/Araxis\ Merge\ v6.5
  export PATH=$PATH:/cygdrive/c/programs/beyond_compare_3/
  export PATH=$PATH:/cygdrive/c/program_files/Sublime\ Text\ 2/
