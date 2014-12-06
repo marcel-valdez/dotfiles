@@ -8,9 +8,10 @@
 # hlsearch on (H) or off (h):
 ~h
 # Command Line History (newest to oldest):
+:q
+:set tw?
 :wq tmp.java
 :i
-:q
 :q!
 :wq!
 :wq
@@ -164,8 +165,6 @@
 -'  26  5  ~/gitflow-installer.sh
 -'  24  52  ~/gitflow-installer.sh
 -'  1  0  ~/gitflow-installer.sh
--'  24  11  ~/tail.sh
--'  22  51  ~/tail.sh
 
 # History of marks within files (newest to oldest):
 

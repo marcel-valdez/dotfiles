@@ -1,0 +1,61 @@
+#!/bin/bash
+
+USAGE="Usage: full-rebase <remote repository name> <branch name>"
+remote_repo="$1"
+branch="$2"
+
+function notify-exit ()
+{
+  notify "full-rebase <$1> failed"
+  exit 1
+}
+
+function exec-cmd ()
+{
+  eval $1
+  if [ $? -eq 1 ]; then
+    notify-exit $1
+  fi
+}
+
+if [ "$remote_repo" = "" ]; then
+  echo "No remote repository specified."
+  echo $USAGE
+  exit 1
+fi
+
+if [ "$branch" = "" ]; then
+  echo "No branch specified."
+  echo $USAGE
+  exit 1
+fi
+
+git_top_level="$(git rev-parse --show-toplevel)"
+current_level="$(pwd)"
+
+if [ ! "$git_top_level" = "$current_level" ]; then
+  echo "You are not at the git repository top level."
+  echo "Current directory: $current_level"
+  echo "Git top level directory: $git_top_level"
+  exit 1
+fi
+
+if [ ! -d "./build" ]; then
+  echo "There is no build directory for ant."
+  exit 1
+fi
+
+git_status=`git status --porcelain`
+if [ ! "$git_status" = "" ]; then
+  echo "You have pending changes to stash or commit."
+  echo $git_status
+  exit 1
+fi
+
+exec-cmd "git clean -dfx"
+exec-cmd "git pull --rebase $remote_repo $branch"
+exec-cmd "cd build"
+exec-cmd "ant"
+exec-cmd "ant start-k"
+exec-cmd "ant start-rdbms"
+exec-cmd "ant start-appserver"

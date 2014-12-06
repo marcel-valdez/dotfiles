@@ -1,5 +1,10 @@
 #!/bin/bash
 
 branch=`git rev-parse --abbrev-ref HEAD`
+to_branch=$1
 
-git push -f marcel $branch:$branch
+if [ "$to_branch" == "" ]; then
+  to_branch=$branch
+fi
+
+git push -f marcel $branch:$to_branch

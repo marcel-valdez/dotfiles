@@ -1,0 +1,13 @@
+#!/usr/bin/env ruby
+
+if ARGV.size == 0
+  puts 'Message must be specified.'
+  return 1
+end
+
+GROWL = '/cygdrive/c/program_files_x86/Growl\ for\ Windows/growlnotify.exe'
+title = 'Cygwin Notification'
+message = ARGV.first
+
+cmd = "#{GROWL} /t:'#{title}' /s:true '#{message}'"
+`#{cmd}`

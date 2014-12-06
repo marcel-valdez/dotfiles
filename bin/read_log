@@ -1,3 +1,0 @@
-#!/usr/bin/env bash
-
-tail -f -n 3000 "$1" | exec-on '.* ERROR .*'
