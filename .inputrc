@@ -12,6 +12,7 @@
 # would be benifitial to all, please feel free to send
 # a patch to the cygwin mailing list.
 
+set bind-tty-special-chars off
 # the following line is actually
 # equivalent to "\C-?": delete-char
 "\e[3~": delete-char
@@ -32,6 +33,7 @@
 "\eOH": beginning-of-line
 "\eOF": end-of-line
 
+"\C-v": paste-from-clipboard
 # Allow 8-bit input/output
 #set meta-flag on
 #set convert-meta off

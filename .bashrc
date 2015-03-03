@@ -17,7 +17,7 @@ alias ssh='/bin/ssh.exe'
 
 # Add git prompt and git completion
 [ -r /etc/git-completion.sh ] && . /etc/git-completion.sh
-[ -r /etc/git-prompt.sh ] && . /etc/git-prompt.sh
+# [ -r /etc/git-prompt.sh ] && . /etc/git-prompt.sh
 
 # non-printable characters must be enclosed inside \[ and \]
 PS1='\[\033[0m\]'              # VT100 compat: reset all colors
@@ -25,10 +25,10 @@ PS1="$PS1"'\[\033[32m\]'       # change color
 PS1="$PS1"'\u@\h '             # user@host<space>
 PS1="$PS1"'\[\033[33m\]'       # change color
 PS1="$PS1"'\w'                 # current working directory
-if test -z "$WINELOADERNOEXEC"
-then
-    PS1="$PS1"'$(__git_ps1)'   # bash function
-fi
+#if test -z "$WINELOADERNOEXEC"
+#then
+#    PS1="$PS1"'$(__git_ps1)'   # bash function for current git branch
+#fi
 PS1="$PS1"'\[\033[0m\]'        # change color
 PS1="$PS1"'\n'                 # new line
                                # show MSYSTEM if non-standard
@@ -101,10 +101,10 @@ unset TEMP
 # Alternatively, set them to the Cygwin temporary directory
 # or to any other tmp directory of your choice
 # export TMP=/tmp
-# export TEMP=/tmp
+export TEMP=/tmp
 
 # Or use TMPDIR instead
-# export TMPDIR=/tmp
+export TMPDIR=/tmp
 
 # Shell Options
 # #############
@@ -236,7 +236,11 @@ export PROMPT_COMMAND="history -a"
  }
 
  function getpid() {
- ps -aW | grep $1 | egrep -o --max-count=1 '[0-9]{3,6}' | uniq
+   ps -aW | grep $1 | egrep -o --max-count=1 '[0-9]{3,6}' | uniq
+ }
+
+ function search() {
+  find . -iregex $1
  }
 
 # Some example alias instructions
@@ -282,12 +286,18 @@ export PROMPT_COMMAND="history -a"
 # custom shell aliases
  alias bashrc_load='source $HOME/.bashrc'
  alias bashrc_edit='nano $HOME/.bashrc'
+ alias nano='nano -F'
  alias py='python'
  alias winpath='cygpath -a -w'
  alias git='/usr/bin/git'
  alias rbundle='/usr/bin/bundle.bat'
  alias bexec='/usr/bin/bundle.bat exec'
  alias pyhttp='python -m SimpleHTTPServer'
+ alias reset-sk='rm -fr /cygdrive/c/Users/Marcel/AppData/Roaming/Skype/para.fernalia1/'
+ alias remind-hr='rubykron --in 1 --message'
+ alias remind-30='rubykron --in 0.5 --message'
+ alias webserver='python -m SimpleHTTPServer'
+
 
 # Functions
 # #########
@@ -304,6 +314,8 @@ export LESSCHARSET='utf-8'
 PATH=$PATH:/cygdrive/d/static/gwt-2.5.1/
 PATH=$PATH:/cygdrive/d/static/ant/bin
 PATH=$PATH:/cygdrive/c/Program\ Files\ \(x86\)/Beyond\ Compare\ 3/
+PATH=~/bin:$PATH
+PATH=$PATH:/cygdrive/c/HashiCorp/Vagrant/bin
 
 if [ -d "/cygdrive/d/static/tools" ] ; then
   PATH=/cygdrive/d/static/tools:$PATH
