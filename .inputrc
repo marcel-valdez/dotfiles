@@ -21,6 +21,7 @@
 # would be benifitial to all, please feel free to send
 # a patch to the cygwin mailing list.
 
+set bind-tty-special-chars off
 set bell-style visible
 
 "\C-,": backward-word
@@ -45,6 +46,8 @@ set bell-style visible
 # VT220
 "\eOH": beginning-of-line
 "\eOF": end-of-line
+
+"\C-V": paste-from-clipboard
 
 # Allow 8-bit input/output
 #set meta-flag on

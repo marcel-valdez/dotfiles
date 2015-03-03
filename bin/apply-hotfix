@@ -28,7 +28,7 @@ if [ -z "$1" ]; then
   exit 1
 fi;
 
-if [ "`in_git_repo`" != "true" ]; then
+if [ "`in_git_repo`" -ne "true" ]; then
   echo "You are not inside a git repository, cannot continue.";
   exit 1
 fi;
@@ -71,7 +71,7 @@ echo "Branching $common_branch from $common_path"
 
 echo "Checking out branch $common_branch"
 git checkout $common_branch & wait $!
-if [ $? == 1 ]; then
+if [ $? -eq 1 ]; then
   exit 1
 fi
 
@@ -85,7 +85,7 @@ do
   fi
 
   git cherry-pick $commit & wait $!
-  if [ $? == 1 ]; then
+  if [ $? -eq 1 ]; then
     exit 1
   fi
 done
@@ -103,18 +103,18 @@ do
   echo "Branching $common_branch as $target_branch for merging";
   ( git branch $target_branch && git checkout $target_branch ) &
   wait $!;
-  if [ $? == 1 ]; then
+  if [ $? -eq 1 ]; then
       exit 1
   fi
 
   echo "Merging $target_branch to $target";
   git merge $target & wait $!;
-  if [ $? == 1 ]; then
+  if [ $? -eq 1 ]; then
       exit 1
   fi
 
   git checkout $common_branch & wait $!;
-  if [ $? == 1 ]; then
+  if [ $? -eq 1 ]; then
       exit 1
   fi
 done;

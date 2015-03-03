@@ -1,5 +1,25 @@
 #!/usr/bin/ruby
 
-puts ARGV[0].gsub('[', "{\n")
-            .gsub(']', "\n}")
-            .gsub(',', ",\n")
+INDENTATION = '  '
+
+dictionary = ARGV.first
+result = ""
+indent_count = 0
+dictionary.each_char do |char|
+  case char
+  when '['
+    indent_count += 1
+    result += "{\n" + (INDENTATION * indent_count)
+  when ']'
+    indent_count -= 1
+    result += "\n" + (INDENTATION * indent_count) + "}"
+  when ','
+    result += ",\n" + (INDENTATION * indent_count)
+  when ';'
+    result += ",\n"
+  else
+    result += char
+  end
+end
+
+puts result

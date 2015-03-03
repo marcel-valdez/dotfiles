@@ -1,61 +1,74 @@
 #!/bin/bash
 
-USAGE="Usage: full-rebase <remote repository name> <branch name>"
-remote_repo="$1"
-branch="$2"
+USAGE="Usage: full-rebase <remote repository name> <branch name>";
+remote_repo="$1";
+branch="$2";
+
+function in_git_repo ()
+{
+  git rev-parse > /dev/null 2>&1 && echo "true";
+  return 0;
+}
 
 function notify-exit ()
 {
-  notify "full-rebase <$1> failed"
-  exit 1
+  notify "full-rebase <$1> failed";
+  exit 1;
 }
 
 function exec-cmd ()
 {
-  eval $1
+  eval $1;
   if [ $? -eq 1 ]; then
-    notify-exit $1
+    notify-exit $1;
   fi
-}
+};
+
+
+is_in_repo=`in_git_repo`;
+
+if [ ! "$is_in_repo" = "true" ]; then
+  echo "You are not in a git repository, cannot continue.";
+  exit 1;
+fi
 
 if [ "$remote_repo" = "" ]; then
-  echo "No remote repository specified."
-  echo $USAGE
-  exit 1
+  echo "No remote repository specified.";
+  echo $USAGE;
+  echo "No rebase will be done.";
 fi
 
 if [ "$branch" = "" ]; then
-  echo "No branch specified."
-  echo $USAGE
-  exit 1
+  echo "No branch specified.";
+  echo $USAGE;
+  echo "No rebase will be done.";
 fi
 
-git_top_level="$(git rev-parse --show-toplevel)"
-current_level="$(pwd)"
-
-if [ ! "$git_top_level" = "$current_level" ]; then
-  echo "You are not at the git repository top level."
-  echo "Current directory: $current_level"
-  echo "Git top level directory: $git_top_level"
-  exit 1
-fi
+git_top_level="$(git rev-parse --show-toplevel)";
+cd "$git_top_level";
 
 if [ ! -d "./build" ]; then
-  echo "There is no build directory for ant."
-  exit 1
+  echo "There is no build directory for ant.";
+  exit 1;
 fi
 
-git_status=`git status --porcelain`
+git_status=`git status --porcelain`;
 if [ ! "$git_status" = "" ]; then
-  echo "You have pending changes to stash or commit."
-  echo $git_status
-  exit 1
+  echo "You have pending changes to stash or commit.";
+  echo $git_status;
+  exit 1;
 fi
 
-exec-cmd "git clean -dfx"
-exec-cmd "git pull --rebase $remote_repo $branch"
-exec-cmd "cd build"
-exec-cmd "ant"
-exec-cmd "ant start-k"
-exec-cmd "ant start-rdbms"
-exec-cmd "ant start-appserver"
+exec-cmd "git clean -dfx";
+
+if [ "$remote_repo" = "" ] || [ "$branch" = "" ]; then
+  echo "Not performing rebase, because no remote repository or branch was specified.";
+else
+  exec-cmd "git pull --no-ff --rebase $remote_repo $branch";
+fi
+
+exec-cmd "cd build";
+exec-cmd "ant";
+exec-cmd "ant start-k";
+exec-cmd "ant start-rdbms";
+exec-cmd "ant start-appserver";

@@ -1,0 +1,52 @@
+#!/usr/bin/env ruby
+
+require 'optparse'
+
+SUCCESS=0
+FAILURE=1
+RDBMS_OPTION = "-Dapn.conf.data.primary.datasource=AppianPrimaryDS"
+CUSTOM_OPTION = "-DTEST_TYPE=custom"
+CUSTOM_PATTERN_OPTION = "-Denv.CUSTOM_TEST_PATTERN"
+FRAMEWORK_OPTION = "-DTEST_TYPE"
+
+def exec_command(command)
+  puts command
+  if system(command)
+    exit SUCCESS
+  else
+    exit FAILURE
+  end
+end
+
+def get_custom_command(qualified_name)
+  class_path = qualified_name.gsub!('.', '/')
+  "ant quicktest  #{RDBMS_OPTION} #{CUSTOM_OPTION} #{CUSTOM_PATTERN_OPTION}=#{class_path}.java"
+end
+
+def get_framework_command(framework)
+  "ant quicktest  #{RDBMS_OPTION} #{FRAMEWORK_OPTION}=#{framework}"
+end
+
+options = {}
+OptionParser.new do |cmd_options|
+  cmd_options.banner = "Usage: ant-quick-test [options]"
+  cmd_options.on(
+    "-f",
+    "--framework [FRAMEWORK_NAME]",
+    "Run an entire framework. Overrides -c. Example: --framework expression") do |option|
+    options[:framework] = option
+  end
+
+  cmd_options.on(
+    "-c",
+    "--class [CLASS_NAME]",
+    "Run a specific class. Example: --class com.appiancorp.expressions.PluginExpressionTest") do |option|
+    options[:klass] = option
+  end
+end.parse!
+
+if not options[:framework].nil?
+  exec_command get_framework_command(options[:framework])
+elsif not options[:klass].nil?
+  exec_command get_custom_command(options[:klass])
+end

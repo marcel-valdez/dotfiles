@@ -2,6 +2,8 @@
 
 require 'timeout'
 require 'io/console'
+require 'iconv'
+
 
 if ARGV.length == 0
  puts "alert-on is a utility that receives piped input text and alerts when a"
@@ -11,6 +13,20 @@ if ARGV.length == 0
  puts "If a command is specified on match, this utility will call the command and send it"
  puts "the line that matched the regular expression as its single input."
  exit(1)
+end
+
+class String
+  def converter
+    if @converter.nil?
+      @converter = Iconv.new('UTF-8//IGNORE', 'UTF-8')
+    end
+
+    @converter
+  end
+
+  def remove_non_utf8
+    converter.iconv(self)[0..-2]
+  end
 end
 
 def highlight(line)
@@ -23,6 +39,7 @@ pattern=Regexp.new(ARGV.shift)
 command = 'echo'
 command = ARGV.shift unless ARGV.first.nil?
 ARGF.each_line do |line|
+  line = line.remove_non_utf8
   if pattern.match line
     puts highlight line
     begin
