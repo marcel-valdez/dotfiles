@@ -8,22 +8,23 @@ function in_git_repo ()
 {
   git rev-parse > /dev/null 2>&1 && echo "true";
   return 0;
-}
-
-function notify-exit ()
-{
-  notify "full-rebase <$1> failed";
-  exit 1;
-}
-
-function exec-cmd ()
-{
-  eval $1;
-  if [ $? -eq 1 ]; then
-    notify-exit $1;
-  fi
 };
 
+#function notify-exit ()
+#{
+#  notify "full-rebase <$1> failed";
+#  exit 1;
+#};
+
+#function exec-cmd ()
+#{
+#  eval $1;
+#  if [ $? -eq 1 ]; then
+#    notify-exit $1;
+#  fi
+#};
+
+source ~/bin/lib/build-functions
 
 is_in_repo=`in_git_repo`;
 
