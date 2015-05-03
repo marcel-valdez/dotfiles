@@ -1,0 +1,10 @@
+#!/bin/sh
+
+tmux new-window -n 'todo' 'exec nano ~/todos/FUTURE.md'
+tmux select-window -t todo:0
+# tmux send-keys 'exec nano ~/todos/FUTURE.md' 'C-m'
+tmux split-window -h 'exec nano ~/todos/TOMORROW.md'
+tmux split-window -h 'exec nano ~/todos/DOING.md'
+tmux split-window -h 'exec nano ~/todos/PENDING.md'
+tmux select-layout even-horizontal
+tmux -2 attach-session -t todo

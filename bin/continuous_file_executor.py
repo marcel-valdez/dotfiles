@@ -53,15 +53,21 @@ def replace_stdout(new_stdout):
   return orig
 
 def execute_file(filename, exec_state):
-  print "-- Change detected, executing file: " + filename + " --"
   try:
     execfile(filename, { '__name__' : '__main__' })
   except Exception, ex:
     print "Error occurred while executing " + filename
     print str(ex)
-  print "-- Done. --"
+  except SystemExit, exit:
+    print "-- Exit status: " + str(exit)
+
+  print "-- Done."
   time.sleep(0.1) # give print_output time to print remaining contents
   exec_state['done'] = True
+
+def print_mod_message(filename, modtime):
+  modtime_msg = time.strftime("%I:%M:%S %p", time.localtime(modtime))
+  print "-- [" + modtime_msg + "] Change detected."
 
 def main(filename):
   validate_file(filename)
@@ -69,14 +75,17 @@ def main(filename):
   win = init_curses()
   try:
     while True:
+      modtime = get_modification_time(filename)
       if last_modification_time != get_modification_time(filename):
         exec_state = { 'done': False }
         clear_screen(win)
+        win.refresh()
         proc_stdout = StringIO()
         replace_stdout(proc_stdout)
+        print_mod_message(filename, modtime)
         start_new_thread(execute_file, (filename, exec_state))
-        last_modification_time = get_modification_time(filename)
         print_output(win, proc_stdout, exec_state)
+        last_modification_time = modtime
       time.sleep(0.5)
   finally:
     end_screen()
