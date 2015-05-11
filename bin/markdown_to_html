@@ -1,0 +1,8 @@
+#!/bin/bash
+
+source ~/bin/functions
+expanded_input_path=`readlink -f $1`
+expanded_output_path=`readlink -f $2`
+output_file=`winpath $expanded_output_path`
+input_file=`winpath $expanded_input_path`
+pandoc --from=markdown --to=html --output=$output_file $input_file

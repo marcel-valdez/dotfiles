@@ -304,6 +304,7 @@ export PROMPT_COMMAND="history -a"
 
 # Some example functions
 # function settitle() { echo -ne "\e]2;$@\a\e]1;$@\a"; }
+ source ~/bin/functions
 
 # UTF-8
 #######
@@ -316,6 +317,7 @@ PATH=$PATH:/cygdrive/d/static/ant/bin
 PATH=$PATH:/cygdrive/c/Program\ Files\ \(x86\)/Beyond\ Compare\ 3/
 PATH=~/bin:$PATH
 PATH=$PATH:/cygdrive/c/HashiCorp/Vagrant/bin
+PATH=$PATH:/cygdrive/c/ProgramData/chocolatey/bin
 
 if [ -d "/cygdrive/d/static/tools" ] ; then
   PATH=/cygdrive/d/static/tools:$PATH
