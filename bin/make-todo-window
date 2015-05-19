@@ -1,10 +1,20 @@
 #!/bin/sh
 
-tmux new-window -n 'todo' 'exec nano ~/todos/FUTURE.md'
-tmux select-window -t todo:0
-# tmux send-keys 'exec nano ~/todos/FUTURE.md' 'C-m'
-tmux split-window -h 'exec nano ~/todos/TOMORROW.md'
-tmux split-window -h 'exec nano ~/todos/DOING.md'
-tmux split-window -h 'exec nano ~/todos/PENDING.md'
+folder="~/todos"
+name="todo"
+echo "parameter: $1"
+
+if [ ! "$1" == "" ]; then
+  folder="~/todos_$1"
+  name="todo_$1"
+fi
+
+echo "Creating window '$name' for todos in folder '$folder'"
+
+tmux new-window -n "$name" "exec nano $folder/FUTURE.md"
+tmux select-window -t "$name:0"
+tmux split-window -h "exec nano $folder/TOMORROW.md"
+tmux split-window -h "exec nano $folder/DOING.md"
+tmux split-window -h "exec nano $folder/PENDING.md"
 tmux select-layout even-horizontal
-tmux -2 attach-session -t todo
+#tmux -2 attach-session -t "$name"

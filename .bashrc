@@ -258,7 +258,10 @@ shopt -s histappend
  export PATH=$PATH:~/bin
 
 # custom environment variables
- source .ghi_token
+ source ~/.ghi_token
+# setup jenkins utility
+ source ~/bin/auto-jenkins.sh
+ setup-jenkins "https://ci.appian.com" "marcel.valdez" "Others"
  export TMPDIR=/tmp
 
  if [ "$(expr substr $(uname) 1 6)" == "CYGWIN" ]; then
@@ -267,6 +270,6 @@ shopt -s histappend
   alias apt-get='apt-cyg -m http://mirror.symnds.com/software/cygwin/x86_64/'
   alias multipane='tmux new -s CYGWIN'
   if [[ "$TERM" != "screen" ]]; then
-    tmux attach -d
+    tmux attach -d || tmux new-session
   fi
  fi
