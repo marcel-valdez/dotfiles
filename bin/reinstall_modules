@@ -1,0 +1,7 @@
+#!/bin/bash
+
+function reinstall_wireless() {
+  cd ~/modules/rtl8812AU_8821AU_linux
+  sudo make install
+  cd -
+}

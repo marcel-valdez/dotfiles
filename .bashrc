@@ -8,7 +8,9 @@ case $- in
       *) return;;
 esac
 
-source .bash_ssh
+source ~/.bash_ssh
+source ~/bin/functions
+source ~/bin/reinstall_modules
 
 # don't put duplicate lines or lines starting with space in the history.
 # See bash(1) for more options
