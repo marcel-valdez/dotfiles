@@ -1,9 +1,9 @@
-#!/bin/sh
+#!/bin/bash
 
 source ~/bin/functions
 
 tmux new-window -n 'todo' 'exec nano ~/todos/FUTURE.md'
-tmux select-window -t todo:0
+tmux select-window -t todo
 tmux split-window -h 'exec nano ~/todos/TOMORROW.md'
 tmux split-window -h 'exec nano ~/todos/DOING.md'
 tmux split-window -h 'exec nano ~/todos/PENDING.md'
