@@ -65,4 +65,4 @@ $endif
 
 $endif
 
-"\C-v": paste-from-clipboard
+"\C-V": paste-from-clipboard
