@@ -1,0 +1,66 @@
+#!/usr/bin/env ruby
+require 'yaml'
+require 'net/pop'
+require 'date'
+
+class String
+  def to_datetime
+    DateTime.parse(self)
+  end
+end
+
+class DateTime
+  def localize
+    self.new_offset(Time.now.getlocal.zone)
+  end
+end
+
+FIVE_MINUTES=60*5
+TEN_MINUTES=60*10
+DATA_FILE = 'mail-notify-data'
+PASS_FILE = '../res/mail-notify-password'
+USER_FILE = '../res/mail-notify-username'
+
+Dir.chdir(File.dirname(__FILE__))
+
+@password = File.open(PASS_FILE).read
+@username = File.open(USER_FILE).read
+
+@read_emails = []
+if File.exist? DATA_FILE
+  @read_emails = YAML::load(File.read(DATA_FILE))
+end
+
+def already_read?(mail)
+  @read_emails.include? mail.unique_id
+end
+
+def mark_read(mail)
+  @read_emails << mail.unique_id
+  File.write(DATA_FILE, YAML::dump(@read_emails))
+end
+
+while true
+  seconds_to_wait = FIVE_MINUTES
+  begin
+    pop = Net::POP3.new 'pop3.live.com', 995
+    pop.enable_ssl
+    pop.start @username, @password
+
+    if not pop.mails.empty?
+      begin
+        eval(File.open('mail-notify-impl').read)
+      rescue Exception => e
+        puts e
+      end
+    end
+
+    pop.finish
+  rescue Exception => e
+    seconds_to_wait = TEN_MINUTES
+    puts e
+    puts "Failure while trying to retrieve e-mails. Will retry in #{seconds_to_wait/60} minutes."
+  end
+
+  sleep(seconds_to_wait)
+end

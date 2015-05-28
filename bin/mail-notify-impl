@@ -1,0 +1,30 @@
+from_regx = /From: (.*)/
+subject_regx = /Subject: (.*)/
+date_regx = /Date: (.*)/
+date_format = "%b %d %I:%M %P"
+new_mail = false
+
+pop.mails.each do | mail |
+  if not already_read? mail
+    mark_read mail
+    header = mail.header
+    from = from_regx.match(header)[1]
+    subject = subject_regx.match(header)[1]
+    date = date_regx.match(header)[1].
+      to_datetime.
+      localize.
+      strftime(date_format)
+    puts "From: #{from}"
+    puts "Subject: #{subject}"
+    puts "Date: #{date}"
+    puts "********************"
+    `tmux rename-window -t${TMUX_PANE} "#{date}"`
+    new_mail = true
+  end
+end
+
+if new_mail
+  `beep`
+  `beep`
+  `beep`
+end
