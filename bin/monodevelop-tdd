@@ -1,0 +1,11 @@
+#/usr/bin/bash
+
+monodevelop &
+
+
+dir="$0"
+if [ -z "$0" ]; then
+  dir="."
+fi
+
+mightymoose $dir &
