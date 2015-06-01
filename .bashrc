@@ -127,4 +127,9 @@ fi
 
 export PATH="$PATH:$HOME/bin" # add local bin folder to path
 export PATH="$PATH:$HOME/.rvm/bin" # Add RVM to PATH for scripting
-export MONO_PATH="$MONO_PATH:/usr/bin/continuoustests"
+
+if [ -z "$MONO_PATH" ]; then
+  export MONO_PATH="/usr/bin/continuoustests";
+else
+  export MONO_PATH="$MONO_PATH:/usr/bin/continuoustests"
+fi
