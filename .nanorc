@@ -91,7 +91,8 @@ set multibuffer
 # set nonewlines
 
 ## Don't wrap text at all.
-# set nowrap
+set nowrap
+# Marcel: I disable this because it is horribly implemented in nano
 
 ## Set operating directory.  nano will not read or write files outside
 ## this directory and its subdirectories.  Also, the current directory
