@@ -103,7 +103,7 @@ alias alert='notify-send --urgency=low -i "$([ $? = 0 ] && echo terminal || echo
 # See /usr/share/doc/bash-doc/examples in the bash-doc package.
 
 if [ -f ~/.bash_aliases ]; then
-    . ~/.bash_aliases
+    source ~/.bash_aliases
 fi
 
 # enable programmable completion features (you don't need to enable
@@ -120,7 +120,7 @@ fi
 
 if [ "$(expr substr $(uname) 1 5)" == "Linux" ]; then
   export GIT_EDITOR=nano
-  if [ "$TERM" == "xterm" ]; then
+  if [ "$TERM" == "xterm" ] || [ "$TERM" == "linux" ]; then
     tmux attach
   fi
 fi
