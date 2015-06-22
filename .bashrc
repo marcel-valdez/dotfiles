@@ -65,7 +65,7 @@ if ! agent_is_running; then
 fi
 
 if ! agent_is_running; then
-    echo "Starting ssh-agent"
+    echo "Starting ssh-agent."
     agent_start
     ssh-add
 elif ! agent_has_keys; then
@@ -112,7 +112,7 @@ unset env
 #
 # Uncomment to turn on programmable completion enhancements.
 # Any completions you add in ~/.bash_completion are sourced last.
- echo "Loading BASH completions"
+ echo "Loading bash completions."
  [[ -f /etc/bash_completion ]] && . /etc/bash_completion
 
 # export GIT_PS1_SHOWDIRTYSTATE=1
