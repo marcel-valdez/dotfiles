@@ -2,7 +2,6 @@
 
 require 'timeout'
 require 'io/console'
-require 'iconv'
 
 
 if ARGV.length == 0
@@ -16,16 +15,12 @@ if ARGV.length == 0
 end
 
 class String
-  def converter
-    if @converter.nil?
-      @converter = Iconv.new('UTF-8//IGNORE', 'UTF-8')
-    end
-
-    @converter
+  def convert
+    self.encode("UTF-8", :invalid => :replace, :undef => :replace, :replace => "?")
   end
 
   def remove_non_utf8
-    converter.iconv(self)[0..-2]
+    convert[0..-2]
   end
 end
 
