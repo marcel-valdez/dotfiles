@@ -2,6 +2,8 @@
 *
 
 # Except
+!lib/
+!lib/*
 !.bash_aliases
 !.bash_functions
 !.bash_profile
