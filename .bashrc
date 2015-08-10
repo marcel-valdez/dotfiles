@@ -102,6 +102,10 @@ if [ -f ~/.bash_aliases ]; then
     . ~/.bash_aliases
 fi
 
+if [ -f ~/.bash_functions ]; then
+    . ~/.bash_functions
+fi
+
 # Custom environment variables
 export M2_HOME='/usr/share/maven'
 export ANT_HOME='/usr/share/ant'
