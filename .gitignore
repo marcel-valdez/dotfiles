@@ -1,0 +1,20 @@
+# Exclude all files
+*
+
+# Except
+!.bash_profile
+!.bashrc
+!.inputrc
+!.minttyrc
+!.nanorc
+!.tmux.conf
+!.viminfo
+!.vimrc
+!.gitignore
+!bin/
+!bin/*
+
+# But do Ignore nano backup files
+.*~
+*~
+

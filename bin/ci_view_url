@@ -1,0 +1,3 @@
+#!/bin/bash
+
+echo "https://ci.appian.com/view/marcelvaldez_`git rev-parse --abbrev-ref HEAD`_`git ls-remote --get-url origin | cut -d / -f 2 | cut -d . -f 1`/"

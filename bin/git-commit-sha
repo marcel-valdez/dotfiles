@@ -1,0 +1,4 @@
+#!/bin/bash
+
+skip=$(($1-1))
+git log  --skip=$skip -1 --oneline | cut -d' ' -f1

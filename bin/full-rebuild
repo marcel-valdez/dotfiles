@@ -1,0 +1,30 @@
+#!/bin/bash
+
+source ~/bin/lib/build-functions
+
+is_git_repo=`in_git_repo`;
+if [ ! "$is_git_repo" = "true" ]; then
+  echo "You are not in a git repository, cannot continue.";
+  exit 1;
+fi
+
+pending_changes=`git_pending_changes`;
+if [ ! "$pending_changes" = "" ]; then
+  echo "You have pending changes to stash or commit, cannot continue.";
+  echo $pending_changes;
+  exit 1;
+fi
+
+top_level_dir=`git_top_level`;
+exec-cmd "cd $top_level_dir";
+if [ ! -d "./build" ]; then
+  echo "There is no build directory for ant.";
+  exit 1;
+fi
+
+exec-cmd "git clean -dfx";
+exec-cmd "cd build";
+exec-cmd "ant dev";
+exec-cmd "ant start-k";
+exec-cmd "ant start-rdbms";
+exec-cmd "ant start-appserver";

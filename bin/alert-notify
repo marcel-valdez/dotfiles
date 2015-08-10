@@ -1,0 +1,15 @@
+#!/bin/bash
+
+cmd="$1 $2 $3 $4 $5 $6 $7 $8 $9"
+cmd_failed="$cmd FAILED"
+cmd_passed="$cmd PASSED"
+
+eval "$cmd"
+
+if [ $? -eq 0 ]; then
+  notify "$cmd_passed"
+  exit 0
+else
+  notify "$cmd_failed"
+  exit 1
+fi

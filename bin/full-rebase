@@ -1,0 +1,55 @@
+#!/bin/bash
+
+USAGE="Usage: full-rebase <remote repository name> <branch name>";
+remote_repo="$1";
+branch="$2";
+
+source ~/bin/lib/build-functions
+
+is_in_repo=`in_git_repo`;
+
+if [ ! "$is_in_repo" = "true" ]; then
+  echo "You are not in a git repository, cannot continue.";
+  exit 1;
+fi
+
+if [ "$remote_repo" = "" ]; then
+  echo "No remote repository specified.";
+  echo $USAGE;
+  echo "No rebase will be done.";
+fi
+
+if [ "$branch" = "" ]; then
+  echo "No branch specified.";
+  echo $USAGE;
+  echo "No rebase will be done.";
+fi
+
+git_top_level="$(git rev-parse --show-toplevel)";
+cd "$git_top_level";
+
+if [ ! -d "./build" ]; then
+  echo "There is no build directory for ant.";
+  exit 1;
+fi
+
+git_status=`git status --porcelain`;
+if [ ! "$git_status" = "" ]; then
+  echo "You have pending changes to stash or commit.";
+  echo $git_status;
+  exit 1;
+fi
+
+exec-cmd "git clean -dfx";
+
+if [ "$remote_repo" = "" ] || [ "$branch" = "" ]; then
+  echo "Not performing rebase, because no remote repository or branch was specified.";
+else
+  exec-cmd "git pull --no-ff --rebase $remote_repo $branch";
+fi
+
+exec-cmd "cd build";
+exec-cmd "ant";
+exec-cmd "ant start-k";
+exec-cmd "ant start-rdbms";
+exec-cmd "ant start-appserver";

@@ -1,0 +1,8 @@
+#!/bin/bash
+
+source ~/bin/lib/build-functions
+
+exec-cmd "ant";
+exec-cmd "ant start-k";
+exec-cmd "ant start-rdbms";
+exec-cmd "ant start-appserver";
