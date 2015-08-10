@@ -86,9 +86,9 @@ function git-checkout-quick ()
 
  function ae() {
   if [ "$(expr substr $(uname) 1 6)" == "CYGWIN" ]; then
-    cd "~/repositories/ae$1"
+    cd $HOME/repositories/ae$1
   else
-    cd "~/repositories/ae$1"
+    cd $HOME/repositories/ae$1
   fi
 
   if in_tmux; then
