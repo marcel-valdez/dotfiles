@@ -57,7 +57,17 @@ if [ -n "$force_color_prompt" ]; then
 fi
 
 if [ "$color_prompt" = yes ]; then
-    PS1='${debian_chroot:+($debian_chroot)}\[\033[01;32m\]\u@\h\[\033[00m\]:\[\033[01;34m\]\w\[\033[00m\]\$ '
+    #PS1='${debian_chroot:+($debian_chroot)}\[\033[01;32m\]\u@\h\[\033[00m\]:\[\033[01;34m\]${__git_ps1:+($__git_ps1)}\w\[\033[00m\]\$ '
+    PS1='\[\033[0m\]'
+    PS1="$PS1"'\[\033[32m\]'
+    PS1="$PS1"'\u@\h '
+    PS1="$PS1"'\[\033[33m\]'
+    PS1="$PS1"'\w'
+    # Add repository name + status to prompt
+    PS1="$PS1"'$(__git_ps1)'
+    PS1="$PS1"'\[\033[0m\]'
+    PS1="$PS1"'\n'
+    PS1="$PS1"'$ '
 else
     PS1='${debian_chroot:+($debian_chroot)}\u@\h:\w\$ '
 fi
