@@ -3,6 +3,7 @@
 
 # Except
 !.bash_functions
+!.bash_aliases
 !.bash_profile
 !.bashrc
 !.inputrc
