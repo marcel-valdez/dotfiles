@@ -15,6 +15,7 @@
 !.gitignore
 !bin/
 !bin/*
+!bin/lib/*
 
 # But do Ignore nano backup files
 .*~
