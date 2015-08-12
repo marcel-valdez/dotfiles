@@ -11,6 +11,7 @@ esac
 source ~/.bash_ssh
 source ~/bin/functions
 source ~/bin/reinstall_modules
+source ~/lib/git-prompt
 
 # don't put duplicate lines or lines starting with space in the history.
 # See bash(1) for more options
@@ -61,10 +62,15 @@ if [ -n "$force_color_prompt" ]; then
 fi
 
 if [ "$color_prompt" = yes ]; then
-    PS1='${debian_chroot:+($debian_chroot)}\[\033[01;32m\]\u@\h\[\033[00m\]:\[\033[01;34m\]\w\[\033[00m\]\$ '
+    PS1='${debian_chroot:+($debian_chroot)}\[\033[01;32m\]\u@\h\[\033[00m\]:\[\033[01;34m\]\w\[\033[00m\]'
 else
-    PS1='${debian_chroot:+($debian_chroot)}\u@\h:\w\$ '
+    PS1='${debian_chroot:+($debian_chroot)}\u@\h:\w'
 fi
+
+PS1="$PS1"'$(__git_ps1)'
+PS1="$PS1"'\n'
+PS1="$PS1"'\$ '
+
 unset color_prompt force_color_prompt
 
 # If this is an xterm set the title to user@host:dir
