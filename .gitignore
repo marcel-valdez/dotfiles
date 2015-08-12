@@ -13,6 +13,7 @@
 !.gitignore
 !bin/
 !bin/*
+bin/dex
 
 # Ignore nano backup files
 *~
