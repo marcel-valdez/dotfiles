@@ -249,8 +249,8 @@ bind ^H help main
 unbind ^O all
 bind ^S writeout all
 
-unbind ^M main
-bind ^M findbracket main
+unbind M-M main
+bind M-M findbracket main
 
 unbind M-z main
 bind M-z undo main
