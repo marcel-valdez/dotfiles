@@ -171,7 +171,7 @@ set tabstospaces
 # set wordbounds
 
 ## Enable the new (EXPERIMENTAL) generic undo code, not just for line cuts
-set undo
+# set undo
 
 ## Enable soft line wrapping (AKA full line display)
 # set softwrap
@@ -230,87 +230,102 @@ set undo
 
 bind M-, prevword all
 bind M-. nextword all
+
 unbind ^Space main
 bind ^Space mark all
+
 unbind M-C main
 bind M-C copytext main
+
 unbind M-V main
 bind M-V uncut main
+
 unbind M-X main
+bind M-X cut main
+
 unbind ^H main
 bind ^H help main
-bind M-X cut main
 
 unbind ^O all
 bind ^S writeout all
 
+unbind ^M main
+bind ^M findbracket main
+
+unbind M-z main
+bind M-z undo main
+
+unbind M-y main
+bind M-y redo main
 
 ## Set this if your backspace key sends delete most of the time (2.1.3+)
 # bind kdel backspace all
 
 
 ## Nanorc files
-include "/usr/share/nano/nanorc.nanorc"
+# include "/usr/share/nano/nanorc.nanorc"
 
 ## C/C++
-include "/usr/share/nano/c.nanorc"
+# include "/usr/share/nano/c.nanorc"
 
 ## Cascading Style Sheets
-include "/usr/share/nano/css.nanorc"
+# include "/usr/share/nano/css.nanorc"
 
 ## Debian files
-include "/usr/share/nano/debian.nanorc"
+# include "/usr/share/nano/debian.nanorc"
 
 ## Gentoo files
-include "/usr/share/nano/gentoo.nanorc"
+# include "/usr/share/nano/gentoo.nanorc"
 
 ## HTML
-include "/usr/share/nano/html.nanorc"
+# include "/usr/share/nano/html.nanorc"
 
 ## PHP
-include "/usr/share/nano/php.nanorc"
+# include "/usr/share/nano/php.nanorc"
 
 ## TCL
-include "/usr/share/nano/tcl.nanorc"
+# include "/usr/share/nano/tcl.nanorc"
 
 ## TeX
-include "/usr/share/nano/tex.nanorc"
+# include "/usr/share/nano/tex.nanorc"
 
 ## Quoted emails (under e.g. mutt)
-include "/usr/share/nano/mutt.nanorc"
+# include "/usr/share/nano/mutt.nanorc"
 
 ## Patch files
-include "/usr/share/nano/patch.nanorc"
+# include "/usr/share/nano/patch.nanorc"
 
 ## Manpages
-include "/usr/share/nano/man.nanorc"
+# include "/usr/share/nano/man.nanorc"
 
 ## Groff
-include "/usr/share/nano/groff.nanorc"
+# include "/usr/share/nano/groff.nanorc"
 
 ## Perl
-include "/usr/share/nano/perl.nanorc"
+# include "/usr/share/nano/perl.nanorc"
 
 ## Python
-include "/usr/share/nano/python.nanorc"
+#include "/usr/share/nano/python.nanorc"
 
 ## Ruby
-include "/usr/share/nano/ruby.nanorc"
+#include "/usr/share/nano/ruby.nanorc"
 
 ## Java
-include "/usr/share/nano/java.nanorc"
+#include "/usr/share/nano/java.nanorc"
 
 ## AWK
-include "/usr/share/nano/awk.nanorc"
+#include "/usr/share/nano/awk.nanorc"
 
 ## Assembler
-include "/usr/share/nano/asm.nanorc"
+#include "/usr/share/nano/asm.nanorc"
 
 ## Bourne shell scripts
-include "/usr/share/nano/sh.nanorc"
+#include "/usr/share/nano/sh.nanorc"
 
 ## POV-Ray
-include "/usr/share/nano/pov.nanorc"
+#include "/usr/share/nano/pov.nanorc"
 
 ## XML-type files
-include "/usr/share/nano/xml.nanorc"
+#include "/usr/share/nano/xml.nanorc"
+
+include "/home/marcel/.nano/syntax/ALL.nanorc"
