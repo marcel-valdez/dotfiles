@@ -231,8 +231,8 @@ set tabstospaces
 bind M-, prevword all
 bind M-. nextword all
 
-unbind ^Space main
-bind ^Space mark all
+unbind ^\ main
+bind ^\ mark main
 
 unbind M-C main
 bind M-C copytext main
