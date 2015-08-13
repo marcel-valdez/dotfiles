@@ -48,6 +48,7 @@ else
   exec-cmd "git pull --no-ff --rebase $remote_repo $branch";
 fi
 
+exec-cmd "appian-clean-db";
 exec-cmd "cd build";
 exec-cmd "ant";
 exec-cmd "ant start-k";

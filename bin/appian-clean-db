@@ -1,0 +1,3 @@
+#!/usr/bin/env bash
+
+mysql -u root < /home/marcel/res/drop-appian-db.sql

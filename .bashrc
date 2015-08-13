@@ -140,3 +140,5 @@ if [ "$(expr substr $(uname) 1 5)" == "Linux" ]; then
     tmux attach
   fi
 fi
+
+export PATH="$PATH:$HOME/.rvm/bin" # Add RVM to PATH for scripting
