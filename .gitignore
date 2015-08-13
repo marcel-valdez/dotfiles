@@ -17,6 +17,8 @@
 !.gitignore
 !bin/
 !bin/*
+!.fluxbox/keys
+!.fluxbox/startup
 
 # But do Ignore nano backup files
 .*~
