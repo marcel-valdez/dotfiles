@@ -35,6 +35,7 @@ sleep 1
   synapse -s  > /home/marcel/.logs/synapse-fluxbox.log 2>&1 &
   /home/marcel/.screenlayout/dual-monitor.sh > /home/marcel/.logs/xrandr.log 2>&1 &
   /usr/bin/xscreensaver -no-splash > /home/marcel/.logs/xscreensaver.log 2>&1 &
+  /usr/bin/volumeicon > /home/marcel/.logs/volumeicon.log 2>&1 &
 } &
 
 wait $fbpid
