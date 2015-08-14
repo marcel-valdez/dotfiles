@@ -71,12 +71,9 @@ Mod1 F2 :Exec fbrun
 
 # volume settings, using common keycodes
 # if these don't work, use xev to find out your real keycodes
-#176 :Exec amixer sset Master,0 1+
-Mod1 Ctrl 5 :Exec amixer sset Master,0 1+
-#174 :Exec amixer sset Master,0 1-
-Mod1 Ctrl 4 :Exec amixer sset Master,0 1-
-#160 :Exec amixer sset Master,0 toggle
-Mod1 Ctrl 6 :Exec amixer sset Master,0 toggle
+Ctrl Mod1 4 :Exec decrease-volume
+Ctrl Mod1 5 :Exec increase-volume
+Ctrl Mod1 6 :Exec mute-volume
 
 # current window commands
 Mod1 F4 :Close
