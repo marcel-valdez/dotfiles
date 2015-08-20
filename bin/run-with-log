@@ -1,0 +1,19 @@
+#!/usr/bin/env bash
+
+program="$1"
+program_filename=$(basename "$program")
+program_exists=$(type -f "$program" >/dev/null 2>&1 || echo "false")
+
+if [ "$program_exists" = "false" ]; then
+  full_path_to_program=$(pwd)/"$program"
+  full_path_exists=$(type -f "$full_path_to_program" >/dev/null 2>&1 || echo "false")
+  if [ "$full_path_exists" = "false" ]; then
+    echo "A program called: <$program> does not exist."
+    exit 1;
+  fi
+
+  $full_path_to_program $2 $3 $4 $5 $6 $7 $8 $9 > "$HOME/.logs/$program_filename.log" 2>&1 &
+else
+  $("$program $2 $3 $4 $5 $6 $7 $8 $9") > "$HOME/.logs/$program_filename.log" 2>&1 &
+fi
+
