@@ -22,9 +22,9 @@ if type continuous_file_listener | grep -q " is " 2>/dev/null; then
     pending_html=`readlink -f ~/todos/PENDING.html`
 
     echo "Executing file listeners."
-    continuous_file_listener $future markdown_to_html $future $future_html &
-    continuous_file_listener $tomorrow markdown_to_html $tomorrow $tomorrow_html &
-    continuous_file_listener $doing markdown_to_html $doing $doing_html &
-    continuous_file_listener $pending markdown_to_html $pending $pending_html &
+    continuous_file_listener $future markdown_to_html $future $future_html > ~/logs/future.todo.log 2>&1  &
+    continuous_file_listener $tomorrow markdown_to_html $tomorrow $tomorrow_html > ~/logs/tomorrow.todo.log 2>&1  &
+    continuous_file_listener $doing markdown_to_html $doing $doing_html > ~/logs/doing.todo.log 2>&1  &
+    continuous_file_listener $pending markdown_to_html $pending $pending_html > ~/logs/pending.todo.log 2>&1 &
   fi
 fi
