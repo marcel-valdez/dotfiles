@@ -32,10 +32,19 @@ fbpid=$!
 # exec fluxbox -log "/home/marcel/.fluxbox/log"
 sleep 1
 {
-  synapse -s  > /home/marcel/.logs/synapse-fluxbox.log 2>&1 &
+  # TODO: only execute if synapse is installed
+  /usr/bin/synapse -s > /home/marcel/.logs/synapse-fluxbox.log 2>&1 &
+  # TODO: only execute if script exists
   /home/marcel/.screenlayout/dual-monitor.sh > /home/marcel/.logs/xrandr.log 2>&1 &
+  # TODO: only execute if xscreensaver is installed
   /usr/bin/xscreensaver -no-splash > /home/marcel/.logs/xscreensaver.log 2>&1 &
+  # TODO: only execute if volumeicon is installed
   /usr/bin/volumeicon > /home/marcel/.logs/volumeicon.log 2>&1 &
+  /usr/bin/nm-applet > /home/marcel/.logs/nm-applet.log 2>&1 &
+  # TODO: only execute if dropbox is installed
+  /usr/bin/dropbox start > /home/marcel/.logs/dropbox.log 2>&1 &
 } &
 
 wait $fbpid
+
+/usr/bin/dropbox stop
