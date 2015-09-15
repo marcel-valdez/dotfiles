@@ -1,0 +1,8 @@
+#!/usr/bin/env bash
+
+# clean mysql directly
+appian-clean-db
+# execute equivalent ant script
+ant clean-rdbms
+# re-initialize rdbms
+ant rdbms
