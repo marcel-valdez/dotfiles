@@ -1,4 +1,4 @@
 #!/usr/bin/env bash
 
 to_copy="$1 $2 $3 $4 $5 $6 $7 $8 $9"
-echo -n $to_copy | clip
+echo -n $to_copy | xclip -sel clip
