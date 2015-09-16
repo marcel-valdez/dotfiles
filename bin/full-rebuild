@@ -22,7 +22,7 @@ if [ ! -d "./build" ]; then
   exit 1;
 fi
 
-exec-cmd "git clean -dfx";
+exec-cmd "git-clean-dfx";
 exec-cmd "appian-clean-db";
 exec-cmd "cd build";
 exec-cmd "ant dev";

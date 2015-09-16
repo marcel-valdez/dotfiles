@@ -1,0 +1,13 @@
+#!/usr/bin/env bash
+
+
+source ~/bin/lib/build-functions
+
+rand=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 32 | head -n 1)
+if [ -e "./.idea" ]; then
+  exec-cmd "cp -r .idea /tmp/$rand"
+  exec-cmd "git clean -dfx"
+  exec-cmd "cp -r /tmp/$rand .idea"
+else
+  exec-cmd "git clean -dfx"
+fi

@@ -40,7 +40,7 @@ if [ ! "$git_status" = "" ]; then
   exit 1;
 fi
 
-exec-cmd "git clean -dfx";
+exec-cmd "git-clean-dfx";
 
 if [ "$remote_repo" = "" ] || [ "$branch" = "" ]; then
   echo "Not performing rebase, because no remote repository or branch was specified.";
