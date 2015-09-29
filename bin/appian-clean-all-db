@@ -1,0 +1,9 @@
+#!/usr/bin/env bash
+
+source "/home/marcel/bin/lib/build-functions"
+exec-cmd "ant clean-rdbms"
+exec-cmd "appian-clean-db"
+exec-cmd "ant rdbms"
+exec-cmd "ant stop-k"
+exec-cmd "appian-kill-k-procs"
+exec-cmd "ant clean-k"
