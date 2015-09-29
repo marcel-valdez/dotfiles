@@ -1,13 +1,40 @@
 #!/usr/bin/env bash
 
+# This script executes git clean -dfx but maintains all IDEA project files intact.
+# The way it does this by copying the .idea files and the .iml files to temporary
+# folders /tmp/<random string>/ and then it executes git clean -dfx, after that,
+# it copies back all the files in the temporary folders back to the repository.
+#
+# If copying back all the files does not succeed, then the temporary folders are
+# not deleted (so you can do something about it manually).
 
 source ~/bin/lib/build-functions
 
-rand=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 32 | head -n 1)
-if [ -e "./.idea" ]; then
-  exec-cmd "cp -r .idea /tmp/$rand"
-  exec-cmd "git clean -dfx"
-  exec-cmd "cp -r /tmp/$rand .idea"
-else
-  exec-cmd "git clean -dfx"
+function _random_word() {
+  eval "$1=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 32 | head -n 1)";
+};
+
+idea_tmp_folder='';
+iml_tmp_folder='';
+idea_was_found=$(ls -d .idea 1>/dev/null 2>&1 && echo "true")
+repo_dir=$(pwd)
+
+if [ $idea_was_found == "true" ]; then
+  _random_word "idea_tmp_folder";
+  exec-cmd "cp -r .idea /tmp/$idea_tmp_folder"
+
+  _random_word "iml_tmp_folder";
+  exec-cmd "find . -name '*.iml' | cpio -pdm /tmp/$iml_tmp_folder"
 fi
+
+exec-cmd "git clean -dfx"
+
+if [ "$idea_was_found" == "true" ]; then
+  # only deletes the temporary folder if all files were successfully copied
+
+  exec-cmd "cp -r /tmp/$idea_tmp_folder .idea && rm -fr /tmp/$idea_tmp_folder"
+  exec-cmd "cd /tmp/$iml_tmp_folder"
+  exec-cmd "find . -name '*.iml' | cpio -pdm $repo_dir && rm -fr /tmp/$iml_tmp_folder"
+  exec-cmd "cd $repo_dir"
+fi
+
