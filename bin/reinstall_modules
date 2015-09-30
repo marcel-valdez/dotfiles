@@ -2,6 +2,8 @@
 
 function reinstall_wireless() {
   cd ~/modules/rtl8812AU_8821AU_linux
+  make
   sudo make install
+  sudo modprobe 8812au
   cd -
 }
