@@ -26,23 +26,62 @@ fi
 # And last but not least we start fluxbox.
 # Because it is the last app you have to run it with ''exec'' before it.
 
+# Create .logs directory if it does not exist
+if [ -d "/home/marcel/.logs" ]; then
+  mkdir /home/marcel/.logs
+fi
+
 fluxbox &
 fbpid=$!
 # or if you want to keep a log:
 # exec fluxbox -log "/home/marcel/.fluxbox/log"
 sleep 1
 {
-  # TODO: only execute if synapse is installed
-  /usr/bin/synapse -s > /home/marcel/.logs/synapse-fluxbox.log 2>&1 &
-  # TODO: only execute if script exists
-  /home/marcel/.screenlayout/dual-monitor.sh > /home/marcel/.logs/xrandr.log 2>&1 &
-  # TODO: only execute if xscreensaver is installed
-  /usr/bin/xscreensaver -no-splash > /home/marcel/.logs/xscreensaver.log 2>&1 &
-  # TODO: only execute if volumeicon is installed
-  /usr/bin/volumeicon > /home/marcel/.logs/volumeicon.log 2>&1 &
-  /usr/bin/nm-applet > /home/marcel/.logs/nm-applet.log 2>&1 &
-  # TODO: only execute if dropbox is installed
-  /usr/bin/dropbox start > /home/marcel/.logs/dropbox.log 2>&1 &
+
+  echo "" > /home/marcel/.logs/fluxbox.startup.log
+
+  if [ -f "/usr/bin/synapse" ]; then
+    /usr/bin/synapse -s > /home/marcel/.logs/synapse-fluxbox.log 2>&1 &
+  else
+   echo "To enable a GUI command start dialog install synapse" >> /home/marcel/.logs/fluxbox.startup.log
+  fi
+
+  if [ -f "/home/marcel/.screenlayout/dual-monitor.sh" ]; then
+    /home/marcel/.screenlayout/dual-monitor.sh > /home/marcel/.logs/xrandr.log 2>&1 &
+  else
+   echo "To enable dual monitors install xrandr and download the dual-monitor.sh script and put it in ~/.screenlayout/dual-monitor.sh." >> /home/marcel/.logs/fluxbox.startup.log
+  fi
+
+  if [ -f "/usr/bin/xscreensaver" ]; then
+    /usr/bin/xscreensaver -no-splash > /home/marcel/.logs/xscreensaver.log 2>&1 &
+  else
+   echo "To enable a screensaver, install xscreensaver." >> /home/marcel/.logs/fluxbox.startup.log
+  fi
+
+  if [ -f "/usr/bin/volumeicon" ]; then
+    /usr/bin/volumeicon > /home/marcel/.logs/volumeicon.log 2>&1 &
+  else
+   echo "To enable a volume indicator, install volumeicon." >> /home/marcel/.logs/fluxbox.startup.log
+  fi
+
+  if [ -f "/usr/bin/nm-applet" ]; then
+    /usr/bin/nm-applet > /home/marcel/.logs/nm-applet.log 2>&1 &
+  else
+   echo "To enable a network manager indicator, install nm-applet." >> /home/marcel/.logs/fluxbox.startup.log
+  fi
+
+  if [ -f "/usr/bin/dropbox" ]; then
+    /usr/bin/dropbox start > /home/marcel/.logs/dropbox.log 2>&1 &
+  else
+   echo "To enable dropbox, install the dropbox daemon." >> /home/marcel/.logs/fluxbox.startup.log
+  fi
+
+  if [ -f "/usr/bin/hipchat" ]; then
+    /usr/bin/hipchat > /home/marcel/.logs/hipchat.log 2>&1 &
+  else
+   echo "To enable hipchat, install the hipchat application." >> /home/marcel/.logs/fluxbox.startup.log
+  fi
+
 } &
 
 wait $fbpid
