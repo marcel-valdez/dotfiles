@@ -49,8 +49,7 @@ else
 fi
 
 exec-cmd "appian-clean-db";
-exec-cmd "cd build";
-exec-cmd "ant";
+exec-cmd "cd build && ant";
 exec-cmd "ant start-k";
 exec-cmd "ant start-rdbms";
 exec-cmd "ant start-appserver";
