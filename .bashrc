@@ -145,3 +145,7 @@ if [ "$(expr substr $(uname) 1 5)" == "Linux" ]; then
 fi
 
 export PATH="$PATH:$HOME/.rvm/bin" # Add RVM to PATH for scripting
+export J2D_PIXMAPS="shared"
+
+export NVM_DIR="/home/marcel/.nvm"
+[ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"  # This loads nvm
