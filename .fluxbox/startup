@@ -52,11 +52,11 @@ sleep 1
    echo "To enable dual monitors install xrandr and download the dual-monitor.sh script and put it in ~/.screenlayout/dual-monitor.sh." >> /home/marcel/.logs/fluxbox.startup.log
   fi
 
-  if [ -f "/usr/bin/xscreensaver" ]; then
-    /usr/bin/xscreensaver -no-splash > /home/marcel/.logs/xscreensaver.log 2>&1 &
-  else
-   echo "To enable a screensaver, install xscreensaver." >> /home/marcel/.logs/fluxbox.startup.log
-  fi
+#  if [ -f "/usr/bin/xscreensaver" ]; then
+#    /usr/bin/xscreensaver -no-splash > /home/marcel/.logs/xscreensaver.log 2>&1 &
+#  else
+#   echo "To enable a screensaver, install xscreensaver." >> /home/marcel/.logs/fluxbox.startup.log
+#  fi
 
   if [ -f "/usr/bin/volumeicon" ]; then
     /usr/bin/volumeicon > /home/marcel/.logs/volumeicon.log 2>&1 &
@@ -82,6 +82,17 @@ sleep 1
    echo "To enable hipchat, install the hipchat application." >> /home/marcel/.logs/fluxbox.startup.log
   fi
 
+  if [ -f "/opt/google/chrome/chrome" ]; then
+    /opt/google/chrome/chrome > /home/marcel/.logs/hipchat.log 2>&1 &
+  else
+    echo "To enable chrome, install the chrome application." >> /home/marcel/.logs/fluxbox.startup.log
+  fi
+
+  if [ -f "/usr/bin/gnome-terminal" ]; then
+    /usr/bin/gnome-terminal > /home/marcel/.logs/gnome-terminal.log 2>&1 &
+  else
+    echo "To enable a gnome-terminal, install the gnome-terminal." >> /hom/marcel/.logs/fluxbox.startup.log
+  fi
 } &
 
 wait $fbpid
