@@ -23,12 +23,12 @@ agent_has_keys() {
 }
 
 agent_load_env() {
-  $HOME "$env" > /dev/null
+  source "$env" > /dev/null
 }
 
 agent_start() {
   (umask 077; ssh-agent > "$env")
-  $HOME "$env" > /dev/null
+  source "$env" > /dev/null
 }
 
 if ! agent_is_running; then
