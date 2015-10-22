@@ -36,4 +36,4 @@ alias webserver='python -m SimpleHTTPServer'
 alias wget_appian='wget_page http://localhost:8080/ae/tempo'
 alias wget_page='wget -q -O -'
 alias appian-openvpn='sudo openvpn --script-security 2 --up /etc/openvpn/openvpn-dns --down /etc/openvpn/openvpn-dns --config ~/.openvpn/client.ovpn'
-alias copy-to-clip='xclip -sel clip'
+alias copy-to-clip="perl -pe 'chomp if eof' | xclip -sel clip"
