@@ -89,8 +89,8 @@ Ctrl Mod1 5 :Exec increase-volume
 Ctrl Mod1 6 :Exec mute-volume
 
 # current window commands
-Mod1 F4 :Close
-Mod1 F5 :Kill
+Mod1 4 :Close
+Mod1 5 :Kill
 #Mod1 F9 :Minimize
 Mod4 Prior :Maximize
 #Mod1 F10 :Maximize
