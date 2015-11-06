@@ -23,8 +23,9 @@ if [ ! -d "./build" ]; then
 fi
 
 exec-cmd "git-clean-dfx";
+exec-cmd "cd build"
 exec-cmd "appian-clean-all-db";
-exec-cmd "cd build && ant dev";
+exec-cmd "ant dev";
 exec-cmd "ant start-k";
 exec-cmd "ant start-rdbms";
 exec-cmd "ant start-appserver";
