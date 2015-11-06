@@ -18,13 +18,13 @@ def exec_command(command)
   end
 end
 
-def get_custom_command(qualified_name)
+def get_custom_command(qualified_name, env_options)
   class_path = qualified_name.gsub!('.', '/')
-  "ant quicktest  #{RDBMS_OPTION} #{CUSTOM_OPTION} #{CUSTOM_PATTERN_OPTION}=#{class_path}.java"
+  "ant quicktest #{env_options} #{RDBMS_OPTION} #{CUSTOM_OPTION} #{CUSTOM_PATTERN_OPTION}=#{class_path}.java"
 end
 
-def get_framework_command(framework)
-  "ant quicktest  #{RDBMS_OPTION} #{FRAMEWORK_OPTION}=#{framework}"
+def get_framework_command(framework, env_options)
+  "ant quicktest #{env_options} #{RDBMS_OPTION} #{FRAMEWORK_OPTION}=#{framework}"
 end
 
 options = {}
@@ -43,10 +43,22 @@ OptionParser.new do |cmd_options|
     "Run a specific class. Example: --class com.appiancorp.expressions.PluginExpressionTest") do |option|
     options[:klass] = option
   end
+
+  cmd_options.on(
+    "-D",
+    "-D[OPTION]",
+    "Add options to the JVM. Example: -Dped.output.dir=/path/") do |option|
+    options[:env] = option
+  end
 end.parse!
 
+env_options = ""
+if not options[:env].nil?
+  env_options = "-D#{options[:env]}"
+end
+
 if not options[:framework].nil?
-  exec_command get_framework_command(options[:framework])
+  exec_command get_framework_command(options[:framework], env_options)
 elsif not options[:klass].nil?
-  exec_command get_custom_command(options[:klass])
+  exec_command get_custom_command(options[:klass], env_options)
 end
