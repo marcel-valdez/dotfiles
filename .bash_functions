@@ -91,10 +91,17 @@ function git-checkout-quick ()
     cd $HOME/repositories/ae$1
   fi
 
-  if in_tmux; then
-    tmux rename-window `git-current-branch`
-  fi
+  tmux-title-git-branch
+ }
 
+ function tmux-title-git-branch() {
+   tmux-title $(git-current-branch | cut -c1-15)
+ }
+
+ function tmux-title() {
+    if in_tmux; then
+      tmux rename-window $1;
+    fi
  }
 
  function in_tmux() {
@@ -106,8 +113,8 @@ function git-checkout-quick ()
  }
 
  function in_git_repo() {
-   git rev-parse > /dev/null 2>&1 && echo true
-   return 0
+   git rev-parse > /dev/null 2>&1 && echo true;
+   return 0;
  }
 
  function merge-with-appian() {
