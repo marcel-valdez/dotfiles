@@ -1,0 +1,10 @@
+#!/usr/bin/env bash
+
+AE=$(pwd | grep -oE "$HOME/repositories/ae[0-9]?" | grep -Eo ae[0-9]?$)
+
+if [ "$AE" == "" ]; then
+  echo Did not find the root ae directory, are you in an appian repository?
+  exit 1;
+fi
+
+read-log "$HOME/repositories/$AE/bin/jboss/jboss-eap-6.4/standalone/log/server.log" "notify-send \"Appian Server Error ($AE)\""

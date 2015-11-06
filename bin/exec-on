@@ -5,12 +5,14 @@ require 'io/console'
 
 
 if ARGV.length == 0
- puts "alert-on is a utility that receives piped input text and alerts when a"
- puts "given pattern is found."
- puts "Usage: cat my.log | alert-on (regular expression) [command on match]"
- puts "If no command on match is specified, this utility will try to execute 'echo' on the shell."
- puts "If a command is specified on match, this utility will call the command and send it"
- puts "the line that matched the regular expression as its single input."
+ puts "exec-on is a utility that receives piped input text and executes a"
+ puts "command when given pattern is matched."
+ puts "Usage: cat my.log | exec-on (regular expression) [command on match]"
+ puts "If no command on match is specified, this utility will just highlight"
+ puts "matched text on the shell."
+ puts "If a command is specified on match, this utility will call the command"
+ puts "and send it the line that matched the regular expression as its single"
+ puts "input."
  exit(1)
 end
 
@@ -24,22 +26,23 @@ class String
   end
 end
 
+# Highlights the line with a black background and yellow foreground
 def highlight(line)
-"--------------------------------------------------------------------------------------------------------\n
-#{line}
----------------------------------------------------------------------------------------------------------"
+  "\e[1;33;40m#{line}\e[0m"
 end
 
 pattern=Regexp.new(ARGV.shift)
-command = 'echo'
+command = nil
 command = ARGV.shift unless ARGV.first.nil?
 ARGF.each_line do |line|
   line = line.remove_non_utf8
   if pattern.match line
     puts highlight line
-    begin
-      system "#{command} '#{line}'"
-    rescue
+    unless command.nil?
+      begin
+        system "#{command} '#{line}'"
+      rescue
+      end
     end
   else
     puts line
