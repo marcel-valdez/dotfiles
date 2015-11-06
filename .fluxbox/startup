@@ -91,7 +91,7 @@ sleep 1
   if [ -f "/usr/bin/gnome-terminal" ]; then
     /usr/bin/gnome-terminal > /home/marcel/.logs/gnome-terminal.log 2>&1 &
   else
-    echo "To enable a gnome-terminal, install the gnome-terminal." >> /hom/marcel/.logs/fluxbox.startup.log
+    echo "To enable a gnome-terminal, install the gnome-terminal." >> /home/marcel/.logs/fluxbox.startup.log
   fi
 } &
 
