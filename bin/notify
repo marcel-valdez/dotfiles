@@ -6,8 +6,10 @@ if ARGV.size < 2
   exit 1
 end
 
+now = Time.now
+time = "#{now.hour}:#{now.min}:#{now.sec}"
 title = ARGV[0]
-message = ARGV[1]
+message = "Sent @ #{time}\n#{ARGV[1]}"
 
 cmd = "notify-send '#{title}' '#{message}'"
 # favor GNTP over notify-send
