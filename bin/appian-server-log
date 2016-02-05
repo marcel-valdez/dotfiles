@@ -7,4 +7,4 @@ if [ "$AE" == "" ]; then
   exit 1;
 fi
 
-read-log "$HOME/repositories/$AE/bin/jboss/jboss-eap-6.4/standalone/log/server.log" "notify-send \"Appian Server Error ($AE)\""
+read-log "$HOME/repositories/$AE/bin/jboss/jboss-eap-6.4/standalone/log/server.log" "notify \"Appian Server LOG ($AE)\""

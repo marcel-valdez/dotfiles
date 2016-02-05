@@ -1,3 +1,4 @@
 #!/usr/bin/env bash
 
-tail -f -n 3000 "$1" | exec-on '.* ERROR .*' "$2"
+# TODO: Last line is not read if piped twice
+tail -f -n 3000 "$1" | exec-on '.* ERROR .*' red "$2" # | exec-on '.* WARN .*' yellow "$2"
