@@ -4,7 +4,7 @@ require 'optparse'
 
 SUCCESS=0
 FAILURE=1
-RDBMS_OPTION = "-Dapn.conf.data.primary.datasource=AppianPrimaryDS"
+RDBMS_OPTION = "-Dapn.conf.data.APPIAN_DATA_SOURCE=AppianPrimaryDS"
 CUSTOM_OPTION = "-DTEST_TYPE=custom"
 CUSTOM_PATTERN_OPTION = "-Denv.CUSTOM_TEST_PATTERN"
 FRAMEWORK_OPTION = "-DTEST_TYPE"
