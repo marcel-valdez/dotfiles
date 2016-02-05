@@ -1,0 +1,6 @@
+#!/bin/bash
+
+filename=$(basename $1)
+
+
+xdg-open "$*" & > "/tmp/$filename.open-file.log" 2>&1
