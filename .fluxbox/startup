@@ -3,7 +3,6 @@
 # fluxbox startup-script:
 #
 # Lines starting with a '#' are ignored.
-
 # Change your keymap:
 xmodmap "/home/marcel/.Xmodmap"
 
@@ -31,6 +30,9 @@ if [ -d "/home/marcel/.logs" ]; then
   mkdir /home/marcel/.logs
 fi
 
+# TODO: It may be appropriate to put initialization in .xinitrc
+#       so that these initializations work on any window manager
+
 fluxbox &
 fbpid=$!
 # or if you want to keep a log:
@@ -56,6 +58,13 @@ sleep 1
 #    /usr/bin/xscreensaver -no-splash > /home/marcel/.logs/xscreensaver.log 2>&1 &
 #  else
 #   echo "To enable a screensaver, install xscreensaver." >> /home/marcel/.logs/fluxbox.startup.log
+#  fi
+
+# The gnome notification-daemon has issues with fluxbox
+#  if [ -f "/usr/lib/notification-daemon/notification-daemon" ]; then
+#    /usr/lib/notification-daemon/notification-daemon > /home/marcel/.logs/notification-daemon.log 2>&1 &
+#  else
+#    echo "To enable notification-daemon, install notification-daemon." >> /home/marcel/.logs/fluxbox.startup.log
 #  fi
 
   if [ -f "/usr/bin/volumeicon" ]; then
@@ -93,6 +102,13 @@ sleep 1
   else
     echo "To enable a gnome-terminal, install the gnome-terminal." >> /home/marcel/.logs/fluxbox.startup.log
   fi
+
+  if [ -f "/usr/bin/gol" ]; then
+    /usr/bin/gol > /home/marcel/.logs/gol.log 2>&1 &
+  else
+    echo "To enable growl on linux (gol), install the growl-for-linux => http://mattn.github.io/growl-for-linux/." >> /home/marcel/.logs/fluxbox.startup.log
+  fi
+
 } &
 
 wait $fbpid
