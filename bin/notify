@@ -1,11 +1,18 @@
 #!/usr/bin/env ruby
 
-if ARGV.size == 0
-  puts 'Message must be specified.'
-  return 1
+if ARGV.size < 2
+  puts 'Title and message must be specified. Usage:'
+  puts '  notify title message'
+  exit 1
 end
 
-message = ARGV.first
+title = ARGV[0]
+message = ARGV[1]
 
-cmd = "notify-send '#{message}'"
+cmd = "notify-send '#{title}' '#{message}'"
+# favor GNTP over notify-send
+if File.exists?("/usr/bin/gntp-send")
+  cmd = "gntp-send -s localhost '#{title}' '#{message}'"
+end
+
 `#{cmd}`
