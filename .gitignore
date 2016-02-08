@@ -15,6 +15,8 @@
 !.viminfo
 !.vimrc
 !.gitignore
+!.XCompose
+!.Xmodmap
 !bin/
 !bin/*
 !.fluxbox/keys
