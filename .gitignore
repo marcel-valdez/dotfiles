@@ -19,3 +19,4 @@ bin/dex
 # Ignore nano backup files
 *~
 bin/mail-notify-data
+*.swp
