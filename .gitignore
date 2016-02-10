@@ -19,10 +19,15 @@
 !.Xmodmap
 !bin/
 !bin/*
+bin/dex
+bin/mail-notify-data
+
+*.pyc
 !.fluxbox/keys
 !.fluxbox/startup
 
 # But do Ignore nano backup files
 .*~
 *~
+*.swp
 
