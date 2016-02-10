@@ -123,11 +123,29 @@ if ! shopt -oq posix; then
   fi
 fi
 
+initialize_session() {
+  # Put commands that should execute once per tmux session here
+  # normally there is one tmux session per each system restart
+
+  # WINE settings
+  # set to use wine simulating Windows 64-bit by default
+  . ~/bin/wine-use-win64
+  # uncomment to use wine simulating Windows 32-bit
+  # . ~/bin/wine-use-win32
+}
 
 if [ "$(expr substr $(uname) 1 5)" == "Linux" ]; then
   export GIT_EDITOR=nano
   if [ "$TERM" == "xterm" ] || [ "$TERM" == "linux" ]; then
+    # if the default-session has not been created, then initialize this terminal session
+    tmux has-session -t "default-session" || initialize_session
+
+    # this will make the terminal attach to an existing tmux session or create one
     tmux attach
+  else
+    # A new TMUX pane was created
+    __ignore__=1
+    # put commands here that should execute with every opened pane
   fi
 fi
 
