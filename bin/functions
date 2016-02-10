@@ -1,2 +1,13 @@
 #!/bin/bash
 
+forecast() {
+  curl -s "http://api.wunderground.com/auto/wui/geo/ForecastXML/index.xml?query=${@:-20171}"| perl -ne '/<title>([^<]+)/&&printf "%s: ",$1;/<fcttext>([^<]+)/&&print $1,"\n"';
+}
+
+weather() {
+ _weather_URL='http://www.accuweather.com/en/us/herndon-va/20171/weather-forecast/341237'
+ wget -q -O- "$_weather_URL" | awk -F\{ '/acm_RecentLocationsCarousel\.push/{print $2}' | head -1 | awk -F\: '{print $2 $3 $7 $8 $9 $10}' | awk -F\' '{print $6"°"$4" "$10". Feels like: "$8"°"$4 ". "$1 ": "$2}'
+# DEBUG WITH:
+# awk -F\: '{print "1:"$1 " 2:"$2 " 3:"$3 " 4:"$4 " 5:"$5 " 6:"$6 " 7:"$7 " 8:"$8 " 9:"$9 " 10:"$10 " 11:"$11 " 12:"$12 " 13:"$13 " 14:"$14 " 15:"$15 " 16:"$16}'
+}
+
