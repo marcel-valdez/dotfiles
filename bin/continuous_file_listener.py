@@ -8,11 +8,17 @@ from continuous_file_executor import *
 
 def execute_command(command, exec_state, output):
   try:
-    command_output = os.popen(command)
-    last_char = command_output.read(1)
+    (cmd_stdin, cmd_stdout, cmd_stderror) = os.popen3(command)
+    last_char = cmd_stdout.read(1)
     while last_char != '':
       output.write(last_char)
-      last_char = command_output.read(1)
+      last_char = cmd_stdout.read(1)
+
+    last_char = cmd_stderror.read(1)
+    while last_char != '':
+      output.write(last_char)
+      last_char = cmd_stderror.read(1)
+
   except Exception, e:
     print "Error while executing command: " + ' '.join(map(str, command))
     print "Details: " + str(e)
