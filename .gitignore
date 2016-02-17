@@ -2,6 +2,7 @@
 *
 
 # Except
+!.bash_aliases
 !.bash_profle
 !.bashrc
 !.inputrc
