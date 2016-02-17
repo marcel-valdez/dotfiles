@@ -138,3 +138,6 @@ export GIT_EDITOR=nano
 if [[ "$TERM" != "screen" ]]; then
   tmux attach
 fi
+
+export NVM_DIR="/home/marcel/.nvm"
+[ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"  # This loads nvm
