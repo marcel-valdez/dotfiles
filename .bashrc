@@ -157,4 +157,4 @@ export PATH="$PATH:$HOME/bin" # add local bin folder to path
 export PATH="$PATH:$HOME/.rvm/bin" # Add RVM to PATH for scripting
 
 export NVM_DIR="/home/marcel/.nvm"
-[ -s "$NVM_DIR/nvm.sh ] && source "$NVM_DIR/nvm.sh"
+[ -s "$NVM_DIR/nvm.sh" ] && source "$NVM_DIR/nvm.sh"
