@@ -12,8 +12,13 @@
 !.viminfo
 !.vimrc
 !.gitignore
+!lib/
 !bin/
 !bin/*
+bin/dex
 
-# Ignore nano backup files
+# Ignore backup files
 *~
+bin/mail-notify-data
+*.swp
+*.pyc

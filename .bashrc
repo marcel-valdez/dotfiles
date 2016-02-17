@@ -8,6 +8,11 @@ case $- in
       *) return;;
 esac
 
+source ~/.bash_ssh
+source ~/bin/functions
+source ~/bin/reinstall_modules
+source ~/lib/git-prompt
+
 # don't put duplicate lines or lines starting with space in the history.
 # See bash(1) for more options
 HISTCONTROL=ignoreboth
@@ -48,7 +53,6 @@ esac
 # off by default to not distract the user: the focus in a terminal window
 # should be on the output of commands, not on the prompt
 force_color_prompt=yes
-color_prompt=yes
 
 if [ -n "$force_color_prompt" ]; then
   if [ -x /usr/bin/tput ] && tput setaf 1 >&/dev/null; then
@@ -61,22 +65,19 @@ if [ -n "$force_color_prompt" ]; then
    fi
 fi
 
-# Load the git prompt
-if [ -f ~/.config/git-prompt.sh ]; then
-  source ~/.config/git-prompt.sh
-#  PROMPT_COMMAND='__git_ps1 "\u@\h:\w" "\\\$ "'
-#  PS1='[\u@\h \W$(__git_ps1 " (%s)")]\$ '
-# else
-  if [ "$color_prompt" = yes ]; then
-    PS1='${debian_chroot:+($debian_chroot)}\[\033[01;32m\]\u@\h\[\033[00m\]:\[\033[01;34m\]\w\[\033[00m\]$(__git_ps1 " (%s)")\$ '
-  else
-    PS1='${debian_chroot:+($debian_chroot)}\u@\h:\w$(__git_ps1 " (%s)")\$ '
-  fi
-  unset color_prompt force_color_prompt
-
-  # If this is an xterm set the title to user@host:dir
+if [ "$color_prompt" = yes ]; then
+    PS1='${debian_chroot:+($debian_chroot)}\[\033[01;32m\]\u@\h\[\033[00m\]:\[\033[01;34m\]\w\[\033[00m\]'
+else
+    PS1='${debian_chroot:+($debian_chroot)}\u@\h:\w'
 fi
 
+PS1="$PS1"'$(__git_ps1)'
+PS1="$PS1"'\n'
+PS1="$PS1"'\$ '
+
+unset color_prompt force_color_prompt
+
+# If this is an xterm set the title to user@host:dir
 case "$TERM" in
 xterm*|rxvt*)
     PS1="\[\e]0;${debian_chroot:+($debian_chroot)}\u@\h: \w\a\]$PS1"
@@ -84,7 +85,6 @@ xterm*|rxvt*)
 *)
     ;;
 esac
-
 
 # enable color support of ls and also add handy aliases
 if [ -x /usr/bin/dircolors ]; then
@@ -113,7 +113,7 @@ alias alert='notify-send --urgency=low -i "$([ $? = 0 ] && echo terminal || echo
 # See /usr/share/doc/bash-doc/examples in the bash-doc package.
 
 if [ -f ~/.bash_aliases ]; then
-    . ~/.bash_aliases
+    source ~/.bash_aliases
 fi
 
 # enable programmable completion features (you don't need to enable
@@ -127,17 +127,34 @@ if ! shopt -oq posix; then
   fi
 fi
 
+initialize_session() {
+  # Put commands that should execute once per tmux session here
+  # normally there is one tmux session per each system restart
 
-if [ -d "$HOME/bin" ]; then
-  PATH="$HOME/bin:$PATH"
+  # WINE settings
+  # set to use wine simulating Windows 64-bit by default
+  source ~/bin/wine-use-win64
+  # uncomment to use wine simulating Windows 32-bit
+  # . ~/bin/wine-use-win32
+}
+
+if [ "$(expr substr $(uname) 1 5)" == "Linux" ]; then
+  export GIT_EDITOR=nano
+  if [ "$TERM" == "xterm" ] || [ "$TERM" == "linux" ]; then
+    # if the default-session has not been created, then initialize this terminal session
+    tmux has-session -t "default-session" || initialize_session
+
+    # this will make the terminal attach to an existing tmux session or create one
+    tmux attach
+  else
+    # A new TMUX pane was created
+    __ignore__=1
+    # put commands here that should execute with every opened pane
+  fi
 fi
 
-PATH=$PATH:$HOME/.rvm/bin # Add RVM to PATH for scripting
-export GIT_EDITOR=nano
-
-if [[ "$TERM" != "screen" ]]; then
-  tmux attach
-fi
+export PATH="$PATH:$HOME/bin" # add local bin folder to path
+export PATH="$PATH:$HOME/.rvm/bin" # Add RVM to PATH for scripting
 
 export NVM_DIR="/home/marcel/.nvm"
-[ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"  # This loads nvm
+[ -s "$NVM_DIR/nvm.sh ] && source "$NVM_DIR/nvm.sh"

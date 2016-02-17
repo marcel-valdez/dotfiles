@@ -1,0 +1,37 @@
+#!/bin/bash
+
+replaced_pattern=${@:(-2):1}
+replacement=${@:(-1):1}
+
+number_of_args=$#
+
+if [ $number_of_args -lt 3 ]; then
+  echo "Usage:"
+  echo "rename-file <filename> <replaced pattern> <replacement>"
+fi
+
+number_of_files=$(expr $number_of_args - 2)
+
+for filepath in ${@:1:$number_of_files}
+do
+  dirpath=$(dirname $filepath)
+  filename=$(basename $filepath)
+  new_filename=$(echo $filename | sed "s/$replaced_pattern/$replacement/")
+  new_filepath="$dirpath/$new_filename"
+  if [ ! -f $filepath ]; then
+    filepath_length=${#filepath}
+    last_char_index=$(expr $filepath_length - 1)
+    shopt -s nullglob
+    last_char="${filepath:last_char_index:1}"
+    if [ "$last_char" == "*" ]; then
+      echo "No files matched the pattern: <$filepath>."
+    else
+      echo "Cannot rename file: <$filepath>, because it does not exist."
+    fi
+  else
+    if [ $filepath != $new_filepath ]; then
+      mv $filepath $new_filepath
+    fi
+  fi
+done
+

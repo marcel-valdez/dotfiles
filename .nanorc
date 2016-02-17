@@ -16,7 +16,7 @@
 ## ", ', ), >, ], and }.
 
 ## Use auto-indentation.
-set autoindent
+# set autoindent
 
 ## Backup files to filename~.
 # set backup
@@ -91,7 +91,7 @@ set multibuffer
 # set nonewlines
 
 ## Don't wrap text at all.
-# set nowrap
+set nowrap
 
 ## Set operating directory.  nano will not read or write files outside
 ## this directory and its subdirectories.  Also, the current directory
@@ -147,7 +147,7 @@ set smooth
 ## Use this spelling checker instead of the internal one.  This option
 ## does not properly have a default value.
 ##
-set speller "aspell -x -c"
+set speller "aspell -x -c --lang=en_US"
 
 ## Allow nano to be suspended.
 set suspend
@@ -239,12 +239,27 @@ bind M-C copytext main
 
 unbind M-V main
 bind M-V uncut main
+
 unbind M-X main
 bind M-X cut main
 
-unbind ^O writeout main
-unbind F3 writeout main
-bind ^S writeout main
+unbind ^H main
+bind ^H help main
+
+unbind ^O all
+bind ^S writeout all
+
+unbind M-M main
+bind M-M findbracket main
+
+unbind M-z main
+bind M-z undo main
+
+unbind M-y main
+bind M-y redo main
+
+unbind ^L main
+bind ^L gotoline main
 
 ## Set this if your backspace key sends delete most of the time (2.1.3+)
 # bind kdel backspace all

@@ -1,0 +1,4 @@
+export WINEARCH=win32 wineboot
+unlink ~/.wine
+ln -s ~/.wine32 ~/.wine
+

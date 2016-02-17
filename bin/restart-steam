@@ -1,0 +1,8 @@
+#!/usr/bin/env bash
+
+kill-steam
+
+sleep 1
+
+start-steam
+

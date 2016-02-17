@@ -1,0 +1,3 @@
+#!/usr/bin/env bash
+
+kill -9 $(ps aux | grep "$HOME/\.steam/" | sed 's/[ ][ ]*/ /g' | cut -d' ' -f2)
