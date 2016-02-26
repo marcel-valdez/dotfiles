@@ -110,11 +110,11 @@ Mod1 Shift Down :PrevWorkspace
 Mod1 Shift Up :NextWorkspace
 
 # send the current window to previous/next workspace
-# Mod4 Left :SendToPrevWorkspace
-# Mod4 Right :SendToNextWorkspace
+Mod4 Down :MacroCmd {SendToPrevWorkspace} {PrevWorkspace}
+Mod4 Up :MacroCmd {SendToNextWorkspace} {NextWorkspace}
 Mod4 Left :ToggleCmd {MacroCmd {ResizeTo 50% 100%} {MoveTo 0 0}} {MacroCmd {ResizeTo 25% 100%} {MoveTo 0 0}} {MacroCmd {ResizeTo 75% 100%} {MoveTo 0 0}}
 # There seems to be an issue with the third toggle, when doing 75% to the right it moves the window to the left monitor
-Mod4 Right :ToggleCmd {MacroCmd {MoveTo 50% 0%} {ResizeTo 50% 100%}} {MacroCmd {ResizeTo 25% 100%} {MoveTo 75% 0%}} {MacroCmd {MoveTo 25% 0%}  {ResizeTo 75% 100%}}
+Mod4 Right :ToggleCmd {MacroCmd {MoveTo 50% 0} {ResizeTo 50% 100%}} {MacroCmd {ResizeTo 25% 100%} {MoveTo 75% 0}} {MacroCmd {MoveTo 25% 0}  {ResizeTo 75% 100%}}
 
 # send the current window and follow it to previous/next workspace
 # Control Mod4 Left :TakeToPrevWorkspace
