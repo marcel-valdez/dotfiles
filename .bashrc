@@ -113,11 +113,11 @@ alias chrome='/opt/google/chrome/chrome'
 # See /usr/share/doc/bash-doc/examples in the bash-doc package.
 
 if [ -f ~/.bash_aliases ]; then
-    . ~/.bash_aliases
+    source ~/.bash_aliases
 fi
 
 if [ -f ~/.bash_functions ]; then
-    . ~/.bash_functions
+    source ~/.bash_functions
 fi
 
 # Custom environment variables
