@@ -12,7 +12,10 @@
 <Multi_key> <O>    : "Ó"   oacute # LATIN UPPERCASE LETTER O WITH ACUTE
 
 <Multi_key> <u>    : "ú"   uacute # LATIN SMALL LETTER U WITH ACUTE
-<Multi_key> <U>    : "Ú"  uacute # LATIN UPPERCASE LETTER U WITH ACUTE
+<Multi_key> <U>    : "Ú"   uacute # LATIN UPPERCASE LETTER U WITH ACUTE
+
+<Multi_key> <n>    : "ñ"   ntilde # LATIN SMALL LETTER N WITH TILDE
+<Multi_key> <N>    : "Ñ"   Ntilde # LATIN UPPERCASE LETTER N WITH TILDE
 
 
 # UTF-8 (Unicode) compose sequence
