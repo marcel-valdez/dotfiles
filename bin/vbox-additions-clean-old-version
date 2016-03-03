@@ -1,0 +1,7 @@
+#!/usr/bin/env bash
+
+sudo rm /usr/share/VBoxGuestAdditions
+sudo rm /usr/lib/VBoxGuestAdditions
+sudo rm /usr/lib/x86_64-linux-gnu/VBoxGuestAdditions
+echo You also need to delete the current vesion of VBoxGuestAdditions from the folder:
+echo /opt/VBoxGuestAdditions-V.E.R.S.I.O.N
