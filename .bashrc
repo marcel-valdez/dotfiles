@@ -151,3 +151,7 @@ export J2D_PIXMAPS="shared"
 
 export NVM_DIR="/home/marcel/.nvm"
 [ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"  # This loads nvm
+
+# This sets up the default node version and loads it
+export NODE_VERSION="5.5.0"
+node-check-use --silent
