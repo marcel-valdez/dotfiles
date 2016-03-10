@@ -8,6 +8,14 @@ number_of_args=$#
 if [ $number_of_args -lt 3 ]; then
   echo "Usage:"
   echo "rename-file <filename> <replaced pattern> <replacement>"
+  echo "filename - this can be a pattern such as *.exe, a filepath or filename"
+  echo "replaced pattern - a regex to match"
+  echo "replacement - a string to replace anything that matched <replaced pattern>"
+  echo
+  echo "Example usage:"
+  echo "rename-file *.pdg pdg pdf"
+  echo "That would convert all *.pdg into *.pdf files"
+  exit 1
 fi
 
 number_of_files=$(expr $number_of_args - 2)
