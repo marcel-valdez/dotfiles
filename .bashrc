@@ -161,3 +161,6 @@ if [ -z "$MONO_PATH" ]; then
 else
   export MONO_PATH="$MONO_PATH:/usr/bin/continuoustests"
 fi
+
+export NVM_DIR="/home/marcel/.nvm"
+[ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"  # This loads nvm
