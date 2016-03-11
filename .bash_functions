@@ -64,3 +64,8 @@ npm-start() {
   node-check-use
   npm start
 }
+
+npm-lint() {
+  node-check-use
+  npm run lint
+}
