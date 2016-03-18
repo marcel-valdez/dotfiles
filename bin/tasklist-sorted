@@ -1,3 +1,0 @@
-#!/bin/bash
-
-tasklist | sort -n -k 5 -r
