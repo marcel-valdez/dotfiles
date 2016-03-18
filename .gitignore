@@ -2,8 +2,11 @@
 *
 
 # Except
-!.bash_profle
 !.bashrc
+!.bash_logout
+!.bash_functions
+!.bash_aliases
+!.bash_profile
 !.inputrc
 !.minttyrc
 !.nanorc
