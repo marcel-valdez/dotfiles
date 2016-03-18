@@ -1,0 +1,7 @@
+#!/usr/bin/env bash
+
+todo_document=$1
+todo_file=$(basename $todo_document)
+
+nano "$todo_document"
+kill-filter-procs "python .*$todo_file .*"
