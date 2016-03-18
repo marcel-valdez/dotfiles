@@ -20,13 +20,34 @@ diff-lines() {
     done
 }
 
+# start git functions
+
 git-diff-lines() {
   git diff $1 $2 $3 $4 | diff-lines
 }
 
+g-diff-lines() {
+  git-diff-lines $1 $2 $3 $4
+}
+
+git-branch-out() {
+  new_branch_name=$1
+  treeish=$2
+  git checkout -b $1 $2
+}
+
+g-branch-out() {
+  git-branch-out $1 $2
+}
+
+# end git functions
+
+
 ae() {
   cd ~/repositories/ae$1
 }
+
+# start npm functions
 
 node-check-use() {
   node_version=$(node --version 2>/dev/null)
@@ -68,4 +89,14 @@ npm-start() {
 npm-lint() {
   node-check-use
   npm run lint
+}
+
+# end npm functions
+
+mlocate-here() {
+  directory="$2"
+  if [ "$directory" == "" ]; then
+    directory="$(pwd)/"
+  fi
+  mlocate -b "$1" | grep --color=never "^$directory"
 }
