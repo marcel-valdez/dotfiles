@@ -29,7 +29,11 @@ function compress-pdf() {
   # /printer selects output similar to the Acrobat Distiller "Print Optimized" setting.
   # /prepress selects output similar to Acrobat Distiller "Prepress Optimized" setting.
   # /default selects output intended to be useful across a wide variety of uses, possibly at the expense of a larger output file.
-  gs -sDEVICE=pdfwrite -dCompatibilityLevel=1.4 -dPDFSETTINGS=$compression_level -dNOPAUSE -dQUIET -dBATCH -sOutputFile=$output_file $input_file
+  gs -dNOPAUSE -dQUIET -dBATCH \
+     -sDEVICE=pdfwrite \
+     -dCompatibilityLevel=1.4 \
+     -dPDFSETTINGS=$compression_level \
+     -sOutputFile=$output_file $input_file
   # other compression options for pdfwrite
   # -dr[resolution] -> default setting is 720dpi
   # -dDetectDuplicateImages -> defaults to true, will reuse a image used more than once
