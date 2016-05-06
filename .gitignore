@@ -30,4 +30,4 @@ bin/mail-notify-data
 .*~
 *~
 *.swp
-
+bin/FoxitReader
