@@ -28,6 +28,9 @@ fi
 # Create .logs directory if it does not exist
 if [ -d "/home/marcel/.logs" ]; then
   mkdir /home/marcel/.logs
+else
+  # TODO: Only delete if it has certain size
+  rm /home/marcel/.logs/notify.log
 fi
 
 # TODO: It may be appropriate to put initialization in .xinitrc
@@ -107,6 +110,12 @@ sleep 1
     /usr/bin/gol > /home/marcel/.logs/gol.log 2>&1 &
   else
     echo "To enable growl on linux (gol), install the growl-for-linux => http://mattn.github.io/growl-for-linux/." >> /home/marcel/.logs/fluxbox.startup.log
+  fi
+
+  if [ -f "/usr/bin/xflux" ]; then
+    /usr/bin/xflux -z 20170 -nofork > /home/marcel/.logs/xflux.log 2>&1 &
+  else
+    echo "To enable f.lux for linux, install the f.lux for linux => https://justgetflux.com/linux.html" >> /home/marcel/.logs/fluxbox.startup.log
   fi
 
 } &
