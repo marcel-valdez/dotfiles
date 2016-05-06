@@ -8,11 +8,11 @@ function usage ()
   echo "3. Checks out branches from <common-base> that will merge to <target-branches>" 1>&2;
   echo "4. Merges each <common-base> branch with its respective <target-branch>" 1>&2;
   echo "Usage:" 1>&2;
-  echo "apply-hotix <common-base> -c <commits> -t <target-branch>." 1>&2;
+  echo "apply-hotfix <common-base> -c <commits> -t <target-branch>." 1>&2;
   echo "" 1>&2;
   echo "Error: No parameters were supplied." 1>&2;
   echo "Example: " 1>&2;
-  echo 'apply-hotix 7.3.0.0 -c "999999 888888 777777" -t "appian/7.3.0.0-maint appian/7.4.0.0-maint"' 1>&2;
+  echo 'apply-hotfix 7.3.0.0 -c "999999 888888 777777" -t "appian/7.3.0.0-maint appian/7.4.0.0-maint"' 1>&2;
   return 1
 }
 
@@ -28,7 +28,9 @@ if [ -z "$1" ]; then
   exit 1
 fi;
 
-if [ "`in_git_repo`" -ne "true" ]; then
+IN_REPO=$(in_git_repo)
+
+if [ "$IN_REPO" != "true" ]; then
   echo "You are not inside a git repository, cannot continue.";
   exit 1
 fi;
