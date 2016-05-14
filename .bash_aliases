@@ -24,7 +24,7 @@ alias wget_page='wget -q -O -'
 alias appian-openvpn='sudo openvpn --script-security 2 --up /etc/openvpn/openvpn-dns --down /etc/openvpn/openvpn-dns --config ~/.openvpn/client.ovpn'
 alias copy-to-clip="perl -pe 'chomp if eof' | xclip -sel clip"
 alias less-lineno='less -N'
-
+alias nano-crypto=crypto-file
 
 # start git commands
 

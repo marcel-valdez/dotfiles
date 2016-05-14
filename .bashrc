@@ -141,6 +141,7 @@ fi
 
 if [ "$(expr substr $(uname) 1 5)" == "Linux" ]; then
   export GIT_EDITOR=nano
+  export EDITOR=nano
   if [ "$TERM" == "xterm" ] || [ "$TERM" == "linux" ]; then
     tmux attach
   fi
