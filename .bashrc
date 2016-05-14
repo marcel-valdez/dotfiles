@@ -140,6 +140,7 @@ initialize_session() {
 
 if [ "$(expr substr $(uname) 1 5)" == "Linux" ]; then
   export GIT_EDITOR=nano
+  export EDITOR=nano
   if [ "$TERM" == "xterm" ] || [ "$TERM" == "linux" ]; then
     # if the default-session has not been created, then initialize this terminal session
     tmux has-session -t "default-session" || initialize_session

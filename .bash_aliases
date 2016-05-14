@@ -7,3 +7,5 @@ alias start-android-notifier='~/modules/android-notifier-desktop/run.sh 2>&1 >> 
 alias intellij='/home/marcel/modules/idea-IC-141.1010.3/bin/idea.sh'
 alias now='date "+%H:%M:%S  %d/%m/%y"'
 alias appian-openvpn='sudo openvpn --script-security 2 --up /etc/openvpn/openvpn-dns --down /etc/openvpn/openvpn-dns --config ~/.openvpn/client.ovpn'
+alias nano-crypto=crypto-file
+alias rm-secure='shred -u -z'
