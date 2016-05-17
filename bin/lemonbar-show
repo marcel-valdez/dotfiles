@@ -1,0 +1,43 @@
+#!/usr/bin/env ruby
+
+require 'optparse'
+require 'shellwords'
+require 'timeout'
+require 'io/console'
+
+options = {}
+parser = OptionParser.new do |cmd_options|
+  cmd_options.banner = "Usage: lemonbar-show [options] MESSAGE"
+  cmd_options.on("-a", "--align [ALIGNMENT]", "Sets the alignment for the text") do |alignment|
+    options[:align] = alignment
+  end
+
+  cmd_options.on("-f", "--font [FONT FAMILY]", "Sets the font for the message") do |font_family|
+    options[:font] = font_family
+  end
+
+  cmd_options.on("--fg [FOREGROUND COLOR]", "Sets the foreground color for the font") do |color|
+    options[:foreground] = color
+  end
+
+  cmd_options.on("--bg [BACKGROUND COLOR]", "Sets the background color for the font") do |color|
+    options[:background] = color
+  end
+
+  cmd_options.on("-c", "--cmd [COMMAND]", "Sets the command to execute on click") do |command|
+    options[:command] = command
+  end
+
+  cmd_options.on("MESSAGE", "The message to show") do |message|
+    options[:message] = message
+  end
+
+  cmd_options.on do |args|
+    options[:message] =args
+  end
+end.parse!
+
+puts options
+puts ARGV
+
+#echo "$1 $2 $3 $4 $5 $6 $7 $8 $9" >> $HOME/tmp/lemonbar-read
