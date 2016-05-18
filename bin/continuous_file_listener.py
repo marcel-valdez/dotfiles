@@ -32,6 +32,15 @@ def execute_command(command, exec_state, output):
 def main(filename, command):
   watch(filename, execute_command, command)
 
+def quoteWhenSpaced(arg):
+  if ' ' in arg:
+    return '"' + arg + '"'
+  else:
+    return arg
+
+def notEmpty(arg):
+  return arg != ''
+
 if __name__ == '__main__':
   script_name = sys.argv[0]
   if len(sys.argv) < 3:
@@ -39,6 +48,7 @@ if __name__ == '__main__':
     exit(1)
 
   filename = sys.argv[1]
-  command = ' '.join(sys.argv[2:len(sys.argv)])
+  command_args = sys.argv[2:len(sys.argv)]
+  command = ' '.join(map(quoteWhenSpaced, filter(notEmpty, command_args)))
 
   main(filename, command)
