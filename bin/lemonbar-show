@@ -1,9 +1,8 @@
 #!/usr/bin/env ruby
 
 require 'optparse'
-require 'shellwords'
-require 'timeout'
-require 'io/console'
+
+MAX_MSG_LENGTH = 77
 
 options = {}
 parser = OptionParser.new do |cmd_options|
@@ -24,20 +23,55 @@ parser = OptionParser.new do |cmd_options|
     options[:background] = color
   end
 
-  cmd_options.on("-c", "--cmd [COMMAND]", "Sets the command to execute on click") do |command|
+  cmd_options.on("--reset-fg", "Resets the foreground color for the font") do |flag|
+    options[:reset_foreground] = flag
+  end
+
+  cmd_options.on("--reset-bg", "Resets the background color for the font") do |flag|
+    options[:reset_background] = flag
+  end
+
+  cmd_options.on("-c", "--cmd", "--command [COMMAND]", "Sets the command to execute on click") do |command|
     options[:command] = command
   end
 
-  cmd_options.on("MESSAGE", "The message to show") do |message|
-    options[:message] = message
-  end
-
-  cmd_options.on do |args|
-    options[:message] =args
+  cmd_options.on("--debug", "Turns on debugging") do |debug|
+    options[:debug] = debug
   end
 end.parse!
 
-puts options
-puts ARGV
+message = ARGV.pop()
 
-#echo "$1 $2 $3 $4 $5 $6 $7 $8 $9" >> $HOME/tmp/lemonbar-read
+# TODO: If text is too long it should horizontally scroll the message in a while loop
+if message.length > MAX_MSG_LENGTH
+  puts "Message too long, truncating MAX = #{MAX_MSG_LENGTH} (found: #{message.length})" if options[:debug]
+  message = message[0...MAX_MSG_LENGTH]
+end
+
+if options[:command] != nil
+  message = "%{A:#{options[:command]}:}#{message}%{A}"
+end
+
+case options[:align]
+  when /^(left|l)$/i
+    message = "%{l}#{message}%{l}"
+  when /^(right|$r)$/i
+    message = "%{r}#{message}%{r}"
+  when /^(center|c)$/i
+    message = "%{c}#{message}%{c}"
+end
+
+if options[:foreground] != nil
+  message = "%{F#{options[:foreground]}}#{message}%{F}"
+end
+
+if options[:background] != nil
+  message = "%{B#{options[:background]}}#{message}%{B}"
+end
+
+puts "DEBUG - Message: <#{message}>" if options[:debug]
+puts "DEBUG - Options: <#{options}>" if options[:debug]
+
+# TODO: If multiple lines are given, it should vertically scroll through each line
+# in a while loop
+`echo "#{message}" >> ~/tmp/lemonbar-fifo`
