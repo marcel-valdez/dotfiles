@@ -94,17 +94,17 @@ sleep 1
    echo "To enable dropbox, install the dropbox daemon." >> /home/marcel/.logs/fluxbox.startup.log
   fi
 
-#  if [ -f "/usr/bin/hipchat" ]; then
-#    /usr/bin/hipchat > /home/marcel/.logs/hipchat.log 2>&1 &
-#  else
-#   echo "To enable hipchat, install the hipchat application." >> /home/marcel/.logs/fluxbox.startup.log
-#  fi
-
-  if [ -f "/usr/bin/hipchat4" ]; then
-    /usr/bin/hipchat4 > /home/marcel/.logs/hipchat4.log 2>&1 &
+  if [ -f "/usr/bin/hipchat" ]; then
+    /usr/bin/hipchat > /home/marcel/.logs/hipchat.log 2>&1 &
   else
    echo "To enable hipchat, install the hipchat application." >> /home/marcel/.logs/fluxbox.startup.log
   fi
+
+#  if [ -f "/usr/local/bin/hipchat4" ]; then
+#    /usr/local/bin/hipchat4 > /home/marcel/.logs/hipchat4.log 2>&1 &
+#  else
+#   echo "To enable hipchat, install the hipchat application." >> /home/marcel/.logs/fluxbox.startup.log
+#  fi
 
   if [ -f "/opt/google/chrome/chrome" ]; then
     /opt/google/chrome/chrome > /home/marcel/.logs/chrome.log 2>&1 &
