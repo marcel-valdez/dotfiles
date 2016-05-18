@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 if [ "$1" = "" ]; then
-  tail -f $HOME/tmp/lemonbar-fifo | $HOME/modules/bar/lemonbar -f "-*-clean-*-r-normal-*-17-*-100-100-*-*-*-*" -a 1 -g620x20+2570+0 | bash
+  tail -f $HOME/tmp/lemonbar-fifo | $HOME/repositories/bar/lemonbar -f "-*-clean-*-r-normal-*-17-*-100-100-*-*-*-*" -a 1 -F "#FF000000" -B "#22000000" -g620x20+1165+2
 else
-  tail -f $HOME/tmp/lemonbar-fifo | $HOME/modules/bar/lemonbar "$1" "$2" "$3" "$4" "$5" "$6" "$7" "$8" "$9" | bash
+  tail -f $HOME/tmp/lemonbar-fifo | $HOME/repositories/bar/lemonbar "$1" "$2" "$3" "$4" "$5" "$6" "$7" "$8" "$9" | bash
 fi

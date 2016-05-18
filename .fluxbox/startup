@@ -45,6 +45,12 @@ sleep 1
 
   echo "" > /home/marcel/.logs/fluxbox.startup.log
 
+  if [ -f "/usr/bin/xcompmgr" ]; then
+    /usr/bin/xcompmgr > /home/marcel/.logs/xcompmgr.log 2>&1 &
+  else
+   echo "To enable alpha channel rendering you must install xcompmgr" >> /home/marcel/.logs/fluxbox.startup.log
+  fi
+
   if [ -f "/usr/bin/synapse" ]; then
     /usr/bin/synapse -s > /home/marcel/.logs/synapse-fluxbox.log 2>&1 &
   else
@@ -118,6 +124,11 @@ sleep 1
     echo "To enable f.lux for linux, install the f.lux for linux => https://justgetflux.com/linux.html" >> /home/marcel/.logs/fluxbox.startup.log
   fi
 
+  if [ -f "$HOME/bin/lemonbar-launcher" ]; then
+    $HOME/bin/lemonbar-launcher > /home/marcel/.logs/lemonbar-launcher.log 2>&1 &
+  else
+    echo "To get the lemonbar-launcher, fetch the scripts from git@github.com/marcel-valdez/dotfiles.git" >> /home/marcel/.logs/fluxbox.startup.log
+  fi
 } &
 
 wait $fbpid
