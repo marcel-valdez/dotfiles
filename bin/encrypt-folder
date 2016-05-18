@@ -1,0 +1,3 @@
+#!/usr/bin/env bash
+
+gpg-zip -c -o $1.encdir $1

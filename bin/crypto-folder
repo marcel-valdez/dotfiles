@@ -1,0 +1,56 @@
+#!/usr/bin/env bash
+
+if [ "$1" = "" ]; then
+  echo "Error: foldername required"
+  echo
+  echo "crypto-folder allows you to create an encrypted folder that is decrypted only"
+  echo "for editing, then immediately ecnrypted after you are done editing."
+  echo
+  echo "Usage: crypto-folder <folder-name>"
+  echo "This script will generate a file <folder-name>.encdir that can only be"
+  echo "encryped/decrypted with a specific passphrase"
+  exit 1
+fi
+
+foldername=$1
+create_encdir="false"
+function cleanup {
+  if [ -e $foldername ]; then
+    post_folder_md5=$(find $foldername | LC_ALL=C sort | cpio -o | md5sum)
+    # only bother the user with encryption if the contents changed
+    if [ "$create_encdir" = "true" ] || [ "$post_folder_md5" != "$pre_folder_md5" ]; then
+      encrypt-folder "$foldername"
+    fi
+
+    # securely delete the plain text file
+    find "$foldername" -type f | xargs -Ifile shred -u file
+    rm -fr "$foldername"
+  fi
+}
+
+# check if an encrypted version of the file exists
+if [ -e "$foldername.encdir" ]; then
+  decrypt-folder $foldername
+  res=$?
+  if [ "$res" != "0" ]; then
+    echo "Failed to decrypt $foldername.encdir, exiting immediately"
+    exit $res
+  fi
+else
+  # if no encrypted version, create a new one
+  if [ ! -e "$foldername" ]; then
+    mkdir $foldername
+  else
+    create_encdir="true"
+  fi
+fi
+
+# get md5sum in order to later verify if the user edited the files
+pre_folder_md5=$(find $foldername | LC_ALL=C sort | cpio -o | md5sum)
+# make sure to clean up the plain text files on EXIT
+trap cleanup EXIT
+
+read -n1 -r -p "Press any key to encrypt folder $foldername again" key
+
+exit 0
+
