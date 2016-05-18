@@ -45,11 +45,11 @@ sleep 1
 
   echo "" > /home/marcel/.logs/fluxbox.startup.log
 
-  if [ -f "/usr/bin/xcompmgr" ]; then
-    /usr/bin/xcompmgr > /home/marcel/.logs/xcompmgr.log 2>&1 &
-  else
-   echo "To enable alpha channel rendering you must install xcompmgr" >> /home/marcel/.logs/fluxbox.startup.log
-  fi
+#  if [ -f "/usr/bin/xcompmgr" ]; then
+#    /usr/bin/xcompmgr > /home/marcel/.logs/xcompmgr.log 2>&1 &
+#  else
+#   echo "To enable alpha channel rendering you must install xcompmgr" >> /home/marcel/.logs/fluxbox.startup.log
+#  fi
 
   if [ -f "/usr/bin/synapse" ]; then
     /usr/bin/synapse -s > /home/marcel/.logs/synapse-fluxbox.log 2>&1 &
