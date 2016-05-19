@@ -100,3 +100,29 @@ mlocate-here() {
   fi
   mlocate -b "$1" | grep --color=never "^$directory"
 }
+
+run-step() {
+  $1
+  __result=$?
+  time=$(date +%H:%M)
+  if [ "$__result" == "0" ]; then
+    lemonbar-show --fg "#99FF99" "($time) <$1> done ($2)"
+  else
+    lemonbar-show --fg "#C45454" "($time) <$1> failed ($2)"
+  fi
+}
+
+npm-run-all() {
+  time=$(date +%H:%M)
+  lemonbar-show --fg "#FFFF00" "($time) Running npm-run-all"
+
+  run-step "npm install" "1/5"
+  if [ "$__result" == "1" ]; then
+    exit 1
+  fi
+
+  run-step "npm run test" "2/5"
+  run-step "npm run test-tools" "3/5"
+  run-step "npm run lint" "4/5"
+  run-step "npm run validateLicenses" "5/5"
+}
