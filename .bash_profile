@@ -12,8 +12,8 @@
 # would be benifitial to all, please feel free to send
 # a patch to the cygwin mailing list.
 
-if [ "$HOME" != "/home/marcel" ]; then
-  export HOME="/home/marcel"
+if [ "$HOME" != "/home/marce" ]; then
+  export HOME="/home/marce"
 fi
 
 # source the system wide bashrc if it exists

@@ -13,28 +13,24 @@
 # a patch to the cygwin mailing list.
 
 # User dependent .bashrc file
-alias ssh='/bin/ssh.exe'
+# alias ssh='/bin/ssh.exe'
 
 # Add git prompt and git completion
-[ -r /etc/git-completion.sh ] && . /etc/git-completion.sh
-# [ -r /etc/git-prompt.sh ] && . /etc/git-prompt.sh
+[ -r ~/bin/git-completion ] && source ~/bin/git-completion
+[ -r ~/bin/git-prompt ] && source ~/bin/git-prompt
+
+[ -r ~/.bash_aliases ] && source ~/.bash_aliases
+[ -r ~/.bash_functions ] && source ~/.bash_functions
 
 # non-printable characters must be enclosed inside \[ and \]
 PS1='\[\033[0m\]'              # VT100 compat: reset all colors
-PS1="$PS1"'\[\033[32m\]'       # change color
-PS1="$PS1"'\u@\h '             # user@host<space>
-PS1="$PS1"'\[\033[33m\]'       # change color
+# PS1="$PS1"'\u@\h '             # user@host<space>
+PS1="$PS1"'\[\033[33m\]'       # change color => yellow
 PS1="$PS1"'\w'                 # current working directory
-#if test -z "$WINELOADERNOEXEC"
-#then
-#    PS1="$PS1"'$(__git_ps1)'   # bash function for current git branch
-#fi
+PS1="$PS1"'\[\033[32m\]'   # change color => green
+PS1="$PS1"'$(__git_ps1)'   # bash function for current git branch
 PS1="$PS1"'\[\033[0m\]'        # change color
 PS1="$PS1"'\n'                 # new line
-                               # show MSYSTEM if non-standard
-# if [ "$MSYSTEM" != "MINGW32" ]; then
-#     PS1="$PS1"'\[\033[35m\]($MSYSTEM)\[\033[0m\] '
-# fi
 PS1="$PS1"'$ '                 # prompt: always $
 
 #############################################################################
@@ -100,7 +96,7 @@ unset TEMP
 
 # Alternatively, set them to the Cygwin temporary directory
 # or to any other tmp directory of your choice
-# export TMP=/tmp
+export TMP=/tmp
 export TEMP=/tmp
 
 # Or use TMPDIR instead
@@ -276,7 +272,6 @@ export PROMPT_COMMAND="history -a"
 
 # Custom Aliases
  alias wget_page='wget -S -qO - '
- alias web_app_creator='/cygdrive/d/static/gwt-2.5.1/webAppCreator.cmd'
 # custom git aliases
  alias git='/usr/bin/git'
  alias gstatus='git status'
@@ -293,7 +288,6 @@ export PROMPT_COMMAND="history -a"
  alias rbundle='/usr/bin/bundle.bat'
  alias bexec='/usr/bin/bundle.bat exec'
  alias pyhttp='python -m SimpleHTTPServer'
- alias reset-sk='rm -fr /cygdrive/c/Users/Marcel/AppData/Roaming/Skype/para.fernalia1/'
  alias remind-hr='rubykron --in 1 --message'
  alias remind-30='rubykron --in 0.5 --message'
  alias webserver='python -m SimpleHTTPServer'
@@ -308,16 +302,16 @@ export PROMPT_COMMAND="history -a"
 
 # UTF-8
 #######
-export LANG=no_NO.UTF-8
+export LANG=en_US.UTF-8
 export LOCALE=UTF-8
 export LESSCHARSET='utf-8'
 
-PATH=$PATH:/cygdrive/d/static/gwt-2.5.1/
-PATH=$PATH:/cygdrive/d/static/ant/bin
-PATH=$PATH:/cygdrive/c/Program\ Files\ \(x86\)/Beyond\ Compare\ 3/
-PATH=~/bin:$PATH
-PATH=$PATH:/cygdrive/c/HashiCorp/Vagrant/bin
-PATH=$PATH:/cygdrive/c/ProgramData/chocolatey/bin
+# PATH=$PATH:/cygdrive/d/static/gwt-2.5.1/
+# PATH=$PATH:/cygdrive/d/static/ant/bin
+# PATH=$PATH:/cygdrive/c/Program\ Files\ \(x86\)/Beyond\ Compare\ 3/
+# PATH=~/bin:$PATH
+# PATH=$PATH:/cygdrive/c/HashiCorp/Vagrant/bin
+# PATH=$PATH:/cygdrive/c/ProgramData/chocolatey/bin
 
 if [ -d "/cygdrive/d/static/tools" ] ; then
   PATH=/cygdrive/d/static/tools:$PATH

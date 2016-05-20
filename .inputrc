@@ -65,3 +65,5 @@ set bind-tty-special-chars off
   # a history expansion in the line
   #Space: magic-space
 #$endif
+
+"\C-V": paste-from-clipboard
