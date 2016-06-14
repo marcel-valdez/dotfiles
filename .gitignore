@@ -1,0 +1,33 @@
+# Exclude all files
+*
+
+# Except
+!lib/
+!lib/*
+!.bash_aliases
+!.bash_functions
+!.bash_profile
+!.bashrc
+!.inputrc
+!.minttyrc
+!.nanorc
+!.tmux.conf
+!.viminfo
+!.vimrc
+!.gitignore
+!.XCompose
+!.Xmodmap
+!bin/
+!bin/*
+bin/dex
+bin/mail-notify-data
+
+*.pyc
+!.fluxbox/keys
+!.fluxbox/startup
+
+# But do Ignore nano backup files
+.*~
+*~
+*.swp
+bin/FoxitReader
