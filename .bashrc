@@ -124,18 +124,19 @@ if ! shopt -oq posix; then
   fi
 fi
 
-export PATH="$PATH:$HOME/.rvm/bin" # Add RVM to PATH for scripting
-
-export NVM_DIR="/usr/local/google/home/marcelvaldez/.nvm"
-[ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"  # This loads nvm
-
 
 if [ -f ~/.bash_functions ]; then
-    source ~/.bash_functions
+    source "$HOME/.bash_functions"
 fi
 
+export PATH="$PATH:$HOME/.rvm/bin" # Add RVM to PATH for scripting
+# export J2D_PIXMAPS="shared"
+
+export NVM_DIR="$HOME/.nvm"
+[ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"  # This loads nvm
+
 # Path additions
-export PATH=$PATH:~/bin
+export PATH=$PATH:"$HOME/bin"
 
 if [ "$(expr substr $(uname) 1 5)" == "Linux" ]; then
   export GIT_EDITOR=nano
@@ -144,12 +145,6 @@ if [ "$(expr substr $(uname) 1 5)" == "Linux" ]; then
     tmux attach
   fi
 fi
-
-export PATH="$PATH:$HOME/.rvm/bin" # Add RVM to PATH for scripting
-# export J2D_PIXMAPS="shared"
-
-export NVM_DIR="/home/marcel/.nvm"
-[ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"  # This loads nvm
 
 # This sets up the default node version and loads it
 export NODE_VERSION="6.2.1"
