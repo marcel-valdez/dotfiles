@@ -1,0 +1,28 @@
+#!/bin/bash
+
+tmux new-window -n 'todo' "exec edit-todo ~/todos/FUTURE.md"
+tmux select-window -t todo
+tmux split-window -h "exec edit-todo ~/todos/TOMORROW.md "
+tmux split-window -h "exec edit-todo ~/todos/DOING.md"
+tmux split-window -h "exec edit-todo ~/todos/PENDING.md"
+tmux select-layout even-horizontal
+
+if type continuous_file_listener | grep -q " is " 2>/dev/null; then
+  if type pandoc | grep -q " is " 2>/dev/null; then
+    future=`readlink -f ~/todos/FUTURE.md`
+    tomorrow=`readlink -f ~/todos/TOMORROW.md`
+    doing=`readlink -f ~/todos/DOING.md`
+    pending=`readlink -f ~/todos/PENDING.md`
+
+    future_html=`readlink -f ~/todos/FUTURE.html`
+    tomorrow_html=`readlink -f ~/todos/TOMORROW.html`
+    doing_html=`readlink -f ~/todos/DOING.html`
+    pending_html=`readlink -f ~/todos/PENDING.html`
+
+    echo "Executing file listeners."
+    continuous_file_listener $future markdown_to_html $future $future_html >> ~/tmp/make-todo-window.log 2>&1 &
+    continuous_file_listener $tomorrow markdown_to_html $tomorrow $tomorrow_html  >> ~/tmp/make-todo-window.log 2>&1 &
+    continuous_file_listener $doing markdown_to_html $doing $doing_html >> ~/tmp/make-todo-window.log 2>&1 &
+    continuous_file_listener $pending markdown_to_html $pending $pending_html >> ~/tmp/make-todo-window.log 2>&1 &
+  fi
+fi

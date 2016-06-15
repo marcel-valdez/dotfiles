@@ -1,0 +1,10 @@
+#!/bin/bash
+
+tasks=$(ps aux | grep $1)
+
+if [ "$tasks" = "" ]; then
+  echo "No tasks matching $1 were found.";
+  exit 0;
+fi
+
+echo $tasks | grep '[0-9]\{4,6\}' -o | xargs -L 1 kill $2

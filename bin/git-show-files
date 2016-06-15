@@ -1,0 +1,24 @@
+# !/bin/bash
+
+if [ "$1" = "--help" ]; then
+  echo "git-show-files [--cached|--staged|commit]"
+  echo "This command shows a compact (computer readable) list of files in the cache, stage or previous commit."
+  echo "--cached: Shows files currently in the cache."
+  echo "--staged: Shows files currently staged."
+  echo "commit: Shows files in a given commit."
+  echo "default: Shows files in the previous commit."
+fi
+
+if [ "$1" = "--cached" ]; then
+  git diff --numstat | sed 's/^[0-9]*\s[0-9]*\s//';
+  exit 0;
+fi
+
+if [ "$1" = "--staged" ]; then
+  git diff --staged --numstat | sed 's/^[0-9]*\s[0-9]*\s//';
+  exit 0;
+fi
+
+git show $1 --numstat --oneline | sed 's/^[0-9]*\s[0-9]*\s//';
+
+exit 0;

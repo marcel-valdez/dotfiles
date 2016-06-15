@@ -1,0 +1,21 @@
+#!/usr/bin/env bash
+
+BAR="/usr/bin/lemonbar"
+if [ ! -e "$BAR" ]; then
+  BAR="$HOME/repositories/bar/lemonbar"
+fi
+
+FIFO="$HOME/tmp/lemonbar-fifo"
+if [ ! -e "$FIFO" ]; then
+  if [ ! -d "$HOME/tmp" ]; then
+    mkdir $HOME/tmp
+  fi
+
+  mkfifo $FIFO
+fi
+
+if [ "$1" = "" ]; then
+  tail -f $FIFO | "$BAR" -f "-*-clean-*-r-normal-*-17-*-100-100-*-*-*-*" -a 1 -F "#FF000000" -B "#FFcccccc" -g "620x18+1165+2"
+else
+  tail -f $FIFO | "$BAR" "$1" "$2" "$3" "$4" "$5" "$6" "$7" "$8" "$9" | bash
+fi

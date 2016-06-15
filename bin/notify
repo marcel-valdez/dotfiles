@@ -1,0 +1,21 @@
+#!/usr/bin/env ruby
+
+if ARGV.size < 2
+  puts 'Title and message must be specified. Usage:'
+  puts '  notify title message'
+  exit 1
+end
+
+now = Time.now
+time = "#{now.hour}:#{now.min}"
+title = "#{time} #{ARGV[0]}"
+message = ARGV[1]
+
+cmd = "notify-send \"#{title}\" \"#{message}\""
+# favor GNTP over notify-send
+if File.exists?("/usr/bin/gntp-send")
+  cmd = "gntp-send -s localhost \"#{title}\" \"#{message}\""
+end
+
+`echo #{title} #{message} >> $HOME/.logs/notify.log`
+`#{cmd}`

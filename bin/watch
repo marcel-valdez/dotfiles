@@ -1,0 +1,57 @@
+#!/usr/bin/env ruby
+
+
+def usage
+  puts "This command executes a bash instruction for N times and/or each X seconds."
+  puts "Example for N times: "
+  puts "watch -n 10 echo 'this will print 10 times'"
+  puts "Example for each X milliseconds: "
+  puts "watch -f 1 echo 'this will print every second'"
+end
+
+def pop_arg(args, index)
+  arg = args[index+1]
+  args.delete_at index
+  args.delete_at index
+end
+
+if ARGV.length == 0
+ usage()
+end
+
+
+
+freq = 1
+count = 99999999
+args = ARGV
+args.each_index do |index|
+  param = args[index]
+  puts "param: #{param}, index: #{index}"
+
+  if param == '-f'
+   begin
+     freq = pop_arg(args, index).to_i
+   rescue Exception => e
+     puts "Error while trying to process the frequency (-f)"
+     puts e.message
+   end
+  end
+
+  if param == '-n'
+   begin
+     count = pop_arg(args, index).to_i
+   rescue Exception => e
+     puts "Error while trying to process the count (-n)."
+     puts e.message
+   end
+  end
+end
+
+
+puts "args: #{args}"
+cmd = args.join(' ')
+
+count.times do
+  system(cmd)
+  sleep(freq / 1000.0)
+end

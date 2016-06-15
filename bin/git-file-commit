@@ -1,0 +1,40 @@
+#!/usr/bin/env ruby
+
+def usage
+  puts 'This script returns unpushed commits for a file, useful'
+  puts "for creating your fixup commits on the current file changes.\n"
+  puts 'Usage: '
+  puts 'git-file-commit [--only-fixup] <filename> [alternate_master]'
+  puts ''
+  puts 'options:'
+  puts '--only-fixup: Only looks for unpushed commits that are fixup commits'
+  puts '              by default it does NOT include fixup commits'
+  puts 'Example: '
+  puts 'git-file-commit path/to/my/File.java'
+end
+
+
+FIXUP_REGX=/.*fixup!.*/i
+master = 'appian/master'
+only_fixups = false
+
+ARGV.each_with_index do |option, index|
+  if option == '--only-fixup'
+    only_fixups = true
+    ARGV.delete_at(index)
+  end
+end
+
+if ARGV.length >= 1
+  file = ARGV[0]
+end
+
+if ARGV.length >= 2
+  master = ARGV[1]
+end
+
+branch_base = `git merge-base HEAD "#{master}"`
+
+all_file_commits = `git log --oneline "#{branch_base.chop}"..HEAD -- "#{file}"`
+non_fixup_commits = all_file_commits.lines.reject { | msg | only_fixups ^ (FIXUP_REGX =~ msg) }
+non_fixup_commits.each { |msg| puts msg }

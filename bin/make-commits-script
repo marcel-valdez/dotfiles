@@ -1,0 +1,135 @@
+#!/usr/bin/env ruby
+
+STATUS_MSG_REGX = /[ ]*([^ ]+)[ ]+(.+)/
+COMMIT_REGX = /([0-9a-z]+) .*/
+NEW_FILE = "NEW_FILES"
+FIX_WHITESPACE_COMMAND = "\# git-fix-whitespace --cached &&"
+SCRIPT_HEADER = '#!/bin/bash'
+ALTERNATE_MASTER = '--alt-master'
+
+@master = 'appian/master'
+ARGV.each_index do |i|
+  if ARGV[i] == ALTERNATE_MASTER
+    if ARGV.length == i+1
+      puts "Expected git reference after #{ALTERNATE_MASTER}"
+      exit(1)
+    end
+    @master = ARGV[i+1]
+  end
+
+  ARGV.delete_at(i+1)
+  ARGV.delete_at(i)
+end
+
+@add_options =  ARGV.length > 0 ? ARGV.first : ''
+@commit_options = ARGV.length > 1 ? ARGV[1] : ''
+@typemap = {
+  'D' => :deleted,
+  'M' => :modified,
+  '??' => :new
+}
+
+def get_commit_sha(oneline_commit)
+  COMMIT_REGX.match(oneline_commit)[1]
+end
+
+def make_status_entry(status_msg)
+  match = STATUS_MSG_REGX.match(status_msg)
+  { type: @typemap[match[1]], file: match[2] }
+end
+
+def add_command(file, modified_in_multiple_commits = false, is_deleted = false)
+  if modified_in_multiple_commits
+    puts "\# WARNING: #{file} is modified in multiple commits"
+  end
+
+  puts "\# DELETED: #{file}"  if is_deleted
+  dash_p = modified_in_multiple_commits ? "-p" : ''
+  "git add #{dash_p} #{@add_options} #{file} &&"
+end
+
+def commit_command(commit_msg)
+  unless commit_msg.eql? NEW_FILE
+    "git commit --fixup=#{get_commit_sha(commit_msg)} #{@commit_options}"
+  else
+    ## The user will be prompted for a commit message
+    "git commit #{@commit_options}"
+  end
+end
+
+def display_commit(commit)
+  if commit.eql? ""
+    "\# COMMIT: --NEW FILES--"
+  else
+    "\# COMMIT: #{commit}"
+  end
+end
+
+def dig_fixup_commit(filename)
+  file_commit_msg = `git-file-commit --only-fixup "#{filename}" "#{@master}"`
+  commits = file_commit_msg.split "\n"
+  commit_titles = commits.collect { |commit| commit.gsub(/^[0-9a-z]+ /, '') }
+  if commit_titles.uniq.count == 1
+    commit_message = commit_titles.first.gsub('fixup! ', '')
+    commit = `git log --oneline --grep='^#{commit_message}'`
+    commit
+  else
+    NEW_FILE
+  end
+end
+
+deleted_files = []
+files_per_commit = {}
+commits_per_file = {}
+git_status_result = `git status --porcelain`
+status_messages = git_status_result.lines.collect { |line| make_status_entry(line) }
+
+status_messages.each do |entry|
+  file_commit_msg = `git-file-commit "#{entry[:file]}" "#{@master}"`
+  commits = file_commit_msg.split "\n"
+  commits.each do | commit |
+    files_per_commit[commit] = [] if files_per_commit[commit].nil?
+    files_per_commit[commit] << entry[:file]
+
+    commits_per_file[entry[:file]] = [] if commits_per_file[entry[:file]].nil?
+    commits_per_file[entry[:file]] << commit
+  end
+
+  if commits.empty?
+    # Look for modifications to this file in the fixup commits
+    # IF all the fixup commits have the SAME message (i.e. point to the same fixup'd commit)
+    # then get the appropriate original commit and fixit-up to that
+    commit = dig_fixup_commit(entry[:file])
+    files_per_commit[commit] = [] if files_per_commit[commit].nil?
+    files_per_commit[commit] << entry[:file]
+  end
+
+  deleted_files << entry[:file]  if entry[:type] == :deleted
+end
+
+files_in_multiple_commits = commits_per_file.reject { |file, commits| commits.count < 2 }
+
+puts SCRIPT_HEADER
+files_per_commit.each do |commit, files|
+  puts display_commit(commit)
+
+  files.each do |file|
+    puts add_command(file, files_in_multiple_commits.has_key?(file), deleted_files.include?(file))
+  end
+
+  puts FIX_WHITESPACE_COMMAND
+  puts commit_command(commit)
+  puts
+end
+
+unless files_in_multiple_commits.empty?
+  puts '## '
+  puts '## FILES MODIFIED IN SEVERAL COMMITS'
+  puts '## '
+  puts ''
+  files_in_multiple_commits.each do |file, commits|
+    puts "\#\# FILE: #{file}"
+    commits.each { |commit| puts "\#\# #{commit}" }
+    puts
+  end
+end

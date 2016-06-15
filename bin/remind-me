@@ -1,0 +1,47 @@
+#!/usr/bin/env ruby
+
+require 'optparse'
+require 'optparse/time'
+
+options = {}
+
+OptionParser.new do |opts|
+  opts.banner = "remind-me [options]"
+
+  opts.on("-i", "--in N", Float, "Hours to wait before reminding.") do |in_hours|
+    options[:start_time] = Time.now + (in_hours * 3600)
+  end
+
+  opts.on("-s", "--start TIME", Time, "Time at which to trigger reminder.") do |start_time|
+    options[:start_time] = start_time
+  end
+
+  opts.on("-m", "--message MSG", "Message for the reminder.") do |message|
+    options[:message] = message
+  end
+
+  opts.on("-t", "--title [TITLE]", "Title for the reminder in task scheduler.") do |title|
+    options[:title] = title
+  end
+end.parse!
+
+if options[:title].nil?
+  options[:title] = "'task-#{Random.rand(10000)}'"
+end
+
+if options[:message].nil?
+  puts "No message specified. Use the -h or --help options for more information."
+  exit(1)
+end
+
+if options[:start_time].nil?
+  puts "No start time specified. Use the -h or --help options for more information."
+  exit(1)
+end
+
+msg_cmd = %Q{C:\\Windows\\System32\\msg.exe marcel.valdez '#{options[:message]}'}
+start_time = options[:start_time].strftime "%H:%M"
+task_cmd = %Q{schtasks /create /TN #{options[:title]} /sc ONCE /ST #{start_time} /TR "#{msg_cmd}"}
+
+result = `#{task_cmd}`
+puts result
