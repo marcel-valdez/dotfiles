@@ -45,7 +45,7 @@ if __name__ == '__main__':
   script_name = sys.argv[0]
   if len(sys.argv) < 3:
     print "Usage: " + sys.argv[0] + " <filename> <command> <arg1> <arg2> ... <argN>"
-    exit(1)
+    sys.exit(1)
 
   filename = sys.argv[1]
   command_args = sys.argv[2:len(sys.argv)]

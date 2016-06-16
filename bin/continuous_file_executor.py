@@ -10,10 +10,10 @@ import curses
 def validate_file(filename):
   if not os.path.isfile(filename):
     print "The file " + filename + " does not exist."
-    exit(1)
+    sys.exit(1)
   if not os.access(filename, os.R_OK):
     print "The file " + filename + " is not accessible."
-    exit(1)
+    sys.exit(1)
 
 def get_modification_time(filename):
   return os.path.getmtime(filename)
@@ -96,6 +96,6 @@ def main(filename):
 if __name__ == '__main__':
   if len(sys.argv) < 2:
     print "Usage: " + sys.argv[0] + " <filename> "
-    exit(1)
+    sys.exit(1)
 
   main(sys.argv[1])
