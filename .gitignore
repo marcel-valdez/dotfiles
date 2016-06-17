@@ -35,4 +35,3 @@ bin/FoxitReader
 bin/__check_version.py
 bin/__latest_version.py
 bin/check-all-versions
-
