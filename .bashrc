@@ -124,7 +124,6 @@ if ! shopt -oq posix; then
   fi
 fi
 
-
 if [ -f ~/.bash_functions ]; then
   source "$HOME/.bash_functions"
 fi
@@ -145,6 +144,8 @@ if [ "$(expr substr $(uname) 1 5)" == "Linux" ]; then
     tmux attach
   fi
 fi
+
+export CHECK_PACKAGES_CONFIG="$HOME/.launchpad-helper"
 
 # This sets up the default node version and loads it
 export NODE_VERSION="6.2.1"
