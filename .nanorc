@@ -171,7 +171,7 @@ set tabstospaces
 # set wordbounds
 
 ## Enable the new (EXPERIMENTAL) generic undo code, not just for line cuts
-# set undo
+set undo
 
 ## Enable soft line wrapping (AKA full line display)
 # set softwrap
