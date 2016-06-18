@@ -22,6 +22,10 @@ agent_has_keys() {
   ssh-add -l > /dev/null 2>&1
 }
 
+agent_has_home_keys() {
+  ssh-add -l | grep "$HOME/.ssh/" > /dev/null 2>&1
+}
+
 agent_load_env() {
   source "$env" > /dev/null
 }
@@ -41,6 +45,8 @@ if ! agent_is_running; then
   agent_start
   ssh-add
 elif ! agent_has_keys; then
+  ssh-add
+elif ! agent_has_home_keys; then
   ssh-add
 fi
 
