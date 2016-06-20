@@ -18,6 +18,7 @@
 !.XCompose
 !.Xmodmap
 !.xinitrc
+!.xsession
 !bin/
 !bin/*
 bin/dex
