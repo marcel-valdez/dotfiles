@@ -17,6 +17,7 @@
 !.gitignore
 !.XCompose
 !.Xmodmap
+!.xinitrc
 !bin/
 !bin/*
 bin/dex
