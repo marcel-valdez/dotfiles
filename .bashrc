@@ -151,4 +151,4 @@ export CHECK_PACKAGES_CONFIG="$HOME/.launchpad-helper"
 # This sets up the default node version and loads it
 export NODE_VERSION="6.2.1"
 node-check-use --silent
-export CHECK_PACKAGES_CONFIG="$HOME/res/packages_config"
+
