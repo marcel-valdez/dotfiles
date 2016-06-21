@@ -151,6 +151,10 @@ if [ "$(expr substr $(uname) 1 5)" == "Linux" ]; then
   if [ "$TERM" == "xterm" ] || [ "$TERM" == "linux" ]; then
     # this will run for every terminal (but not for every pane)
     tmux attach
+  else
+    # we are already in a tmux session, this will run for every
+    # tmux pane
+    $HOME/bin/verify-packages
   fi
 fi
 
