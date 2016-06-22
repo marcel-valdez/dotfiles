@@ -142,6 +142,7 @@ export PATH=$PATH:"$HOME/.rvm/bin"
 export NVM_DIR="$HOME/.nvm"
 export CHECK_PACKAGES_CONFIG="$HOME/.launchpad-helper"
 export NODE_VERSION="6.2.1"
+export BIN_UTILS_PASS_PHRASE_FILE="$HOME/.bin-utils-pass-phrase"
 
 if [ "$(expr substr $(uname) 1 5)" == "Linux" ]; then
   export GIT_EDITOR=nano
