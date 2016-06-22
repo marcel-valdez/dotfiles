@@ -1,0 +1,40 @@
+#!/usr/bin/env bash
+
+function usage() {
+  >&2 echo "nc-send <receiving hostname> [filename]"
+  >&2 echo "receiving hostname <required>: the hostname/IP to the machine on the receiving end"
+  >&2 echo "filename [optional]: the file to send to the other machine"
+}
+
+if [ "$1" == "" ]; then
+  usage
+  exit 1
+fi
+
+if [ "$2" == "" ]; then
+  nc -w 3 $1 13579
+else
+  filepath="$2"
+  if ! [ -f "$filepath" ]; then
+    >&2 echo "File $filepath does not exist."
+    usage
+    exit 1
+  fi
+
+  pass_phrase=$(get-pass-phrase)
+  if ! [ $? -eq 0 ]; then
+    exit 1
+  fi
+
+  encrypt $filepath $pass_phrase
+
+  function cleanup() {
+    if [ -f "$filepath.enc" ]; then
+      rm "$filepath.enc"
+    fi
+  }
+
+  trap cleanup EXIT
+
+  nc -w 3 $1 13579 < "$filepath.enc"
+fi
