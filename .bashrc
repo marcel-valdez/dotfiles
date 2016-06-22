@@ -134,16 +134,16 @@ if [ -f ~/.bash_functions ]; then
 fi
 
 # Path additions
-export PATH=$PATH:"$HOME/bin"
+if [ -f "$HOME/bin" ]; then
+  export PATH=$PATH:"$HOME/bin"
+fi
 # Add RVM to PATH for scripting
 export PATH=$PATH:"$HOME/.rvm/bin"
-
 # custom environment variables
 # export J2D_PIXMAPS="shared"
 export NVM_DIR="$HOME/.nvm"
 export CHECK_PACKAGES_CONFIG="$HOME/.launchpad-helper"
 export NODE_VERSION="6.2.1"
-
 
 if [ "$(expr substr $(uname) 1 5)" == "Linux" ]; then
   export GIT_EDITOR=nano
@@ -160,5 +160,8 @@ fi
 
 # This loads nvm
 [ -s "$NVM_DIR/nvm.sh" ] && source "$NVM_DIR/nvm.sh"
+# Load RVM into a shell session *as a function*
+[[ -s "$HOME/.rvm/scripts/rvm" ]] && source "$HOME/.rvm/scripts/rvm"
+
 # This sets up the default node version and loads it
 node-check-use --silent
