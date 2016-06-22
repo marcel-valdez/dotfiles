@@ -9,8 +9,6 @@ case $- in
     *) return;;
 esac
 
-source "$HOME/lib/ssh-persist-session.sh"
-
 # don't put duplicate lines or lines starting with space in the history.
 # See bash(1) for more options
 HISTCONTROL=ignoreboth
@@ -149,6 +147,8 @@ if [ "$(expr substr $(uname) 1 5)" == "Linux" ]; then
   export GIT_EDITOR=nano
   export EDITOR=nano
   if [ "$TERM" == "xterm" ] || [ "$TERM" == "linux" ]; then
+    # This is slow, so we do not want to do it for every TMUX pane
+    source "$HOME/lib/ssh-persist-session.sh"
     # this will run for every terminal (but not for every pane)
     tmux attach
   else
@@ -162,6 +162,5 @@ fi
 [ -s "$NVM_DIR/nvm.sh" ] && source "$NVM_DIR/nvm.sh"
 # Load RVM into a shell session *as a function*
 [[ -s "$HOME/.rvm/scripts/rvm" ]] && source "$HOME/.rvm/scripts/rvm"
-
 # This sets up the default node version and loads it
 node-check-use --silent
