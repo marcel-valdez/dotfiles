@@ -112,8 +112,16 @@ if [ -f "$HOME/.bash_aliases" ]; then
   source "$HOME/.bash_aliases"
 fi
 
+if [ -f "$HOME/.bash_functions" ]; then
+  source "$HOME/.bash_functions"
+fi
+
 if [ -f "$HOME/.google_aliases" ]; then
   source "$HOME/.google_aliases"
+fi
+
+if [ -f "$HOME/.google_functions" ]; then
+  source "$HOME/.google_functions"
 fi
 
 # enable programmable completion features (you don't need to enable
@@ -125,10 +133,6 @@ if ! shopt -oq posix; then
   elif [ -f /etc/bash_completion ]; then
     source /etc/bash_completion
   fi
-fi
-
-if [ -f ~/.bash_functions ]; then
-  source "$HOME/.bash_functions"
 fi
 
 # Path additions
