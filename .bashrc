@@ -121,6 +121,10 @@ if [ -f "$HOME/.bash_functions" ]; then
   source "$HOME/.bash_functions"
 fi
 
+if [ -f "$HOME/.googlerc" ]; then
+  source "$HOME/.googlerc"
+fi
+
 if [ -f "$HOME/.google_aliases" ]; then
   source "$HOME/.google_aliases"
 fi
