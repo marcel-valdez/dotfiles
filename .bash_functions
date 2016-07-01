@@ -121,3 +121,16 @@ npm-run-all() {
   run-step "npm run lint" "4/5"
   run-step "npm run validateLicenses" "5/5"
 }
+
+function top-n() {
+  history \
+  | sed 's/^ \+//;s/  / /' \
+  | cut -d']' -f2- \
+  | awk '{ count[$0]++ } END { for (i in count) print count[i], i }' \
+  | sort -rn \
+  | head -$1
+}
+
+function top-ten() {
+  top-n 10
+}
