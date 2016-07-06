@@ -22,7 +22,7 @@ else
   # command line, and therefore don't need to execute .bashrc
 
   # Instructions required even when not in bash shell
-  if [ -f "$HOME/bin" ]; then
+  if [ -d "$HOME/bin" ]; then
     export PATH=$PATH:"$HOME/bin"
   fi
 
