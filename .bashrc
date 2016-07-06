@@ -145,7 +145,7 @@ if ! shopt -oq posix; then
 fi
 
 # Path additions
-if [ -f "$HOME/bin" ]; then
+if [ -d "$HOME/bin" ]; then
   export PATH=$PATH:"$HOME/bin"
 fi
 # Add RVM to PATH for scripting
@@ -168,7 +168,7 @@ if [ "$(expr substr $(uname) 1 5)" == "Linux" ]; then
   else
     # we are already in a tmux session, this will run for every
     # tmux pane
-    $HOME/bin/verify-packages
+    verify-packages --use-cache
   fi
 fi
 
