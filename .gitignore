@@ -25,6 +25,7 @@
 !bin/*
 bin/dex
 bin/mail-notify-data
+bin/rebaser
 
 *.pyc
 !.fluxbox/keys
