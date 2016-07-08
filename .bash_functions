@@ -134,3 +134,12 @@ function top-n() {
 function top-ten() {
   top-n 10
 }
+
+function java-package-to-path() {
+  package="$1"
+  if [ "$package" == "" ]; then
+    cat | sed 's/\./\//g'
+  else
+    echo "$package" | sed 's/\./\//g'
+  fi
+}
