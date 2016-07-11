@@ -1,0 +1,27 @@
+syntax "KickStart" "\.ks$" "\.kickstart$"
+
+color brightmagenta  "%[a-z]+"
+color cyan  "^[[:space:]]*(install|cdrom|text|graphical|volgroup|logvol|reboot|timezone|lang|keyboard|authconfig|firstboot|rootpw|user|firewall|selinux|repo|part|partition|clearpart|bootloader)"
+color cyan  "--(name|mirrorlist|baseurl|utc)(=|\>)"
+color brightyellow "\$(releasever|basearch)\>"
+
+# Packages and groups
+color brightblack "^@[A-Za-z][A-Za-z-]*"
+color brightred   "^-@[a-zA-Z0-9*-]+"
+color red         "^-[a-zA-Z0-9*-]+"
+
+color brightblack "(^|[[:space:]])#([^{].*)?$"
+color ,green "[[:space:]]+$"
+color ,red "	+ +| +	+"
+
+# trailing whitespace
+color ,blue "[[:space:]]+$"
+# multiples of eight spaces at the start a line
+# (after zero or more tabs) should be a tab
+color ,blue "^([TAB]*[ ]{8})+"
+# tabs after spaces
+color ,yellow "( )+TAB"
+# highlight indents that have an odd number of spaces
+color ,red "^(([ ]{2})+|(TAB+))*[ ]{1}[^ ]{1}"
+# lines longer than 80 characters
+color ,yellow "^(.{80})|(TAB.{63})|(TAB{2}.{55})|(TAB{3}.{47}).+$"

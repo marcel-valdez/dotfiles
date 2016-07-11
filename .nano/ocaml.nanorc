@@ -1,0 +1,37 @@
+syntax "OCaml" "\.mli?$"
+#uid
+color red "\<[A-Z][0-9a-z_]{2,}\>"
+#declarations
+color green "\<(let|val|method|in|and|rec|private|virtual|constraint)\>"
+#structure items
+color red "\<(type|open|class|module|exception|external)\>"
+#patterns
+color blue "\<(fun|function|functor|match|try|with)\>"
+#patterns-modifiers
+color yellow "\<(as|when|of)\>" 
+#conditions
+color cyan "\<(if|then|else)\>"
+#blocs
+color magenta "\<(begin|end|object|struct|sig|for|while|do|done|to|downto)\>"
+#constantes
+color green "\<(true|false)\>"
+#modules/classes
+color green "\<(include|inherit|initializer)\>"
+#expr modifiers
+color yellow "\<(new|ref|mutable|lazy|assert|raise)\>"
+#comments
+color white start="\(\*" end="\*\)"
+#strings (no multiline handling yet)
+color brightblack ""[^\"]*""
+
+# trailing whitespace
+color ,blue "[[:space:]]+$"
+# multiples of eight spaces at the start a line
+# (after zero or more tabs) should be a tab
+color ,blue "^([TAB]*[ ]{8})+"
+# tabs after spaces
+color ,yellow "( )+TAB"
+# highlight indents that have an odd number of spaces
+color ,red "^(([ ]{2})+|(TAB+))*[ ]{1}[^ ]{1}"
+# lines longer than 80 characters
+color ,yellow "^(.{80})|(TAB.{63})|(TAB{2}.{55})|(TAB{3}.{47}).+$"

@@ -1,0 +1,21 @@
+## Here is an example for manpages.
+##
+syntax "Man" "\.[1-9]x?$"
+color green "\.(S|T)H.*$"
+color brightgreen "\.(S|T)H" "\.TP"
+color brightred "\.(BR?|I[PR]?).*$"
+color brightblue "\.(BR?|I[PR]?|PP)"
+color brightwhite "\\f[BIPR]"
+color yellow "\.(br|DS|RS|RE|PD)"
+
+# trailing whitespace
+color ,blue "[[:space:]]+$"
+# multiples of eight spaces at the start a line
+# (after zero or more tabs) should be a tab
+color ,blue "^([TAB]*[ ]{8})+"
+# tabs after spaces
+color ,yellow "( )+TAB"
+# highlight indents that have an odd number of spaces
+color ,red "^(([ ]{2})+|(TAB+))*[ ]{1}[^ ]{1}"
+# lines longer than 80 characters
+color ,yellow "^(.{80})|(TAB.{63})|(TAB{2}.{55})|(TAB{3}.{47}).+$"

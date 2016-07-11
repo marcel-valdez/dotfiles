@@ -1,0 +1,38 @@
+## Syntax highlighting for Dockerfiles
+syntax "Dockerfile" "Dockerfile[^/]*$" "\.dockerfile$"
+
+## Keywords
+icolor red "^(FROM|MAINTAINER|RUN|CMD|LABEL|EXPOSE|ENV|ADD|COPY|ENTRYPOINT|VOLUME|USER|WORKDIR|ONBUILD)[[:space:]]"
+
+## Brackets & parenthesis
+color brightgreen "(\(|\)|\[|\])"
+
+## Double ampersand
+color brightmagenta "&&"
+
+## Comments
+icolor cyan "^[[:space:]]*#.*$"
+
+## Blank space at EOL
+color ,green "[[:space:]]+$"
+
+## Strings, single-quoted
+color brightwhite "'([^']|(\\'))*'" "%[qw]\{[^}]*\}" "%[qw]\([^)]*\)" "%[qw]<[^>]*>" "%[qw]\[[^]]*\]" "%[qw]\$[^$]*\$" "%[qw]\^[^^]*\^" "%[qw]![^!]*!"
+
+## Strings, double-quoted
+color brightwhite ""([^"]|(\\"))*"" "%[QW]?\{[^}]*\}" "%[QW]?\([^)]*\)" "%[QW]?<[^>]*>" "%[QW]?\[[^]]*\]" "%[QW]?\$[^$]*\$" "%[QW]?\^[^^]*\^" "%[QW]?![^!]*!"
+
+## Single and double quotes
+color brightyellow "('|\")"
+
+# trailing whitespace
+color ,blue "[[:space:]]+$"
+# multiples of eight spaces at the start a line
+# (after zero or more tabs) should be a tab
+color ,blue "^([TAB]*[ ]{8})+"
+# tabs after spaces
+color ,yellow "( )+TAB"
+# highlight indents that have an odd number of spaces
+color ,red "^(([ ]{2})+|(TAB+))*[ ]{1}[^ ]{1}"
+# lines longer than 80 characters
+color ,yellow "^(.{80})|(TAB.{63})|(TAB{2}.{55})|(TAB{3}.{47}).+$"

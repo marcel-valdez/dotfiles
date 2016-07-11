@@ -1,0 +1,28 @@
+syntax "CoffeeScript" "\.coffee$"
+header "^#!.*/(env +)?coffee"
+
+color red "[!&|=/*+-<>]|\<(and|or|is|isnt|not)\>"
+color brightblue "[A-Za-z_][A-Za-z0-9_]*:[[:space:]]*(->|\()" "->"
+color brightblue "[()]"
+color cyan  "\<(for|of|continue|break|isnt|null|unless|this|else|if|return)\>"
+color cyan  "\<(try|catch|finally|throw|new|delete|typeof|in|instanceof)\>"
+color cyan  "\<(debugger|switch|while|do|class|extends|super)\>"
+color cyan  "\<(undefined|then|unless|until|loop|of|by|when)\>"
+color brightcyan  "\<(true|false|yes|no|on|off)\>"
+color brightyellow "@[A-Za-z0-9_]*"
+color yellow ""(\\.|[^"])*"|'(\\.|[^'])*'"
+color brightblack "(^|[[:space:]])#([^{].*)?$"
+color ,green "[[:space:]]+$"
+color ,red "	+ +| +	+"
+
+# trailing whitespace
+color ,blue "[[:space:]]+$"
+# multiples of eight spaces at the start a line
+# (after zero or more tabs) should be a tab
+color ,blue "^([TAB]*[ ]{8})+"
+# tabs after spaces
+color ,yellow "( )+TAB"
+# highlight indents that have an odd number of spaces
+color ,red "^(([ ]{2})+|(TAB+))*[ ]{1}[^ ]{1}"
+# lines longer than 80 characters
+color ,yellow "^(.{80})|(TAB.{63})|(TAB{2}.{55})|(TAB{3}.{47}).+$"

@@ -1,0 +1,27 @@
+syntax "GLSL" "\.(frag|vert|fp|vp|glsl)$"
+
+color brightblue "[A-Za-z_][A-Za-z0-9_]*[[:space:]]*[()]"
+color green     "\<(void|bool|bvec2|bvec3|bvec4|int|ivec2|ivec3|ivec4|float|vec2|vec3|vec4|mat2|mat3|mat4|struct|sampler1D|sampler2D|sampler3D|samplerCUBE|sampler1DShadow|sampler2DShadow)\>"
+color green     "\<gl_(DepthRangeParameters|PointParameters|MaterialParameters|LightSourceParameters|LightModelParameters|LightModelProducts|LightProducts|FogParameters)\>"
+color cyan  "\<(const|attribute|varying|uniform|in|out|inout|if|else|return|discard|while|for|do)\>"
+color brightred     "\<(break|continue)\>"
+color brightcyan "\<(true|false)\>"
+color red "[-+/*=<>?:!~%&|^]"
+color blue   "\<([0-9]+|0x[0-9a-fA-F]*)\>"
+color brightblack "(^|[[:space:]])//.*"
+color brightblack start="/\*" end="\*/"
+color brightwhite,cyan "TODO:?"
+color ,green "[[:space:]]+$"
+color ,red "	+ +| +	+"
+
+# trailing whitespace
+color ,blue "[[:space:]]+$"
+# multiples of eight spaces at the start a line
+# (after zero or more tabs) should be a tab
+color ,blue "^([TAB]*[ ]{8})+"
+# tabs after spaces
+color ,yellow "( )+TAB"
+# highlight indents that have an odd number of spaces
+color ,red "^(([ ]{2})+|(TAB+))*[ ]{1}[^ ]{1}"
+# lines longer than 80 characters
+color ,yellow "^(.{80})|(TAB.{63})|(TAB{2}.{55})|(TAB{3}.{47}).+$"

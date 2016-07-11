@@ -1,0 +1,48 @@
+# Nano configuration for Rust
+# Copyright 2015 The Rust Project Developers.
+#
+# NOTE: Rules are applied in order: later rules re-colorize matching text.
+syntax "Rust" "\.rs"
+
+# function definition
+color magenta "fn [a-z0-9_]+"
+
+# Reserved words
+color yellow "\<(abstract|alignof|as|become|box|break|const|continue|crate|do|else|enum|extern|false|final|fn|for|if|impl|in|let|loop|macro|match|mod|move|mut|offsetof|override|priv|pub|pure|ref|return|sizeof|static|self|struct|super|true|trait|type|typeof|unsafe|unsized|use|virtual|where|while|yield)\>"
+
+# macros
+color red "[a-z_]+!"
+
+# Constants
+color magenta "[A-Z][A-Z_]+"
+
+# Traits/Enums/Structs/Types/etc.
+color magenta "[A-Z][a-z]+"
+
+# Strings
+color green "\".*\""
+color green start="\".*\\$" end=".*\""
+# NOTE: This isn't accurate but matching "#{0,} for the end of the string is too liberal
+color green start="r#+\"" end="\"#+"
+
+# Comments
+color blue "//.*"
+color blue start="/\*" end="\*/"
+
+# Attributes
+color magenta start="#!\[" end="\]"
+
+# Some common markers
+color brightcyan "(XXX|TODO|FIXME|\?\?\?)"
+
+# trailing whitespace
+color ,blue "[[:space:]]+$"
+# multiples of eight spaces at the start a line
+# (after zero or more tabs) should be a tab
+color ,blue "^([TAB]*[ ]{8})+"
+# tabs after spaces
+color ,yellow "( )+TAB"
+# highlight indents that have an odd number of spaces
+color ,red "^(([ ]{2})+|(TAB+))*[ ]{1}[^ ]{1}"
+# lines longer than 80 characters
+color ,yellow "^(.{80})|(TAB.{63})|(TAB{2}.{55})|(TAB{3}.{47}).+$"

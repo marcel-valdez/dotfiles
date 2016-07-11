@@ -1,0 +1,59 @@
+syntax "AsciiDoc" "\.(asc|asciidoc|adoc)$"
+
+# main header
+color red "^====+$"
+# h1
+color red "^==[[:space:]].*$"
+color red "^----+$"
+# h2
+color magenta "^===[[:space:]].*$"
+color magenta "^~~~~+$"
+# h4
+color green "^====[[:space:]].*$"
+color green "^\^\^\^\^+$"
+# h5
+color brightblue "^=====[[:space:]].*$"
+color brightblue "^\+\+\+\++$"
+
+# attributes
+color brightgreen ":.*:"
+color brightred "\{[a-z0-9]*\}"
+color red "\\\{[a-z0-9]*\}"
+color red "\+\+\+\{[a-z0-9]*\}\+\+\+"
+
+# Paragraph Title
+color yellow "^\..*$"
+
+# source 
+color magenta "^\[(source,.+|NOTE|TIP|IMPORTANT|WARNING|CAUTION)\]"
+
+# Other markup
+color yellow ".*[[:space:]]\+$"
+color yellow "_[^_]+_"
+color yellow "\*[^\*]+\*"
+color yellow "\+[^\+]+\+"
+color yellow "`[^`]+`"
+color yellow "\^[^\^]+\^"
+color yellow "~[^~]+~"
+color yellow "'[^']+'"
+
+color cyan "`{1,2}[^']+'{1,2}"
+
+# bullets
+color brightmagenta "^[[:space:]]*[\*\.-]{1,5}[[:space:]]"
+
+# anchors
+color brightwhite "\[\[.*\]\]"
+color brightwhite "<<.*>>"
+
+# trailing whitespace
+color ,blue "[[:space:]]+$"
+# multiples of eight spaces at the start a line
+# (after zero or more tabs) should be a tab
+color ,blue "^([TAB]*[ ]{8})+"
+# tabs after spaces
+color ,yellow "( )+TAB"
+# highlight indents that have an odd number of spaces
+color ,red "^(([ ]{2})+|(TAB+))*[ ]{1}[^ ]{1}"
+# lines longer than 80 characters
+color ,yellow "^(.{80})|(TAB.{63})|(TAB{2}.{55})|(TAB{3}.{47}).+$"

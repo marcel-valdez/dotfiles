@@ -1,0 +1,38 @@
+## Arch PKGBUILD files
+##
+syntax "PKGBUILD" "^.*PKGBUILD$"
+color green start="^." end="$"
+color cyan "^.*(pkgbase|pkgname|pkgver|pkgrel|pkgdesc|arch|url|license).*=.*$"
+color brightcyan "\<(pkgbase|pkgname|pkgver|pkgrel|pkgdesc|arch|url|license)\>"
+color brightcyan "(\$|\$\{|\$\()(pkgbase|pkgname|pkgver|pkgrel|pkgdesc|arch|url|license)(\}|\))"
+color cyan "^.*(depends|makedepends|optdepends|conflicts|provides|replaces).*=.*$"
+color brightcyan "\<(depends|makedepends|optdepends|conflicts|provides|replaces)\>"
+color brightcyan "(\$|\$\{|\$\()(depends|makedepends|optdepends|conflicts|provides|replaces)(\}|\))"
+color cyan "^.*(groups|backup|noextract|options).*=.*$"
+color brightcyan "\<(groups|backup|noextract|options)\>"
+color brightcyan "(\$|\$\{|\$\()(groups|backup|noextract|options)(\}|\))"
+color cyan "^.*(install|source|md5sums|sha1sums|sha256sums|sha384sums|sha512sums).*=.*$"
+color brightcyan "\<(install|source|md5sums|sha1sums|sha256sums|sha384sums|sha512sums)\>"
+color brightcyan "(\$|\$\{|\$\()(install|source|md5sums|sha1sums|sha256sums|sha384sums|sha512sums)(\}|\))"
+color brightcyan "\<(startdir|srcdir|pkgdir)\>"
+color cyan "\.install"
+color brightwhite "=" "'" "\(" "\)" "\"" "#.*$" "\," "\{" "\}"
+color brightred "build\(\)"
+color brightred "package_.*.*$"
+color brightred "\<(configure|make|cmake|scons)\>"
+color red "\<(DESTDIR|PREFIX|prefix|sysconfdir|datadir|libdir|includedir|mandir|infodir)\>"
+
+## Trailing whitespace
+color ,green "[[:space:]]+$"
+
+# trailing whitespace
+color ,blue "[[:space:]]+$"
+# multiples of eight spaces at the start a line
+# (after zero or more tabs) should be a tab
+color ,blue "^([TAB]*[ ]{8})+"
+# tabs after spaces
+color ,yellow "( )+TAB"
+# highlight indents that have an odd number of spaces
+color ,red "^(([ ]{2})+|(TAB+))*[ ]{1}[^ ]{1}"
+# lines longer than 80 characters
+color ,yellow "^(.{80})|(TAB.{63})|(TAB{2}.{55})|(TAB{3}.{47}).+$"
