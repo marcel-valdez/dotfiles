@@ -5,13 +5,12 @@ alias cls='clear'
 alias edit-bashrc='edit_bashrc_func'
 alias load-bashrc='source $HOME/.bashrc'
 alias nano='nano -F'
-alias rm_merge_files='rm -f `find | grep ".*\.\(REMOTE\|LOCAL\|BASE\).*\.java"`'
+alias rm-merge-files='rm -f `find | grep ".*\.\(REMOTE\|LOCAL\|BASE\).*\.java"`'
 alias search='find -iregex'
 alias search-history='history | grep -v history | grep '
 alias vdir='ls --color=auto --format=long'
 alias webserver='python -m SimpleHTTPServer'
 alias wget_page='wget -q -O -'
-alias copy-to-clip="perl -pe 'chomp if eof' | xclip -sel clip"
 alias less-lineno='less -N'
 alias nano-crypto=crypto-file
 

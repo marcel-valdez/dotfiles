@@ -1,23 +1,23 @@
 #!/bin/bash
 
 diff-lines() {
-    local path=
-    local line=
-    while read; do
-        esc=$'\033'
-        if [[ $REPLY =~ ---\ (a/)?.* ]]; then
-            continue
-        elif [[ $REPLY =~ \+\+\+\ (b/)?([^[:blank:]$esc]+).* ]]; then
-            path=${BASH_REMATCH[2]}
-        elif [[ $REPLY =~ @@\ -[0-9]+(,[0-9]+)?\ \+([0-9]+)(,[0-9]+)?\ @@.* ]]; then
-            line=${BASH_REMATCH[2]}
-        elif [[ $REPLY =~ ^($esc\[[0-9;]+m)*([\ +-]) ]]; then
-            echo "$path:$line:$REPLY"
-            if [[ ${BASH_REMATCH[2]} != - ]]; then
-                ((line++))
-            fi
-        fi
-    done
+  local path=
+  local line=
+  while read; do
+    esc=$'\033'
+    if [[ $REPLY =~ ---\ (a/)?.* ]]; then
+      continue
+    elif [[ $REPLY =~ \+\+\+\ (b/)?([^[:blank:]$esc]+).* ]]; then
+      path=${BASH_REMATCH[2]}
+    elif [[ $REPLY =~ @@\ -[0-9]+(,[0-9]+)?\ \+([0-9]+)(,[0-9]+)?\ @@.* ]]; then
+      line=${BASH_REMATCH[2]}
+    elif [[ $REPLY =~ ^($esc\[[0-9;]+m)*([\ +-]) ]]; then
+      echo "$path:$line:$REPLY"
+      if [[ ${BASH_REMATCH[2]} != - ]]; then
+        ((line++))
+      fi
+    fi
+  done
 }
 
 # start git functions
@@ -138,8 +138,17 @@ function top-ten() {
 function java-package-to-path() {
   package="$1"
   if [ "$package" == "" ]; then
-    cat | sed 's/\./\//g'
-  else
-    echo "$package" | sed 's/\./\//g'
+    package=$(cat)
   fi
+
+  echo "$package" | sed 's/\./\//g'
+}
+
+function copy-to-clip() {
+  __text__="$1"
+  if [ "$__text__" == "" ]; then
+    __text__=$(cat)
+  fi
+
+  echo "$__text__" | perl -pe 'chomp if eof' | xclip -sel clip
 }
