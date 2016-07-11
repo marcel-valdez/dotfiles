@@ -35,7 +35,7 @@ set backupdir "$HOME/.nano_bak"
 ## punctuation, optionally followed by closing brackets, can end
 ## sentences.
 ##
-# set brackets ""')>]}"
+set brackets ""')>]}"
 
 ## Do case sensitive searches by default.
 # set casesensitive
@@ -60,7 +60,7 @@ set historylog
 ## searches.  They cannot contain blank characters.  The former set must
 ## come before the latter set, and both must be in the same order.
 ##
-# set matchbrackets "(<[{)>]}"
+set matchbrackets "(<[{)>]}"
 
 ## Use the blank line below the titlebar as extra editing space.
 # set morespace
