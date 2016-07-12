@@ -15,5 +15,5 @@ color ,blue "^([TAB]*[ ]{8})+"
 color ,yellow "( )+TAB"
 # highlight indents that have an odd number of spaces
 color ,red "^(([ ]{2})+|(TAB+))*[ ]{1}[^ ]{1}"
-# lines longer than 80 characters
-color ,yellow "^(.{80})|(TAB.{63})|(TAB{2}.{55})|(TAB{3}.{47}).+$"
+# lines longer than 100 characters
+color ,yellow "^(.{100})|(TAB.{63})|(TAB{2}.{55})|(TAB{3}.{47}).+$"
