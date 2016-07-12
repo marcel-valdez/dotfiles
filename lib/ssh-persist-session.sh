@@ -1,7 +1,9 @@
 # Save SSH key
 # Note: ~/.ssh/environment should not be used, as it already has a
 # different purpose in SSH
-env=~/.ssh/agent.env
+HOME_SSH="$HOME/.ssh"
+env="$HOME_SSH/agent.env"
+clear_ssh_add_l_cache
 
 # Note: Don't bother checking SSH_AGENT_PID. It is not used by
 # SSH itself, and it might even be incorrect.
@@ -47,7 +49,12 @@ agent_has_keys() {
 
 agent_has_home_keys() {
   cache_ssh_add_l
-  echo "$SSH_KEYS" | grep "$HOME/.ssh/" > /dev/null 2>&1
+  __grep_home_ssh=$(echo "$SSH_KEYS" | grep -o "$HOME_SSH")
+  if [ "$__grep_home_ssh" == "$HOME_SSH" ]; then
+    true
+  else
+    false
+  fi
 }
 
 agent_load_env() {
@@ -74,7 +81,7 @@ else
     echo "Adding all keys to ssh-agent"
     ssh-add
   elif ! agent_has_home_keys; then
-    echo "Adding keys in $HOME/.ssh/ dir to ssh-agent"
+    echo "Adding keys in $HOME_SSH dir to ssh-agent"
     ssh-add
   fi
 fi
