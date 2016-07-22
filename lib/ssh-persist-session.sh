@@ -3,7 +3,6 @@
 # different purpose in SSH
 HOME_SSH="$HOME/.ssh"
 env="$HOME_SSH/agent.env"
-clear_ssh_add_l_cache
 
 # Note: Don't bother checking SSH_AGENT_PID. It is not used by
 # SSH itself, and it might even be incorrect.
@@ -13,6 +12,8 @@ clear_ssh_add_l_cache() {
   unset SSH_KEYS
   unset SSH_ADD_STATUS
 }
+
+clear_ssh_add_l_cache
 
 cache_ssh_add_l() {
   if [ "$SSH_KEYS" == "" ]; then
