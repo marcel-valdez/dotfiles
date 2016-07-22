@@ -152,3 +152,24 @@ function copy-to-clip() {
 
   echo "$__text__" | perl -pe 'chomp if eof' | xclip -sel clip
 }
+
+function paste-clip() {
+  xclip -o
+}
+
+function get-arg-or-stdin() {
+  __arg="$1"
+  if [ "$__arg" == "" ]; then
+    __arg=$(cat)
+  fi
+
+  echo "$__arg"
+}
+
+function tmux-to-clip() {
+  tmux show-buffer | copy-to-clip
+}
+
+function history-cmd-only() {
+  history | sed 's/^[^]]*\]//'
+}
