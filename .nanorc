@@ -249,6 +249,9 @@ bind ^H help main
 unbind ^O all
 bind ^S writeout all
 
+unbind ^R main
+bind ^O insert main
+
 unbind M-M main
 bind M-M findbracket main
 
@@ -260,6 +263,7 @@ bind M-y redo main
 
 unbind ^L main
 bind ^L gotoline main
+
 
 ## Set this if your backspace key sends delete most of the time (2.1.3+)
 # bind kdel backspace all
