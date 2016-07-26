@@ -40,6 +40,32 @@ if [ -z "${debian_chroot:-}" ] && [ -r /etc/debian_chroot ]; then
   debian_chroot=$(cat /etc/debian_chroot)
 fi
 
+
+# Alias definitions.
+# You may want to put all your additions into a separate file like
+# ~/.bash_aliases, instead of adding them here directly.
+# See /usr/share/doc/bash-doc/examples in the bash-doc package.
+
+if [ -f "$HOME/.bash_aliases" ]; then
+  source "$HOME/.bash_aliases"
+fi
+
+if [ -f "$HOME/.bash_functions" ]; then
+  source "$HOME/.bash_functions"
+fi
+
+if [ -f "$HOME/.googlerc" ]; then
+  source "$HOME/.googlerc"
+fi
+
+if [ -f "$HOME/.google_aliases" ]; then
+  source "$HOME/.google_aliases"
+fi
+
+if [ -f "$HOME/.google_functions" ]; then
+  source "$HOME/.google_functions"
+fi
+
 # set a fancy prompt (non-color, unless we know we "want" color)
 case "$TERM" in
   xterm-color) color_prompt=yes;;
@@ -63,14 +89,17 @@ fi
 
 color_prompt=yes
 
-if [ "$color_prompt" = yes ]; then
-  #PS1='${debian_chroot:+($debian_chroot)}\[\033[01;32m\]\u@\h\[\033[00m\]:\[\033[01;34m\]\w\[\033[00m\]\$ '
-  # do not display username, I am always me ;)
-  PS1='${debian_chroot:+($debian_chroot)}\[\033[01;32m\]@\h\[\033[00m\]:\[\033[01;34m\]\w\[\033[00m\]\n\$ '
+__function_exists=$((type g3-client-name >/dev/null 2>&1 && echo "yes") || echo "no")
+if [ "$__function_exists" == "yes" ]; then
+  __PS1_SUFFIX='$(g3-client-name)\n\$ '
 else
-  #PS1='${debian_chroot:+($debian_chroot)}\u@\h:\w\$ '
-  # do not display username, I am always me ;)
-  PS1='${debian_chroot:+($debian_chroot)}@\h:\w\$ '
+  __PS1_SUFFIX='\n\$ '
+fi
+
+if [ "$color_prompt" = yes ]; then
+  PS1='${debian_chroot:+($debian_chroot)}\[\033[01;32m\]@\h\[\033[00m\]:\[\033[01;34m\]\w\[\033[00m\]'$__PS1_SUFFIX
+else
+  PS1='${debian_chroot:+($debian_chroot)}@\h:\w'$__PS1_SUFFIX
 fi
 
 unset color_prompt force_color_prompt
@@ -78,8 +107,6 @@ unset color_prompt force_color_prompt
 # If this is an xterm set the title to user@host:dir
 case "$TERM" in
 xterm*|rxvt*)
-  #PS1="\[\e]0;${debian_chroot:+($debian_chroot)}\u@\h: \w\a\]$PS1"
-  # do not display username, I am always me ;)
   PS1="\[\e]0;${debian_chroot:+($debian_chroot)}@\h: \w\a\]$PS1"
   ;;
 *)
@@ -106,31 +133,6 @@ alias l='ls -CF'
 # Add an "alert" alias for long running commands.  Use like so:
 #   sleep 10; alert
 # alias alert='notify-send --urgency=low -i "$([ $? = 0 ] && echo terminal || echo error)" "$(history|tail -n1|sed -e '\''s/^\s*[0-9]\+\s*//;s/[;&|]\s*alert$//'\'')"'
-
-# Alias definitions.
-# You may want to put all your additions into a separate file like
-# ~/.bash_aliases, instead of adding them here directly.
-# See /usr/share/doc/bash-doc/examples in the bash-doc package.
-
-if [ -f "$HOME/.bash_aliases" ]; then
-  source "$HOME/.bash_aliases"
-fi
-
-if [ -f "$HOME/.bash_functions" ]; then
-  source "$HOME/.bash_functions"
-fi
-
-if [ -f "$HOME/.googlerc" ]; then
-  source "$HOME/.googlerc"
-fi
-
-if [ -f "$HOME/.google_aliases" ]; then
-  source "$HOME/.google_aliases"
-fi
-
-if [ -f "$HOME/.google_functions" ]; then
-  source "$HOME/.google_functions"
-fi
 
 # enable programmable completion features (you don't need to enable
 # this, if it's already enabled in /etc/bash.bashrc and /etc/profile
@@ -177,3 +179,4 @@ fi
 [[ -s "$HOME/.rvm/scripts/rvm" ]] && source "$HOME/.rvm/scripts/rvm"
 # This sets up the default node version and loads it
 node-check-use --silent
+
