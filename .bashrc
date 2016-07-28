@@ -161,7 +161,8 @@ export BIN_UTILS_PASS_PHRASE_FILE="$HOME/.bin-utils-pass-phrase"
 if [ "$(expr substr $(uname) 1 5)" == "Linux" ]; then
   export GIT_EDITOR=nano
   export EDITOR=nano
-  if [ "$TERM" == "xterm" ] || [ "$TERM" == "linux" ]; then
+  __XTERM=$(echo "$TERM" | grep -o "xterm")
+  if [ "$__XTERM" == "xterm" ] || [ "$TERM" == "linux" ]; then
     # This is slow, so we do not want to do it for every TMUX pane
     source "$HOME/lib/ssh-persist-session.sh"
     # this will run for every terminal (but not for every pane)
