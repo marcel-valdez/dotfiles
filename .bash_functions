@@ -173,3 +173,7 @@ function tmux-to-clip() {
 function history-cmd-only() {
   history | sed 's/^[^]]*\]//'
 }
+
+function cmd-exists() {
+  ( type "$1" >/dev/null 2>&1 && echo "true" ) || echo "false"
+}
