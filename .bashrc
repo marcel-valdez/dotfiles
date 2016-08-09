@@ -8,6 +8,10 @@ case $- in
     *) return;;
 esac
 
+function log_debug() {
+  [ "$DEBUG_BASHRC" != "" ] && echo "$(date +%H:%M:%S) $1"
+}
+
 # don't put duplicate lines or lines starting with space in the history.
 # See bash(1) for more options
 export HISTCONTROL=ignoreboth:erasedups
@@ -46,6 +50,7 @@ fi
 # ~/.bash_aliases, instead of adding them here directly.
 # See /usr/share/doc/bash-doc/examples in the bash-doc package.
 
+log_debug "Loading .bash* sources"
 if [ -f "$HOME/.bash_aliases" ]; then
   source "$HOME/.bash_aliases"
 fi
@@ -53,7 +58,9 @@ fi
 if [ -f "$HOME/.bash_functions" ]; then
   source "$HOME/.bash_functions"
 fi
+log_debug "Loaded .bash* sources"
 
+log_debug "Loading .google* sources"
 if [ -f "$HOME/.googlerc" ]; then
   source "$HOME/.googlerc"
 fi
@@ -65,6 +72,7 @@ fi
 if [ -f "$HOME/.google_functions" ]; then
   source "$HOME/.google_functions"
 fi
+log_debug "Loaded .google* sources"
 
 # set a fancy prompt (non-color, unless we know we "want" color)
 case "$TERM" in
@@ -89,6 +97,7 @@ fi
 
 color_prompt=yes
 
+log_debug "Setting PS1 (prompt)"
 __function_exists=$((type g3-client-name >/dev/null 2>&1 && echo "yes") || echo "no")
 if [ "$__function_exists" == "yes" ]; then
   __PS1_SUFFIX='$(g3-client-name)\n\$ '
@@ -112,6 +121,7 @@ xterm*|rxvt*)
 *)
   ;;
 esac
+log_debug "Done setting PS1 (prompt)"
 
 # enable color support of ls and also add handy aliases
 if [ -x /usr/bin/dircolors ]; then
@@ -134,6 +144,7 @@ alias l='ls -CF'
 #   sleep 10; alert
 # alias alert='notify-send --urgency=low -i "$([ $? = 0 ] && echo terminal || echo error)" "$(history|tail -n1|sed -e '\''s/^\s*[0-9]\+\s*//;s/[;&|]\s*alert$//'\'')"'
 
+log_debug "Loading bash_completion"
 # enable programmable completion features (you don't need to enable
 # this, if it's already enabled in /etc/bash.bashrc and /etc/profile
 # sources /etc/bash.bashrc).
@@ -144,6 +155,8 @@ if ! shopt -oq posix; then
     source /etc/bash_completion
   fi
 fi
+
+log_debug "Loaded bash_completion"
 
 # Path additions
 if [ -d "$HOME/bin" ]; then
@@ -164,20 +177,33 @@ if [ "$(expr substr $(uname) 1 5)" == "Linux" ]; then
   __XTERM=$(echo "$TERM" | grep -o "xterm")
   if [ "$__XTERM" == "xterm" ] || [ "$TERM" == "linux" ]; then
     # This is slow, so we do not want to do it for every TMUX pane
+    log_debug "Loading SSH session"
     source "$HOME/lib/ssh-persist-session.sh"
+    log_debug "Loaded SSH session"
     # this will run for every terminal (but not for every pane)
     tmux attach
   else
     # we are already in a tmux session, this will run for every
     # tmux pane
+    log_debug "Verifying packages with cache"
     verify-packages --use-cache
+    log_debug "Verified packages with cache"
   fi
 fi
 
 # This loads nvm
+log_debug "Loading NVM"
 [ -s "$NVM_DIR/nvm.sh" ] && source "$NVM_DIR/nvm.sh"
+log_debug "Loaded NVM"
+
 # Load RVM into a shell session *as a function*
+log_debug "Loading RVM"
 [[ -s "$HOME/.rvm/scripts/rvm" ]] && source "$HOME/.rvm/scripts/rvm"
+log_debug "Loaded RVM"
+
+
 # This sets up the default node version and loads it
+log_debug "Loading node.js"
 node-check-use --silent
+log_debug "Loaded node.js"
 
