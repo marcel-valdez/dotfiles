@@ -207,3 +207,6 @@ log_debug "Loading node.js"
 node-check-use --silent
 log_debug "Loaded node.js"
 
+# Reads the pending log buffer
+log-buffer --read
+

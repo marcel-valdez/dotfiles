@@ -1,0 +1,30 @@
+#!/usr/bin/env bash
+
+if [ "$__LOG_BUFFER" == "" ]; then
+  __LOG_BUFFER="$HOME/.log-buffer"
+fi
+
+__USAGE="log-buffer: This function simply logs a message onto a buffer at
+$__LOG_BUFFER that is read and printed on every log-buffer call,
+in order to change where the log is sent to, then set the variable \$__LOG_BUFFER
+
+Usage: log-buffer [--read]
+  --read: when set, the log is read and emptied"
+
+if ! [ -e "$__LOG_BUFFER" ]; then
+  touch "$__LOG_BUFFER"
+fi
+
+if [ "$1" == "--read" ]; then
+  __buffer= $(cat $__LOG_BUFFER)
+  if [ "$__buffer" != "" ]; then
+    echo "$__buffer"
+    echo "$USER's log buffer" > "$__LOG_BUFFER"
+  fi
+elif [ "$1" == "" ]; then
+  __msg=$(cat)
+  echo "$__msg" >> "$__LOG_BUFFER"
+else
+  echo "Option $1 is not known"
+  echo "$__USAGE"
+fi
