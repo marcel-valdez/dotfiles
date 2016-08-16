@@ -1,5 +1,9 @@
 #!/bin/bash
 
+now() {
+  date "+%H:%M:%S"
+}
+
 diff-lines() {
   local path=
   local line=
