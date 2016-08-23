@@ -16,7 +16,7 @@ if ! [ -e "$__LOG_BUFFER" ]; then
 fi
 
 if [ "$1" == "--read" ]; then
-  __buffer= $(cat $__LOG_BUFFER)
+  __buffer="$(cat $__LOG_BUFFER)"
   if [ "$__buffer" != "" ]; then
     echo "$__buffer"
     echo "$USER's log buffer" > "$__LOG_BUFFER"
