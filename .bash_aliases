@@ -67,3 +67,4 @@ alias g-receive-pack='git-receive-pack'
 alias g-upload-pack='git-load-pack'
 
 # end git commands
+alias bisect='/google/data/ro/teams/tetralight/bin/bisect'
