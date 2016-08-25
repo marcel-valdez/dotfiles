@@ -2,6 +2,7 @@
 *
 
 # Except
+!.xbindkeysrc.scm
 !lib/
 !lib/*
 !.bash_aliases
