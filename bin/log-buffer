@@ -18,12 +18,13 @@ fi
 if [ "$1" == "--read" ]; then
   __buffer="$(cat $__LOG_BUFFER)"
   if [ "$__buffer" != "" ]; then
+    echo "$USER's log buffer"
     echo "$__buffer"
-    echo "$USER's log buffer" > "$__LOG_BUFFER"
+    echo "" > "$__LOG_BUFFER"
   fi
 elif [ "$1" == "" ]; then
-  __msg=$(cat)
-  echo "$__msg" >> "$__LOG_BUFFER"
+  __msg="$(cat)"
+  echo "$(date '+%Y-%m-%d %H:%M:%S') $__msg" >> "$__LOG_BUFFER"
 else
   echo "Option $1 is not known"
   echo "$__USAGE"
