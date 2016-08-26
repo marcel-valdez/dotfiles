@@ -174,34 +174,33 @@
 )
 
 (define-chord-keys-cmd '(control c:51) '(control Left)
-  "/usr/local/google/home/marcelvaldez/projects/x-window-shortcuts/x-window-move left")
+  "~/projects/x-window-shortcuts/x-window-move left")
 
 (define-chord-keys-cmd '(control c:51) '(control Right)
-  "/usr/local/google/home/marcelvaldez/projects/x-window-shortcuts/x-window-move right")
+  "~/projects/x-window-shortcuts/x-window-move right")
 
 (define-chord-keys-cmd '(control c:51) '(control Up)
-  "/usr/local/google/home/marcelvaldez/projects/x-window-shortcuts/x-window-move up")
+  "~/projects/x-window-shortcuts/x-window-move up")
 
 (define-chord-keys-cmd '(control c:51) '(control Down)
-  "/usr/local/google/home/marcelvaldez/projects/x-window-shortcuts/x-window-move down")
+  "~/projects/x-window-shortcuts/x-window-move down")
 
 (define-chord-keys-cmd '(control c:51) '(control Prior)
-  "/usr/local/google/home/marcelvaldez/projects/x-window-shortcuts/x-window-move maximize")
+  "~/projects/x-window-shortcuts/x-window-move maximize")
 
 (define-chord-keys-cmd '(control c:51) '(control Next)
-  "/usr/local/google/home/marcelvaldez/projects/x-window-shortcuts/x-window-move minimize")
+  "~/projects/x-window-shortcuts/x-window-move minimize")
 
 (define-chord-keys-cmd '(control c:51) '(control comma)
-  "/usr/local/google/home/marcelvaldez/projects/x-window-shortcuts/x-window-move left-screen")
+  "~/projects/x-window-shortcuts/x-window-move left-screen")
 
 (define-chord-keys-cmd '(control c:51) '(control period)
-  "/usr/local/google/home/marcelvaldez/projects/x-window-shortcuts/x-window-move right-screen")
-
+  "~/projects/x-window-shortcuts/x-window-move right-screen")
 
 
 ;; Example:
 ;;   Shift + b:1                   start an xterm
-;;   Shift + b:3                   start an rxvt
+;;  Shift + b:3                   start an rxvt
 ;;   Shift + b:1 then Shift + b:3  start gv
 ;;   Shift + b:3 then Shift + b:1  start xpdf
 
