@@ -1,0 +1,5 @@
+#!/usr/bin/env bash
+
+google-chrome --user-data-dir=$HOME/.alt-google-chrome-profile >/dev/null 2>&1 &
+echo "Launching google chrome with alternative profile"
+echo "This may take a few seconds"
