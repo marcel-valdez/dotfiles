@@ -1,8 +1,12 @@
+# exlude all files
 *
+
+# specifically include
+
 !.gitconfig
 !.gitignore
 !.bash*
-!bin
+!bin/
 
 # specifically exclude
 
