@@ -1,0 +1,10 @@
+[user]
+	email = marcel.valdez@live.com
+	name = Marcel Valdez
+[alias]
+	st = status
+	co = checkout
+	cm = commit
+	cp = cherry-pick
+	rb = rebase
+	ft = fetch

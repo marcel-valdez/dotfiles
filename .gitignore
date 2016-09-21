@@ -1,0 +1,10 @@
+*
+!.gitconfig
+!.gitignore
+!.bash*
+!bin
+
+# specifically exclude
+
+.bash_history
+*.bak
