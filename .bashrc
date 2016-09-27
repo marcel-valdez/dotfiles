@@ -1,4 +1,4 @@
-# ~/.bashrc: executed by bash(1) for non-login shells.
+ # ~/.bashrc: executed by bash(1) for non-login shells.
 # see /usr/share/doc/bash/examples/startup-files (in the package bash-doc)
 # for examples
 
@@ -141,7 +141,7 @@ initialize_session() {
 if [ "$(expr substr $(uname) 1 5)" == "Linux" ]; then
   export GIT_EDITOR=nano
   export EDITOR=nano
-  if [ "$TERM" == "xterm" ] || [ "$TERM" == "linux" ]; then
+  if (echo "$TERM" | grep "xterm" >/dev/null 2>&1 ) || [ "$TERM" == "linux" ]; then
     # if the default-session has not been created, then initialize this terminal session
     tmux has-session -t "default-session" || initialize_session
 
