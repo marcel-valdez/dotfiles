@@ -14,8 +14,45 @@ if [ ! -e "$FIFO" ]; then
   mkfifo $FIFO
 fi
 
-if [ "$1" = "" ]; then
-  tail -f $FIFO | "$BAR" -f "-*-clean-*-r-normal-*-17-*-100-100-*-*-*-*" -a 1 -F "#FF000000" -B "#FFcccccc" -g "620x18+1165+2"
+SCRIPT="$(basename $0)"
+function usage() {
+  echo "Launches the lemonbar"
+  echo "$SCRIPT [-h|--help] [-s|--single-big-screen] [--]"
+  echo "  help: displays this message and exits with code 0"
+  echo "  single-big-screen: treats the system as a single big screen with dual monitors"
+  echo "                    (both the same size)"
+  echo "  --: lemonbar is launched with custom arguments, all arguments after -- are sent directly"
+  echo "     to lemonbar. Arguments before -- are ignored   (except --help)"
+}
+
+custom_options="false"
+center_offset=650
+while [ $# -gt 0 ]; do
+  arg="$1"
+  echo $arg
+  case $arg in
+    -h|--help)
+    usage
+    exit 0
+    ;;
+    --single-big-screen)
+    center_offset=1165
+    ;;
+    --)
+    custom_options="true"
+    shift
+    break # options should be passed down directly to the bar command
+    ;;
+    *)
+    echo "Argument $1 unknown"
+    usage
+    exit 1
+  esac
+  shift
+done
+
+if [ "$custom_options" == "false" ]; then
+tail -f $FIFO | $BAR -f "-*-clean-*-r-normal-*-17-*-100-100-*-*-*-*" -a 1 -F "#FF000000" -B "#FFcccccc" -g "620x18+$center_offset+2"
 else
-  tail -f $FIFO | "$BAR" "$1" "$2" "$3" "$4" "$5" "$6" "$7" "$8" "$9" | bash
+  tail -f $FIFO | $BAR "$1" "$2" "$3" "$4" "$5" "$6" "$7" "$8" "$9" | bash
 fi
