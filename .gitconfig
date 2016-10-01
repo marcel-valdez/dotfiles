@@ -8,3 +8,5 @@
 	cp = cherry-pick
 	rb = rebase
 	ft = fetch
+[push]
+	default = simple
