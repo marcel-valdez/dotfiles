@@ -162,6 +162,10 @@ log_debug "Loaded bash_completion"
 if [ -d "$HOME/bin" ]; then
   export PATH=$PATH:"$HOME/bin"
 fi
+
+if [ -d "$HOME/.local/bin" ]; then
+  export PATH=$PATH:"$HOME/.local/bin"
+fi
 # Add RVM to PATH for scripting
 export PATH=$PATH:"$HOME/.rvm/bin"
 # custom environment variables
@@ -170,6 +174,7 @@ export NVM_DIR="$HOME/.nvm"
 export CHECK_PACKAGES_CONFIG="$HOME/.launchpad-helper"
 export NODE_VERSION="6.2.1"
 export BIN_UTILS_PASS_PHRASE_FILE="$HOME/.bin-utils-pass-phrase"
+export SUBLIME_PROJECTS_FOLDER="$HOME/sublime_projects"
 
 if [ "$(expr substr $(uname) 1 5)" == "Linux" ]; then
   export GIT_EDITOR=nano
