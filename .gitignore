@@ -29,6 +29,10 @@ bin/dex
 bin/mail-notify-data
 bin/rebaser
 bin/update-package
+bin/g3-*
+bin/magicbuild
+bin/magicjar
+
 
 *.pyc
 !.fluxbox/keys
