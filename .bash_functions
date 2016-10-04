@@ -149,12 +149,7 @@ function java-package-to-path() {
 }
 
 function copy-to-clip() {
-  __text__="$1"
-  if [ "$__text__" == "" ]; then
-    __text__=$(cat)
-  fi
-
-  echo "$__text__" | perl -pe 'chomp if eof' | xclip -sel clip
+  get-arg-or-stdin $* | perl -pe 'chomp if eof' | xclip -sel clip
 }
 
 function paste-clip() {
@@ -162,16 +157,16 @@ function paste-clip() {
 }
 
 function get-arg-or-stdin() {
-  __arg="$1"
-  if [ "$__arg" == "" ]; then
-    __arg=$(cat)
-  fi
-
-  echo "$__arg"
+  # if there is less than one argument, then echo from stdin, otherwise echo all arguments
+  ( [ $# -lt 1 ] && echo $(cat)) || echo "$*"
 }
 
 function tmux-to-clip() {
   tmux show-buffer | copy-to-clip
+}
+
+function copy-to-tmux() {
+  tmux set-buffer "$(get-arg-or-stdin $*)"
 }
 
 function history-cmd-only() {
@@ -180,4 +175,12 @@ function history-cmd-only() {
 
 function cmd-exists() {
   ( type "$1" >/dev/null 2>&1 && echo "true" ) || echo "false"
+}
+
+function tmux-session-name() {
+  tmux display-message -p '#S'
+}
+
+function tmux-goto-session-client() {
+  g4d $(tmux-session-name)
 }
