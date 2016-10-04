@@ -1,0 +1,18 @@
+#!/usr/bin/env bash
+
+echo '$HOME:' "$HOME"
+echo 'dirs:' "$(dirs)" '(dir stack)'
+echo '~+:' "get next dir in dir stack"
+echo '~-:' "get previous dir in dir stack"
+echo '${10} (10th arg):' "${10}"
+echo '$0:' "$0"
+echo '$$:' "$$" '(PID)'
+echo '$@:' "$@" '(all args as multiple words)'
+echo '$*:' "$*" '(all args as one word)'
+echo '$#:' "$#" '(number of args)'
+echo '$?:' "$?" '(status of last command)'
+echo '$!:' "$!" '(PID of most recent background process)'
+echo '$-:' "$-" '(current bash options)'
+echo '!!' "$(echo '!!' | bash)" '(previous command)'
+echo '!str' '(last command that starts with str)'
+echo '!str:s/x/y/' '(run last command that starts with str and replace x -> y [/g does not work])'
