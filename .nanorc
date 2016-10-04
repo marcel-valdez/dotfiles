@@ -168,7 +168,7 @@ set tabstospaces
 
 ## Detect word boundaries more accurately by treating punctuation
 ## characters as parts of words.
-# set wordbounds
+set wordbounds
 
 ## Enable the new (EXPERIMENTAL) generic undo code, not just for line cuts
 set undo
