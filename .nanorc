@@ -108,7 +108,7 @@ set nowrap
 ## punctuation, optionally followed by closing brackets, can end
 ## sentences.
 ##
-# set punct "!.?"
+set punct "!.?%/"
 
 ## Do quick statusbar blanking.  Statusbar messages will disappear after
 ## 1 keystroke instead of 26.  Note that "const" overrides this.
@@ -169,9 +169,6 @@ set tabstospaces
 ## Detect word boundaries more accurately by treating punctuation
 ## characters as parts of words.
 set wordbounds
-
-## Enable the new (EXPERIMENTAL) generic undo code, not just for line cuts
-set undo
 
 ## Enable soft line wrapping (AKA full line display)
 # set softwrap
@@ -245,6 +242,9 @@ bind M-X cut main
 
 unbind ^H main
 bind ^H help main
+
+bind M-3 findnext main
+bind M-# findprevious main
 
 unbind ^O all
 bind ^S writeout all
