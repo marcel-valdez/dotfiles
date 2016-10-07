@@ -27,11 +27,11 @@ diff-lines() {
 # start git functions
 
 git-diff-lines() {
-  git diff $1 $2 $3 $4 | diff-lines
+  git diff $@ | diff-lines
 }
 
 g-diff-lines() {
-  git-diff-lines $1 $2 $3 $4
+  git-diff-lines $@
 }
 
 git-branch-out() {
