@@ -39,6 +39,7 @@ bin/magicjar
 !.fluxbox/startup
 
 # But do Ignore nano backup files
+.nano/search_history
 .*~
 *~
 *.swp
