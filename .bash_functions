@@ -184,3 +184,19 @@ function tmux-session-name() {
 function tmux-goto-session-client() {
   g4d $(tmux-session-name)
 }
+
+function is-ssh-session() {
+  ([ -n "$SSH_CLIENT" ] || [ -n "$SSH_TTY" ] || [ -n "$SSH_CONNECTION" ]) && echo "true"
+}
+
+function get-ssh-relay-ip() {
+  connection_string=$(([ "$SSH_CLIENT" != "" ] && echo $SSH_CLIENT) || echo $SSH_CONNECTION)
+  echo $connection_string | cut -d' ' -f1
+}
+
+function get-ssh-relay-hostname() {
+  relay_ip=$(get-ssh-relay-ip)
+  if [ "$relay_ip" != "" ]; then
+    nslookup $relay_ip | grep -o 'name =.*'  | cut -d'=' -f2 | sed 's/ //g' | sed 's/\.$//'
+  fi
+}
