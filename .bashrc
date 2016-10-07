@@ -179,8 +179,9 @@ export SUBLIME_PROJECTS_FOLDER="$HOME/sublime_projects"
 if [ "$(expr substr $(uname) 1 5)" == "Linux" ]; then
   export GIT_EDITOR=nano
   export EDITOR=nano
-  __XTERM=$(echo "$TERM" | grep -o "xterm")
-  if [ "$__XTERM" == "xterm" ] || [ "$TERM" == "linux" ]; then
+  IS_XTERM=$(echo "$TERM" | grep -o "xterm" >/dev/null 2>&1 && echo "true")
+  # If not already in a TMUX session
+  if [ "$TMUX" == "" ]; then
     # This is slow, so we do not want to do it for every TMUX pane
     log_debug "Loading SSH session"
     source "$HOME/lib/ssh-persist-session.sh"
