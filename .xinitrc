@@ -1,6 +1,4 @@
 #!/usr/bin/env bash
 
-# Load modified keys for the user
-if [ -f "$HOME/.Xmodmap" ]; then
-  xmodmap "$HOME/.Xmodmap"
-fi
+# Commands that execute on each server start for a given
+# user go here
