@@ -67,7 +67,6 @@
 (xbindkey '(control alt shift q) "xbindkeys_show")
 
 ;; set directly keycode (here control + f with my keyboard)
-;; (xbindkey '("m:0x4" "c:41") "xterm")
 
 ;; specify a mouse button
 ;; (xbindkey '(control "b:2") "xterm")
@@ -156,7 +155,7 @@
 
 (define (define-chord-keys-cmd key1 key2 cmd)
   "Define chording key"
-  (let ((key2-registered #f) (time (current-time)))
+  (let ((key2-registered #f))
     (xbindkey-function key1 (lambda ()
       ;;(display (string-append (to-str key1) " pressed\n"))
       (if (not key2-registered)
@@ -197,6 +196,26 @@
 (define-chord-keys-cmd '(control c:51) '(control period)
   "~/projects/x-window-shortcuts/x-window-move right-screen")
 
+(define (define-xdotool-remap source_guile_key target_xdotool_key)
+  (let ()
+    (xbindkey-function (cons 'release source_guile_key)
+      (lambda ()
+        (run-command (string-append "xdotool key --clearmodifiers " target_xdotool_key))
+      )
+    )
+  )
+)
+
+;; remaps Alt+Shift+1 to F1 key via xdotool key --clearmodifiers
+(define-xdotool-remap '(m:0x9 c:10) "F1")
+;; remaps Alt+Shift+2 to F2 key via xdotool key --clearmodifiers
+(define-xdotool-remap '(m:0x9 c:11) "F2")
+;; remaps Alt+Shift+3 to F3 key via xdotool key --clearmodifiers
+(define-xdotool-remap '(m:0x9 c:12) "F3")
+;; remaps Alt+Shift+4 to F4 key via xdotool key --clearmodifiers
+(define-xdotool-remap '(m:0x9 c:13) "F4")
+;; remaps Alt+Shift+5 to F5 key via xdotool key --clearmodifiers
+(define-xdotool-remap '(m:0x9 c:14) "F5")
 
 ;; Example:
 ;;   Shift + b:1                   start an xterm
