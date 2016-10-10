@@ -4,3 +4,7 @@
 if [ -f "$HOME/.Xmodmap" ]; then
   xmodmap "$HOME/.Xmodmap"
 fi
+# Load xbindkeys
+if [ -f "/usr/bin/xbindkeys_autostart" ]; then
+  /usr/bin/xbindkeys_autostart
+fi
