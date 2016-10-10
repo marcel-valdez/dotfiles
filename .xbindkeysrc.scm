@@ -206,15 +206,15 @@
   )
 )
 
-;; remaps Alt+Shift+1 to F1 key via xdotool key --clearmodifiers
+;; remaps Alt+Shift+1 to F1 key via xdotool
 (define-xdotool-remap '(m:0x9 c:10) "F1")
-;; remaps Alt+Shift+2 to F2 key via xdotool key --clearmodifiers
+;; remaps Alt+Shift+2 to F2 key via xdotool
 (define-xdotool-remap '(m:0x9 c:11) "F2")
-;; remaps Alt+Shift+3 to F3 key via xdotool key --clearmodifiers
+;; remaps Alt+Shift+3 to F3 key via xdotool
 (define-xdotool-remap '(m:0x9 c:12) "F3")
-;; remaps Alt+Shift+4 to F4 key via xdotool key --clearmodifiers
+;; remaps Alt+Shift+4 to F4 key via xdotool
 (define-xdotool-remap '(m:0x9 c:13) "F4")
-;; remaps Alt+Shift+5 to F5 key via xdotool key --clearmodifiers
+;; remaps Alt+Shift+5 to F5 key via xdotool
 (define-xdotool-remap '(m:0x9 c:14) "F5")
 
 ;; Example:
