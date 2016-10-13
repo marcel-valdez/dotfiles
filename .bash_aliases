@@ -9,3 +9,4 @@ alias now='date "+%H:%M:%S  %d/%m/%y"'
 alias appian-openvpn='sudo openvpn --script-security 2 --up /etc/openvpn/openvpn-dns --down /etc/openvpn/openvpn-dns --config ~/.openvpn/client.ovpn'
 alias nano-crypto=crypto-file
 alias rm-secure='shred -u -z'
+alias g='git'
