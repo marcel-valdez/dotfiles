@@ -24,5 +24,6 @@ gnome-settings-daemon &
 ## visual components
 gnome-panel &
 x-terminal-emulator -geometry 80x24+10+10 -ls -title "$VNCDESKTOP Desktop" &
-type kupfer >/dev/null 2>&1 && kupfer &
 
+## user installed applications
+type kupfer >/dev/null 2>&1 && kupfer &
