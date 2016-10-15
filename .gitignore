@@ -47,6 +47,7 @@ bin/verify-packages
 !.vnc/
 # 2. unignore the specific file
 !.vnc/xstartup
+!.vnc/config
 
 !.nano/
 !.nano/*

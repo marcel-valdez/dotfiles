@@ -19,11 +19,13 @@ vncconfig -iconic &
 gnome-session --session=gnome-fallback &
 gnome-wm --no-composite & # defaults to metacity
 gnome-settings-daemon &
+
+export TMUX_INIT_SESSION="vnc${DISPLAY}"
 [ -x $HOME/.xinitrc ] && exec $HOME/.xinitrc
 
 ## visual components
 gnome-panel &
-x-terminal-emulator -geometry 80x24+10+10 -ls -title "$VNCDESKTOP Desktop" &
+x-terminal-emulator -geometry 80x24+10+10 -ls -title "${VNCDESKTOP} Desktop" &
 
 ## user installed applications
 type kupfer >/dev/null 2>&1 && kupfer &
