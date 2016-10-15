@@ -12,6 +12,14 @@ function log_debug() {
   [ "$DEBUG_BASHRC" != "" ] && echo "$(date +%H:%M:%S) $1"
 }
 
+function tmux_attach_initial_session() {
+  if [ "${TMUX_INIT_SESSION}" == "" ]; then
+    tmux attach -d
+  else
+    tmux attach new -s "${TMUX_INIT_SESSION}" || tmux attach -t "${TMUX_INIT_SESSION}"
+  fi
+}
+
 # don't put duplicate lines or lines starting with space in the history.
 # See bash(1) for more options
 export HISTCONTROL=ignoreboth:erasedups
@@ -186,7 +194,7 @@ if [ "$(expr substr $(uname) 1 5)" == "Linux" ]; then
     source "$HOME/lib/ssh-persist-session.sh"
     log_debug "Loaded SSH session"
     # this will run for every terminal (but not for every pane)
-    tmux attach
+    tmux_attach_initial_session
   else
     # we are already in a tmux session, this will run for every
     # tmux pane
