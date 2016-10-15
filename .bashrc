@@ -175,7 +175,6 @@ if [ -d "$HOME/.local/bin" ]; then
   export PATH=$PATH:"$HOME/.local/bin"
 fi
 # Add RVM to PATH for scripting
-export PATH=$PATH:"$HOME/.rvm/bin"
 # custom environment variables
 # export J2D_PIXMAPS="shared"
 export NVM_DIR="$HOME/.nvm"
