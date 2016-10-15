@@ -20,6 +20,7 @@
 !.xinitrc
 !.xsession
 !.quotes
+
 # In order to unignore a set of files under a directory:
 # 1. unignore the directory
 !bin/
@@ -57,7 +58,9 @@ bin/verify-packages
 
 # Common backup/generated files
 .*~
+**/.*~
 *~
+**/*~
 *.swp
 **/*.swp
 *.pyc
@@ -66,3 +69,8 @@ bin/verify-packages
 **/*.lock
 *.bak
 **/*.bak
+*.tmp
+**/*.tmp
+*.log
+**/*.log
+
