@@ -21,12 +21,12 @@
 !.xinitrc
 !.xsession
 !.quotes
+# In order to unignore a set of files under a directory:
+# 1. unignore the directory
 !bin/
+# 2. unignore the set of files
 !bin/*
-!.nano/
-!.nano/*
-!.vnc/
-!.vnc/xstartup
+# Optionally, re-ignore files you don't want from the set
 bin/dex
 bin/mail-notify-data
 bin/rebaser
@@ -34,18 +34,36 @@ bin/update-package
 bin/g3-*
 bin/magicbuild
 bin/magicjar
-*.pyc
-!.fluxbox/keys
-!.fluxbox/startup
-
-# But do Ignore nano backup files
-.nano/search_history
-.*~
-*~
-*.swp
 # Applications that must be installed separately
 bin/FoxitReader
 bin/__check_version.py
 bin/__latest_version.py
 bin/check-all-versions
 bin/verify-packages
+
+
+# In order to unignore a specific file under a directory:
+# 1. unignore the directory
+!.vnc/
+# 2. unignore the specific file
+!.vnc/xstartup
+
+!.nano/
+!.nano/*
+.nano/search_history
+
+!.fluxbox/
+!.fluxbox/keys
+!.fluxbox/startup
+
+# Common backup/generated files
+.*~
+*~
+*.swp
+**/*.swp
+*.pyc
+**/*.pyc
+*.lock
+**/*.lock
+*.bak
+**/*.bak
