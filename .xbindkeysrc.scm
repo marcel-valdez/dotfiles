@@ -190,27 +190,28 @@
   )
 )
 
+;; ctrl + \ + left
 (define-chord-keys-cmd '(control c:51) '(control Left)
   "~/projects/x-window-shortcuts/x-window-move left")
-
+;; ctrl + \ + right
 (define-chord-keys-cmd '(control c:51) '(control Right)
   "~/projects/x-window-shortcuts/x-window-move right")
-
+;; ctrl + \ + up
 (define-chord-keys-cmd '(control c:51) '(control Up)
   "~/projects/x-window-shortcuts/x-window-move up")
-
+;; ctrl + \ + down
 (define-chord-keys-cmd '(control c:51) '(control Down)
   "~/projects/x-window-shortcuts/x-window-move down")
-
+;; ctrl + \ + pageup
 (define-chord-keys-cmd '(control c:51) '(control Prior)
   "~/projects/x-window-shortcuts/x-window-move maximize")
-
+;; ctrl + \ + pagedown
 (define-chord-keys-cmd '(control c:51) '(control Next)
   "~/projects/x-window-shortcuts/x-window-move minimize")
-
+;; ctrl + \ + comma
 (define-chord-keys-cmd '(control c:51) '(control comma)
   "~/projects/x-window-shortcuts/x-window-move left-screen")
-
+;; ctrl + \ + period
 (define-chord-keys-cmd '(control c:51) '(control period)
   "~/projects/x-window-shortcuts/x-window-move right-screen")
 
