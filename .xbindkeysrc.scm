@@ -148,13 +148,21 @@
 ;; executes a command when 2 key combinations happen
 ;; the only problem with this, is that xbindkeys intercepts
 ;; key2 no matter what
-
-;; m:0x8 c:48 == alt + '
-(xbindkey-function '(m:0x8 c:48)
+(define (release-modifiers)
   (lambda ()
+    (display "xbindkeys: Releasing modifiers" )
     (run-command "~/bin/release-modifiers")
   )
 )
+
+;; m:0x8 c:48 == alt + '
+(xbindkey-function '(m:0x8 c:48) (release-modifiers))
+;; m:0x9 c:48 == alt + shift + '
+(xbindkey-function '(m:0x9 c:48) (release-modifiers))
+;; m:0xc c:48 == ctrl + alt  + '
+(xbindkey-function '(m:0xc c:48) (release-modifiers))
+;; m:0xd c:48 == ctrl + shift + alt  + '
+(xbindkey-function '(m:0xd c:48) (release-modifiers))
 
 (define (to-str obj)
   (format #f "~a" obj)
