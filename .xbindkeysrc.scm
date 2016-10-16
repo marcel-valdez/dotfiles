@@ -154,14 +154,17 @@
     (run-command "~/bin/release-modifiers")
   )
 )
-
-;; m:0x8 c:48 == alt + '
+;; ctrl + '
+(xbindkey-function '(m:0x4 c:48) (release-modifiers))
+;; ctrl + shift + '
+(xbindkey-function '(m:0x5 c:48) (release-modifiers))
+;; alt + '
 (xbindkey-function '(m:0x8 c:48) (release-modifiers))
-;; m:0x9 c:48 == alt + shift + '
+;; alt + shift + '
 (xbindkey-function '(m:0x9 c:48) (release-modifiers))
-;; m:0xc c:48 == ctrl + alt  + '
+;; ctrl + alt  + '
 (xbindkey-function '(m:0xc c:48) (release-modifiers))
-;; m:0xd c:48 == ctrl + shift + alt  + '
+;; ctrl + shift + alt  + '
 (xbindkey-function '(m:0xd c:48) (release-modifiers))
 
 (define (to-str obj)
