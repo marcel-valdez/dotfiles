@@ -9,14 +9,17 @@ case $- in
 esac
 
 function log_debug() {
-  [ "$DEBUG_BASHRC" != "" ] && echo "$(date +%H:%M:%S) $1"
+  [ "${DEBUG_BASHRC}" != "" ] && echo "$(date +%H:%M:%S) $1"
 }
 
 function tmux_attach_initial_session() {
   if [ "${TMUX_INIT_SESSION}" == "" ]; then
-    tmux attach -d
+    log_debug "tmux init: attaching to default session"
+    tmux attach-session -d
   else
-    tmux attach new -s "${TMUX_INIT_SESSION}" || tmux attach -t "${TMUX_INIT_SESSION}"
+    log_debug "tmux init: attaching to ${TMUX_INIT_SESSION}"
+    tmux new-session -s "${TMUX_INIT_SESSION}" 2>/dev/null \
+    || tmux attach-session -t "${TMUX_INIT_SESSION}"
   fi
 }
 
