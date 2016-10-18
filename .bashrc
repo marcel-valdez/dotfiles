@@ -15,7 +15,8 @@ function log_debug() {
 function tmux_attach_initial_session() {
   if [ "${TMUX_INIT_SESSION}" == "" ]; then
     log_debug "tmux init: attaching to default session"
-    tmux attach-session -d
+    tmux new-session -s "default" 2>/dev/null \
+    || tmux attach-session -t "default"
   else
     log_debug "tmux init: attaching to ${TMUX_INIT_SESSION}"
     tmux new-session -s "${TMUX_INIT_SESSION}" 2>/dev/null \
