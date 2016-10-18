@@ -242,8 +242,16 @@ function ps-nice() {
     $@
 }
 
+function emacs() {
+  /usr/bin/emacs --no-window-system $@
+}
+
+function google-emacs() {
+  /usr/bin/google-emacs --no-window-system $@
+}
+
 # force myself to use emacs, not nano
 function nano() {
   [ "$1" == "-F" ] && shift
-  emacs --no-window-system $@
+  emacs $@
 }
