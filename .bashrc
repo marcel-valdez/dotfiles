@@ -187,8 +187,8 @@ export BIN_UTILS_PASS_PHRASE_FILE="$HOME/.bin-utils-pass-phrase"
 export SUBLIME_PROJECTS_FOLDER="$HOME/sublime_projects"
 
 if [ "$(expr substr $(uname) 1 5)" == "Linux" ]; then
-  export GIT_EDITOR=nano
-  export EDITOR=nano
+  export EDITOR="emacs --no-window-system"
+  export GIT_EDITOR=$EDITOR
   # If not already in a TMUX session
   if [ "$TMUX" == "" ]; then
     # This is slow, so we do not want to do it for every TMUX pane

@@ -241,3 +241,9 @@ function ps-nice() {
     ${config}\
     $@
 }
+
+# force myself to use emacs, not nano
+function nano() {
+  [ "$1" == "-F" ] && shift
+  emacs --no-window-system $@
+}
