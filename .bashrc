@@ -15,12 +15,12 @@ function log_debug() {
 function tmux_attach_initial_session() {
   if [ "${TMUX_INIT_SESSION}" == "" ]; then
     log_debug "tmux init: attaching to default session"
-    tmux new-session -s "default" 2>/dev/null \
-    || tmux attach-session -t "default"
+    tmux new-session -s "default" >&/dev/null \
+    || tmux attach-session -d -t "default"
   else
     log_debug "tmux init: attaching to ${TMUX_INIT_SESSION}"
-    tmux new-session -s "${TMUX_INIT_SESSION}" 2>/dev/null \
-    || tmux attach-session -t "${TMUX_INIT_SESSION}"
+    tmux new-session -s "${TMUX_INIT_SESSION}" >&/dev/null \
+    || tmux attach-session -d -t "${TMUX_INIT_SESSION}"
   fi
 }
 
@@ -110,7 +110,7 @@ fi
 color_prompt=yes
 
 log_debug "Setting PS1 (prompt)"
-__function_exists=$((type g3-client-name >/dev/null 2>&1 && echo "yes") || echo "no")
+__function_exists=$((type g3-client-name >&/dev/null && echo "yes") || echo "no")
 if [ "$__function_exists" == "yes" ]; then
   __PS1_SUFFIX='$(g3-client-name)\n\$ '
 else
