@@ -145,17 +145,17 @@
 ;;      		     (if k2 (run-command cmd-k2)))
 ;;      		 (set! k1 #f) (set! k2 #f)))))
 
-(define (remap-to-tmux newkeys)
+(define (remap-to-tmux oldkeys newkeys)
   (lambda()
-    ;; (display (string-append "tmux send-keys " newkeys))
-    (run-command (string-append "tmux send-keys " newkeys))
+    ;; (display (string-append "~/bin/if-terminal-has-focus --then tmux send-keys " newkeys " --else xdotool key " oldkeys))
+    (run-command (string-append "~/bin/if-terminal-has-focus --then tmux send-keys " newkeys " --else xdotool key " oldkeys))
   )
 )
 
 ;; ctrl + ;
-(xbindkey-function (cons 'release '(m:0x4 c:47)) (remap-to-tmux "\"C-\\;\""))
+(xbindkey-function (cons 'release '(m:0x4 c:47)) (remap-to-tmux "ctrl+semicolon"  "\"C-\\;\""))
 ;; ctrl + .
-(xbindkey-function (cons 'release '(m:0x4 c:60)) (remap-to-tmux "\"C-.\""))
+(xbindkey-function (cons 'release '(m:0x4 c:60)) (remap-to-tmux "ctrl+period" "\"C-.\""))
 
 ;; executes a command when 2 key combinations happen
 ;; the only problem with this, is that xbindkeys intercepts

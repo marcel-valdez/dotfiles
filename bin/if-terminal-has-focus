@@ -1,0 +1,41 @@
+#!/usr/bin/env bash
+
+source ~/.bash_functions
+
+_then=""
+_else=""
+_append_to_then="true"
+_append_to_else="false"
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --then)
+      _append_to_then="true"
+      _append_to_else="false"
+      shift
+      continue
+    ;;
+    --else)
+      _append_to_else="true"
+      _append_to_then="false"
+      shift
+      continue
+      ;;
+  esac
+
+  if [ "${_append_to_then}" == "true" ]; then
+    _then="${_then} "'"'"$1"'"'
+    shift
+  elif [ "${_append_to_else}" == "true" ]; then
+    _else="${_else} "'"'"$1"'"'
+    shift
+  fi
+done
+
+command=$(ps-filter | grep $(xdotool getactivewindow getwindowpid) | cut -d' ' -f5)
+
+if [[ "${command}" =~ "terminal" ]]; then
+  eval "${_then}"
+else
+  eval "${_else}"
+fi
+
