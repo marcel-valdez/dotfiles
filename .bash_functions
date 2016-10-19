@@ -3,7 +3,7 @@
 function open-bg() {
   filename=$(basename $1)
   logfile="/tmp/$USER-$filename.log"
-  $1 1>$logfile 2>$logfile &
+  $1 >&${logfile} &
 }
 
 function compress-pdf() {
@@ -41,4 +41,14 @@ function compress-pdf() {
   # -dOptimize -> defaults to false, set to true on /screen, /ebook, /printer, /prepress
   # -dCompressFonts -> defaults to true, never set to false.
 
+}
+
+# executes a command without any output
+function succeeds() {
+  $@ >&/dev/null
+}
+
+# executes a command with output
+function fails() {
+  $@ >&/dev/null
 }
