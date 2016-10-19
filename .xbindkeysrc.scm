@@ -156,13 +156,17 @@
 (xbindkey-function (cons 'release '(m:0x4 c:47)) (remap-to-tmux "ctrl+semicolon"  "\"C-\\;\""))
 ;; ctrl + .
 (xbindkey-function (cons 'release '(m:0x4 c:60)) (remap-to-tmux "ctrl+period" "\"C-.\""))
+;; ctrl + home
+(xbindkey-function (cons 'release '(m:0x4 c:110)) (remap-to-tmux "ctrl+Home" "\"C-home\""))
+;; ctrl + end
+(xbindkey-function (cons 'release '(m:0x4 c:115)) (remap-to-tmux "ctrl+End" "\"C-end\""))
 
 ;; executes a command when 2 key combinations happen
 ;; the only problem with this, is that xbindkeys intercepts
 ;; key2 no matter what
 (define (release-modifiers)
   (lambda ()
-    (display "xbindkeys: Releasing modifiers" )
+    ;; (display "xbindkeys: Releasing modifiers" )
     (run-command "~/bin/release-modifiers")
   )
 )

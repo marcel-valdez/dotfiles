@@ -6,6 +6,7 @@ _then=""
 _else=""
 _append_to_then="true"
 _append_to_else="false"
+
 while [ $# -gt 0 ]; do
   case "$1" in
     --then)
@@ -31,8 +32,7 @@ while [ $# -gt 0 ]; do
   fi
 done
 
-command=$(ps-filter | grep $(xdotool getactivewindow getwindowpid) | cut -d' ' -f5)
-
+command=$(ps-filter $(xdotool getactivewindow getwindowpid) | rev | cut -d' ' -f1 | rev)
 if [[ "${command}" =~ "terminal" ]]; then
   eval "${_then}"
 else
