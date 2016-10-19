@@ -145,6 +145,18 @@
 ;;      		     (if k2 (run-command cmd-k2)))
 ;;      		 (set! k1 #f) (set! k2 #f)))))
 
+(define (remap-to-tmux newkeys)
+  (lambda()
+    ;; (display (string-append "tmux send-keys " newkeys))
+    (run-command (string-append "tmux send-keys " newkeys))
+  )
+)
+
+;; ctrl + ;
+(xbindkey-function (cons 'release '(m:0x4 c:47)) (remap-to-tmux "\"C-\\;\""))
+;; ctrl + .
+(xbindkey-function (cons 'release '(m:0x4 c:60)) (remap-to-tmux "\"C-.\""))
+
 ;; executes a command when 2 key combinations happen
 ;; the only problem with this, is that xbindkeys intercepts
 ;; key2 no matter what
