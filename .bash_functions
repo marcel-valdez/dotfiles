@@ -52,3 +52,12 @@ function succeeds() {
 function fails() {
   $@ >&/dev/null
 }
+
+function emacs() {
+  /usr/bin/emacs -nw $@
+}
+
+function nano() {
+  [ "$1" == "-F" ] && shift
+  emacs $@
+}
