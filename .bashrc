@@ -9,7 +9,7 @@ case $- in
 esac
 
 DEFAULT_TMUX_SESSION="default"
-[ -z ${TMUX_INIT_SESSION} ] && TMUX_INIT_SESSION=$DEFAULT_TMUX_SESSION
+[ -z ${TMUX_INIT_SESSION} ] && TMUX_INIT_SESSION=${DEFAULT_TMUX_SESSION}
 
 function log_debug() {
   [ ! -z ${DEBUG_BASHRC} ] && echo "$(date +%H:%M:%S) $1"
