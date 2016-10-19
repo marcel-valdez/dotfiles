@@ -8,10 +8,42 @@ case $- in
       *) return;;
 esac
 
-source ~/.bash_ssh
+DEFAULT_TMUX_SESSION="default"
+[ -z ${TMUX_INIT_SESSION} ] && TMUX_INIT_SESSION=$DEFAULT_TMUX_SESSION
+
+function log_debug() {
+  [ ! -z ${DEBUG_BASHRC} ] && echo "$(date +%H:%M:%S) $1"
+}
+
+function tmux_attach_session() {
+  log_debug "tmux init: attaching to <${TMUX_INIT_SESSION}>"
+  tmux new-session -s ${TMUX_INIT_SESSION} >&/dev/null \
+  || tmux attach-session -t ${TMUX_INIT_SESSION}
+}
+
+function is_first_time_starting_tmux() {
+  tmux has-session -t ${DEFAULT_TMUX_SESSION}
+}
+
+function initialize_environment() {
+  # Put commands that should execute once per shell session
+  # normally there is one tmux session per each system restart
+
+  # WINE settings
+  # set to use wine simulating Windows 64-bit by default
+  source ~/bin/wine-use-win64
+  # uncomment to use wine simulating Windows 32-bit
+  # . ~/bin/wine-use-win32
+
+  # SSH agent environment, only load it whenever we start
+  # the environment for the first time
+  source ~/.bash_ssh
+}
+
 source ~/bin/functions
 source ~/bin/reinstall_modules
 source ~/lib/git-prompt
+
 
 # don't put duplicate lines or lines starting with space in the history.
 # See bash(1) for more options
@@ -125,29 +157,18 @@ if ! shopt -oq posix; then
   fi
 fi
 
-initialize_session() {
-  # Put commands that should execute once per tmux session here
-  # normally there is one tmux session per each system restart
-
-  # WINE settings
-  # set to use wine simulating Windows 64-bit by default
-  . ~/bin/wine-use-win64
-  # uncomment to use wine simulating Windows 32-bit
-  # . ~/bin/wine-use-win32
-}
-
-if [ "$(expr substr $(uname) 1 5)" == "Linux" ]; then
+if [[ "$(uname)" =~ "Linux" ]]; then
   export GIT_EDITOR=nano
   export EDITOR=nano
-  if (echo "$TERM" | grep "xterm" >/dev/null 2>&1 ) || [ "$TERM" == "linux" ]; then
-    # if the default-session has not been created, then initialize this terminal session
-    tmux has-session -t "default-session" || initialize_session
-
+  # if we are not in a tmux session
+  if [ -z ${TMUX} ]; then
+    # initialize environment if running for the first time
+    [ is_first_time_starting_tmux ] && initialize_environment
     # this will make the terminal attach to an existing tmux session or create one
-    tmux attach
+    tmux_attach_session
   else
     # A new TMUX pane was created
-    __ignore__=1
+    __ignore__=1 # only added so BASH does not hate us
     # put commands here that should execute with every opened pane
   fi
 fi
@@ -155,8 +176,8 @@ fi
 export PATH="$PATH:$HOME/bin" # add local bin folder to path
 export PATH="$PATH:$HOME/.rvm/bin" # Add RVM to PATH for scripting
 
-if [ -z "$MONO_PATH" ]; then
-  export MONO_PATH="/usr/bin/continuoustests";
+if [ -z ${MONO_PATH} ]; then
+  export MONO_PATH="/usr/bin/continuoustests"
 else
   export MONO_PATH="$MONO_PATH:/usr/bin/continuoustests"
 fi
