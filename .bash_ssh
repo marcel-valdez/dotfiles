@@ -1,5 +1,14 @@
 # Save ssh key
 
+source ~/.bash_functions
+
+if fails type log_debug; then
+  function log_debug() {
+    : # no-op
+  }
+fi
+
+
 # Note: ~/.ssh/environment should not be used, as it
 #       already has a different purpose in SSH
 env=~/.ssh/agent.env
@@ -14,7 +23,7 @@ agent_is_running() {
         #   0 = agent running, has keys
         #   1 = agent running, no keys
         #   2 = agent not running
-        ssh-add -l >/dev/null 2>&1 || [ $? -eq 1 ]
+        ssh-add -l >&/dev/null || [ $? -eq 1 ]
     else
         false
     fi
@@ -25,21 +34,21 @@ agent_has_keys() {
 }
 
 agent_load_env() {
-    . "$env" >/dev/null
+    source ${env} >/dev/null
 }
 
 agent_start() {
-    (umask 077; ssh-agent >"$env")
-    . "$env" >/dev/null
+    (umask 077; ssh-agent > ${env})
+    source ${env} >/dev/null
 }
 
 if ! agent_is_running; then
-    echo "Loading SSH environment."
+    log_debug "Loading SSH environment."
     agent_load_env
 fi
 
 if ! agent_is_running; then
-    echo "Starting ssh-agent"
+    log_debug "Starting ssh-agent"
     agent_start
     ssh-add
 elif ! agent_has_keys; then
