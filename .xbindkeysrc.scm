@@ -144,26 +144,51 @@
 ;;      		     (run-command cmd-k2-k1)
 ;;      		     (if k2 (run-command cmd-k2)))
 ;;      		 (set! k1 #f) (set! k2 #f)))))
+;; These are too buggy for it to be worth having, use alternate bindings
 
-(define (remap-to-tmux oldkeys newkeys)
-  (lambda()
-    ;; (display (string-append "~/bin/if-terminal-has-focus --then tmux send-keys " newkeys " --else xdotool key " oldkeys))
-    (run-command (string-append "~/bin/if-terminal-has-focus --then tmux send-keys " newkeys " --else xdotool key " oldkeys))
+;; sends a tmux key to the terminal when the focused window is a terminal
+;; otherwise it sens a key combination using xdotool
+(define (remap-when-terminal tmux_key xdotool_key)
+  (let ((result 0))
+    (set! result (system*
+		  (string-append
+		   (getenv "HOME") "/bin/focused-window-is-program")
+		  "terminal")
+	  )
+    (if (= result 0)
+	(system* "tmux" "send-keys" tmux_key)
+	(begin
+	  ;; (display "grabbed ctrl+semicolon\n")
+	  (ungrab-all-keys)
+	  (system* "xdotool" "key" xdotool_key "sleep" "0.05")
+	  (grab-all-keys)
+	  )
+	)
+    )
   )
-)
 
-;; ctrl + ;
-(xbindkey-function (cons 'release '(m:0x4 c:47)) (remap-to-tmux "ctrl+semicolon"  "\"C-\\;\""))
-;; ctrl + .
-(xbindkey-function (cons 'release '(m:0x4 c:60)) (remap-to-tmux "ctrl+period" "\"C-.\""))
+
+;; bind ctrl+;
+(xbindkey-function '("m:0x4" "c:47")
+		   (lambda ()
+		     (remap-when-terminal "C-\\;" "ctrl+semicolon")
+		     )
+		   )
+
 ;; ctrl + home
-(xbindkey-function (cons 'release '(m:0x4 c:110)) (remap-to-tmux "ctrl+Home" "\"C-home\""))
-;; ctrl + end
-(xbindkey-function (cons 'release '(m:0x4 c:115)) (remap-to-tmux "ctrl+End" "\"C-end\""))
+(xbindkey-function '("m:0x4" "c:110")
+		   (lambda ()
+		     (remap-when-terminal "C-home" "ctrl+Home")
+		     )
+		   )
 
-;; executes a command when 2 key combinations happen
-;; the only problem with this, is that xbindkeys intercepts
-;; key2 no matter what
+;; ctrl + end
+(xbindkey-function '("m:0x4" "c:115")
+		   (lambda ()
+		     (remap-when-terminal "C-end" "ctrl+End")
+		     )
+		   )
+
 (define (release-modifiers)
   (lambda ()
     ;; (display "xbindkeys: Releasing modifiers" )
@@ -187,6 +212,9 @@
   (format #f "~a" obj)
 )
 
+;; executes a command when 2 key combinations happen
+;; the only problem with this, is that xbindkeys intercepts
+;; key2 no matter what
 (define (define-chord-keys-cmd key1 key2 cmd)
   "Define chording key"
   (let ((key2-registered #f))

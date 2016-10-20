@@ -1,0 +1,3 @@
+#!/usr/bin/env bash
+
+ps-filter | grep $(xdotool getactivewindow getwindowpid) | grep $1 >&/dev/null
