@@ -1,0 +1,6 @@
+#!/usr/bin/env bash
+
+source ${HOME}/.bash_functions
+
+ps-nice | grep -v "ps-filter" | grep -v "grep $1" | grep "$1" | sed 's/\s\+/ /g'
+

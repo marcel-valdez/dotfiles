@@ -15,6 +15,7 @@
 !.vimrc
 !.gitignore
 !.emacs
+!.xbindkeysrc.scm
 !lib/
 !bin/
 !bin/*
