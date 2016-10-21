@@ -148,46 +148,61 @@
 
 ;; sends a tmux key to the terminal when the focused window is a terminal
 ;; otherwise it sens a key combination using xdotool
-(define (remap-when-terminal tmux_key xdotool_key)
+(use-modules (ice-9 threads))
+
+(define (fire-and-remap xbind_key tmux_key xdotool_key)
+   (yield)
+  ;; (lambda ()
+    ;; seems like no matter what I do, the subsequent xdotool call will be
+    ;; grabbed by xbindkeys, no matter how long the timeout is
+    ;; TODO: another possible way may be by using "worker" threads that do not
+    ;; share context, so that the worker thread that re-maps the key does not
+    ;; share a call stack with the calling thread
+    (usleep 10000) ;; 10,000 microseconds = 10 milliseconds
+    ;; (display (string-append (to-str (current-time)) ": Firing xdotool event for " xdotool_key "\n"))
+    (system* "xdotool" "key" xdotool_key)
+    (usleep 10000) ;; 10,000 microseconds = 10 milliseconds
+    (remap-when-terminal xbind_key tmux_key xdotool_key)
+    ;; )
+  )
+
+(define (remap-when-terminal-fire-and-forget xbind_key tmux_key xdotool_key)
   (let ((result 0))
-    (set! result (system*
-		  (string-append
-		   (getenv "HOME") "/bin/focused-window-is-program")
-		  "terminal")
+    (lambda ()
+      (set! result (system*
+		    (string-append (getenv "HOME") "/bin/focused-window-is-program") "terminal"
+		    ))
+      (if (= result 0)
+	  (system* "tmux" "send-keys" tmux_key)
+	  (begin
+	    (display (string-append (to-str (current-time)) ": GRABBED " xdotool_key "\n" ))
+	    (remove-xbindkey xbind_key)
+	    ;; should instead be a "signal" for a running thread to re-map the key
+	    ;; completely unaway of the context of this function
+	    ;; SEE: http://community.schemewiki.org/?guile-asyncs-batch-processing
+	    (begin-thread (fire-and-remap xbind_key tmux_key xdotool_key))
+	    )
 	  )
-    (if (= result 0)
-	(system* "tmux" "send-keys" tmux_key)
-	(begin
-	  ;; (display "grabbed ctrl+semicolon\n")
-	  (ungrab-all-keys)
-	  (system* "xdotool" "key" xdotool_key "sleep" "0.05")
-	  (grab-all-keys)
-	  )
-	)
+      (display "finish remap-when-ter...\n")
+      )
     )
   )
 
+(define (remap-when-terminal xbind_key tmux_key xdotool_key)
+   (xbindkey-function xbind_key (remap-when-terminal-fire-and-forget xbind_key tmux_key xdotool_key))
+)
 
 ;; bind ctrl+;
-(xbindkey-function '("m:0x4" "c:47")
-		   (lambda ()
-		     (remap-when-terminal "C-\\;" "ctrl+semicolon")
-		     )
-		   )
+(remap-when-terminal '("m:0x4" "c:47") "C-\\;" "ctrl+semicolon")
+
+;; bind ctrl+;
+(remap-when-terminal '("m:0x4" "c:60") "C-." "ctrl+period")
 
 ;; ctrl + home
-(xbindkey-function '("m:0x4" "c:110")
-		   (lambda ()
-		     (remap-when-terminal "C-home" "ctrl+Home")
-		     )
-		   )
+;; (remap-when-terminal '("m:0x4" "c:110") "C-home" "ctrl+Home")
 
 ;; ctrl + end
-(xbindkey-function '("m:0x4" "c:115")
-		   (lambda ()
-		     (remap-when-terminal "C-end" "ctrl+End")
-		     )
-		   )
+;;(remap-when-terminal '("m:0x4" "c:115") "C-end" "ctrl+End")
 
 (define (release-modifiers)
   (lambda ()
