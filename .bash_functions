@@ -243,11 +243,19 @@ function ps-nice() {
 }
 
 function emacs() {
-  /usr/bin/emacs --no-window-system $@
+  if [[ "$TERM" =~ "eterm" ]]; then
+    /usr/bin/emacsclient
+  else
+    /usr/bin/emacs --no-window-system $@
+  fi
 }
 
 function google-emacs() {
-  /usr/bin/google-emacs --no-window-system $@
+  if [[ "$TERM" =~ "eterm" ]]; then
+    /usr/bin/emacsclient
+  else
+    /usr/bin/google-emacs --no-window-system $@
+  fi
 }
 
 # force myself to use emacs, not nano

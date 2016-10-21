@@ -188,23 +188,33 @@ export BIN_UTILS_PASS_PHRASE_FILE="$HOME/.bin-utils-pass-phrase"
 export SUBLIME_PROJECTS_FOLDER="$HOME/sublime_projects"
 
 if [ "$(expr substr $(uname) 1 5)" == "Linux" ]; then
-  export EDITOR="emacs --no-window-system"
-  export GIT_EDITOR=$EDITOR
-  # If not already in a TMUX session
-  if [ "$TMUX" == "" ]; then
+  if [[ "$TERM" =~ "eterm" ]]; then
+    export EDITOR="emacsclient"
+    export GIT_EDITOR=$EDITOR
+  else
+    export EDITOR="emacs --no-window-system"
+    export GIT_EDITOR=$EDITOR
+  fi
+  # if ther terminal has not been initialized yet
+  if [ -z $TERMINAL_SESSION_INITIALIZED ]; then
     # This is slow, so we do not want to do it for every TMUX pane
     log_debug "Loading SSH session"
     source "$HOME/lib/ssh-persist-session.sh"
     log_debug "Loaded SSH session"
-    # this will run for every terminal (but not for every pane)
-    tmux_attach_initial_session
-  else
-    # we are already in a tmux session, this will run for every
-    # tmux pane
-    log_debug "Verifying packages with cache"
-    verify-packages --use-cache
-    log_debug "Verified packages with cache"
+    export TERMINAL_SESSION_INITIALIZED="true"
   fi
+
+  # if we are not within tmux and not within an emacs ansi-term
+  # start or join a tmux session
+  if [ "$TMUX" == "" ] && [[ ! "$TERM" =~ "eterm" ]] ; then
+    # this will run for once per non-eterm terminal opened
+    tmux_attach_initial_session
+  fi
+
+  # this will run for every terminal opened and tmux pane
+  log_debug "Verifying packages with cache"
+  verify-packages --use-cache
+  log_debug "Verified packages with cache"
 fi
 
 # This loads nvm
@@ -225,4 +235,3 @@ log_debug "Loaded node.js"
 
 # Reads the pending log buffer
 log-buffer --read
-
