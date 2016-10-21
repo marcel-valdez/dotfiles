@@ -4,6 +4,14 @@
 # Be 8 bit clean.
 set input-meta on
 set output-meta on
+set colored-stats on
+
+# do not reload TTY special chars every time readline() is called
+# needed so that readline does not overwrite custom bindings on
+# special TTY chars such as C-w
+set bind-tty-special-chars on
+
+# custom keybindings
 
 # To allow the use of 8bit-characters like the german umlauts, uncomment
 # the line below. However this makes the meta key not work as a meta key,
@@ -65,4 +73,6 @@ $endif
 
 $endif
 
-"\C-V": paste-from-clipboard
+;; This system's shell does not have the paste-from-clipboard
+;; capability
+;; "\C-v": paste-from-clipboard
