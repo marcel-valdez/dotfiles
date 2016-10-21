@@ -61,3 +61,31 @@ function nano() {
   [ "$1" == "-F" ] && shift
   emacs $@
 }
+
+
+# shows the shell's keyboard shortcuts
+function bind-show-shortcuts() {
+  bind -p | grep -v "not bound" | grep -v "self-insert"
+}
+
+# shows the shell's settings
+function bind-show-settings() {
+  bind -v
+}
+
+# show the shell's interactive capabilities
+function bind-show-capabilities() {
+  bind -l
+}
+
+function show-shell-shortcuts() {
+  bind-show-shortcuts
+}
+
+function show-shell-settings() {
+  bind-show-settings
+}
+
+function show-shell-capabilities() {
+  bind-show-capabilities
+}
