@@ -150,59 +150,69 @@
 ;; otherwise it sens a key combination using xdotool
 (use-modules (ice-9 threads))
 
-(define (fire-and-remap xbind_key tmux_key xdotool_key)
-   (yield)
-  ;; (lambda ()
-    ;; seems like no matter what I do, the subsequent xdotool call will be
-    ;; grabbed by xbindkeys, no matter how long the timeout is
-    ;; TODO: another possible way may be by using "worker" threads that do not
-    ;; share context, so that the worker thread that re-maps the key does not
-    ;; share a call stack with the calling thread
-    (usleep 10000) ;; 10,000 microseconds = 10 milliseconds
-    ;; (display (string-append (to-str (current-time)) ": Firing xdotool event for " xdotool_key "\n"))
-    (system* "xdotool" "key" xdotool_key)
-    (usleep 10000) ;; 10,000 microseconds = 10 milliseconds
-    (remap-when-terminal xbind_key tmux_key xdotool_key)
-    ;; )
-  )
+;; -- start worker thread code --
+(define worker-running #f)
+(define worker-thread #f)
 
-(define (remap-when-terminal-fire-and-forget xbind_key tmux_key xdotool_key)
-  (let ((result 0))
-    (lambda ()
-      (set! result (system*
-		    (string-append (getenv "HOME") "/bin/focused-window-is-program") "terminal"
-		    ))
+(define (start-worker)
+  (set! worker-running #t)
+  (set! worker-thread (begin-thread
+		   (while worker-running
+			  (usleep 1000)))))
+
+(define (enqueue-work thunk)
+  (system-async-mark thunk worker-thread))
+
+(define (stop-worker)
+  (enqueue-work (lambda ()
+		    (set! worker-running #f))))
+
+(if (not worker-running)
+   (start-worker))
+
+;; -- end worker thread-code --
+
+(define (send-keys-to-tmux-or-x tmux_key xdotool_key)
+  (lambda ()
+    (let ((result 0))
+      ;; (display (string-append (to-str (current-time)) ": grabbed: " xdotool_key "\n"))
+      (set! result (system* (string-append
+			     (getenv "HOME")
+			     "/bin/focused-window-is-program")
+			    "terminal"))
       (if (= result 0)
 	  (system* "tmux" "send-keys" tmux_key)
 	  (begin
-	    (display (string-append (to-str (current-time)) ": GRABBED " xdotool_key "\n" ))
-	    (remove-xbindkey xbind_key)
-	    ;; should instead be a "signal" for a running thread to re-map the key
-	    ;; completely unaway of the context of this function
-	    ;; SEE: http://community.schemewiki.org/?guile-asyncs-batch-processing
-	    (begin-thread (fire-and-remap xbind_key tmux_key xdotool_key))
+	    ;; (display (string-append (to-str (current-time)) ": will attempt to send back " xdotool_key "\n"))
+	    (ungrab-all-keys)
+	    (enqueue-work (lambda ()
+	    ;; (system-async-mark (system-async (lambda ()
+			    ;; (display (string-append (to-str (current-time)) ": sending " xdotool_key " to xdotool\n"))
+			    (yield)
+			    (system* "xdotool" "key" xdotool_key)
+			    (grab-all-keys)))
 	    )
 	  )
-      (display "finish remap-when-ter...\n")
       )
     )
   )
 
-(define (remap-when-terminal xbind_key tmux_key xdotool_key)
-   (xbindkey-function xbind_key (remap-when-terminal-fire-and-forget xbind_key tmux_key xdotool_key))
-)
 
 ;; bind ctrl+;
-(remap-when-terminal '("m:0x4" "c:47") "C-\\;" "ctrl+semicolon")
+(xbindkey-function (cons 'release '("m:0x4" "c:47"))
+		   (send-keys-to-tmux-or-x "C-\\;" "ctrl+semicolon"))
 
 ;; bind ctrl+;
-(remap-when-terminal '("m:0x4" "c:60") "C-." "ctrl+period")
+(xbindkey-function (cons 'release '("m:0x4" "c:60"))
+		   (send-keys-to-tmux-or-x "C-." "ctrl+period"))
 
 ;; ctrl + home
-;; (remap-when-terminal '("m:0x4" "c:110") "C-home" "ctrl+Home")
+;; (xbindkey-function (cons 'release '("m:0x4" "c:110"))
+		   ;; (send-keys-to-tmux-or-x "C-home" "ctrl+Home"))
 
 ;; ctrl + end
-;;(remap-when-terminal '("m:0x4" "c:115") "C-end" "ctrl+End")
+;; (xbindkey-function (cons 'release '("m:0x4" "c:115"))
+		   ;; (send-keys-to-tmux-or-x "C-end" "ctrl+End"))
 
 (define (release-modifiers)
   (lambda ()
