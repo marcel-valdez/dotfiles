@@ -60,33 +60,56 @@
 ;; (ungrab-all-keys)
 ;; (remove-all-keys)
 ;; (debug)
+(use-modules (ice-9 threads))
 
+(define bg-run #f)
+(define bg-thread #f)
 
-;; Examples of commands:
+(define (bg-start)
+  (set! bg-run #t)
+  (set! bg-thread (begin-thread
+		   (while bg-run
+			  (usleep 1000)))))
 
-(xbindkey '(control alt shift q) "xbindkeys_show")
+(define (bg-enqueue thunk)
+  (system-async-mark thunk bg-thread))
+
+(define (bg-stop)
+  (bg-enqueue (lambda ()
+		(set! bg-run #f))))
+
+(bg-start)
+
 
 (define (remap-when-terminal tmux_key xdotool_key)
   (let ((result 0))
-    (set! result (system* "/home/marcel/bin/focused-window-is-program" "terminal"))
+    ;; (display (string-append "grabbed: " xdotool_key "\n"))
+    (set! result (system* (string-append
+			   (getenv "HOME")
+			   "/bin/focused-window-is-program")
+			  "terminal"))
     (if (= result 0)
 	(system* "tmux" "send-keys" tmux_key)
 	(begin
-	  ;; (display "grabbed ctrl+semicolon\n")
+	  ;; (display (string-append "will attempt to send back " xdotool_key "\n"))
 	  (ungrab-all-keys)
-	  (system* "xdotool" "key" xdotool_key "sleep" "0.05")
-	  (grab-all-keys)
+	  (bg-enqueue (lambda ()
+			(yield)
+			(system* "xdotool" "key" xdotool_key)
+			(grab-all-keys)))
 	  )
 	)
-    )  
-)
+    )
+  )
 
 ;; bind ctrl+;
-(xbindkey-function '("m:0x4" "c:47")
-  (lambda ()
-    (remap-when-terminal "C-\\;" "ctrl+semicolon")
-  )
-)
+(xbindkey-function (cons 'release '("m:0x4" "c:47"))
+		   (lambda () (remap-when-terminal "C-\\;" "ctrl+semicolon")))
+
+;; bind ctrl+.
+(xbindkey-function '("m:0x4" "c:60")
+		   (lambda () (remap-when-terminal "C-." "ctrl+period")))
+
 
 ;; set directly keycode (here control + f with my keyboard)
 ;; (xbindkey '("m:0x4" "c:41") "xterm")
