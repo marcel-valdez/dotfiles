@@ -196,7 +196,7 @@ if [ "$(expr substr $(uname) 1 5)" == "Linux" ]; then
     export GIT_EDITOR=$EDITOR
   fi
   # if ther terminal has not been initialized yet
-  if [ -z $TERMINAL_SESSION_INITIALIZED ]; then
+  if [ -z "${TERMINAL_SESSION_INITIALIZED}" ]; then
     # This is slow, so we do not want to do it for every TMUX pane
     log_debug "Loading SSH session"
     source "$HOME/lib/ssh-persist-session.sh"
@@ -207,7 +207,7 @@ if [ "$(expr substr $(uname) 1 5)" == "Linux" ]; then
   # if we are not within tmux and not within an emacs ansi-term
   # start or join a tmux session
   if [ "$TMUX" == "" ] && [[ ! "$TERM" =~ "eterm" ]] ; then
-    # this will run for once per non-eterm terminal opened
+    # this will run once per non-eterm terminal opened
     tmux_attach_initial_session
   fi
 
