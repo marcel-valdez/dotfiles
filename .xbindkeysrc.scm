@@ -167,8 +167,8 @@
   (enqueue-work (lambda ()
 		    (set! worker-running #f))))
 
-(if (not worker-running)
-   (start-worker))
+;; (if (not worker-running)
+;;   (start-worker))
 
 ;; -- end worker thread-code --
 
@@ -186,9 +186,9 @@
 	    ;; (display (string-append (to-str (current-time)) ": will attempt to send back " xdotool_key "\n"))
 	    (ungrab-all-keys)
 	    (enqueue-work (lambda ()
-	    ;; (system-async-mark (system-async (lambda ()
 			    ;; (display (string-append (to-str (current-time)) ": sending " xdotool_key " to xdotool\n"))
 			    (yield)
+			    (usleep 5000)
 			    (system* "xdotool" "key" xdotool_key)
 			    (grab-all-keys)))
 	    )
@@ -197,14 +197,16 @@
     )
   )
 
+;; re-sending keystrokes to the command-line turned out to be very
+;; flaky, not worth the trouble it causes. Keep this code for
+;; historical purposes, as reference for future implementations
+;; bind ctrl+;
+;; (xbindkey-function (cons 'release '("m:0x4" "c:47"))
+;;		   (send-keys-to-tmux-or-x "C-\\;" "ctrl+semicolon"))
 
 ;; bind ctrl+;
-(xbindkey-function (cons 'release '("m:0x4" "c:47"))
-		   (send-keys-to-tmux-or-x "C-\\;" "ctrl+semicolon"))
-
-;; bind ctrl+;
-(xbindkey-function (cons 'release '("m:0x4" "c:60"))
-		   (send-keys-to-tmux-or-x "C-." "ctrl+period"))
+;; (xbindkey-function (cons 'release '("m:0x4" "c:60"))
+;;		   (send-keys-to-tmux-or-x "C-." "ctrl+period"))
 
 ;; ctrl + home
 ;; (xbindkey-function (cons 'release '("m:0x4" "c:110"))
