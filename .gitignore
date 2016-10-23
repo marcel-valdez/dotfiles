@@ -17,9 +17,17 @@
 !.emacs
 !.xbindkeysrc.scm
 !lib/
+
+# include the bin folder
 !bin/
 !bin/*
+# with the exception of these binaries
 bin/dex
+
+# include custom emacs lisp configs
+!.emacs.d/
+!.emacs.d/lisp/
+!.emacs.d/lisp/*
 
 # Ignore nano backup files
 *~
