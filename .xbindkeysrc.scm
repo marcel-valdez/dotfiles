@@ -60,6 +60,7 @@
 ;; (ungrab-all-keys)
 ;; (remove-all-keys)
 ;; (debug)
+
 (use-modules (ice-9 threads))
 
 (define bg-run #f)
@@ -81,6 +82,32 @@
 (bg-start)
 
 
+(define keys-grabbed #t)
+
+(define (set-keys-grabbed new-value)
+  (if (eq? (not keys-grabbed) new-value)
+      (monitor
+       (if (eq? (not keys-grabbed) new-value)
+	   (if new-value
+	       (begin
+		 ;; (display "grabbing all keys\n")
+		 (grab-all-keys)
+		 (set! keys-grabbed #t))
+	       (begin
+		 ;; (display "ungrabbing all keys\n")
+		 (ungrab-all-keys)
+		 (set! keys-grabbed #f)
+	       ))))))
+
+(define (ungrab-keys)
+  ;; (display "attempting to ungrab keys\n")
+  (set-keys-grabbed #f))
+
+(define (grab-keys)
+  ;; (display "attempting to grab keys\n")
+  (set-keys-grabbed #t))
+
+
 (define (remap-when-terminal tmux_key xdotool_key)
   (let ((result 0))
     ;; (display (string-append "grabbed: " xdotool_key "\n"))
@@ -91,19 +118,20 @@
     (if (= result 0)
 	(system* "tmux" "send-keys" tmux_key)
 	(begin
+	  (ungrab-keys)
 	  ;; (display (string-append "will attempt to send back " xdotool_key "\n"))
-	  (ungrab-all-keys)
 	  (bg-enqueue (lambda ()
 			(yield)
 			(system* "xdotool" "key" xdotool_key)
-			(grab-all-keys)))
+			(grab-keys)))
 	  )
 	)
     )
   )
 
+
 ;; bind ctrl+;
-(xbindkey-function (cons 'release '("m:0x4" "c:47"))
+ (xbindkey-function (cons 'release '("m:0x4" "c:47"))
 		   (lambda () (remap-when-terminal "C-\\;" "ctrl+semicolon")))
 
 ;; bind ctrl+.

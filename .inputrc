@@ -73,6 +73,6 @@ $endif
 
 $endif
 
-;; This system's shell does not have the paste-from-clipboard
-;; capability
-;; "\C-v": paste-from-clipboard
+# This system's shell does not have the paste-from-clipboard
+# capability
+# "\C-v": paste-from-clipboard
