@@ -44,15 +44,15 @@
 ;; (set-numlock! #f or #t)
 ;; (set-scrolllock! #f or #t)
 ;; (set-capslock! #f or #t)
-;; 
+;;
 ;; Shell command key:
 ;; (xbindkey key "foo-bar-command [args]")
 ;; (xbindkey '(modifier* key) "foo-bar-command [args]")
-;; 
+;;
 ;; Scheme function key:
 ;; (xbindkey-function key function-name-or-lambda-function)
 ;; (xbindkey-function '(modifier* key) function-name-or-lambda-function)
-;; 
+;;
 ;; Other functions:
 ;; (remove-xbindkey key)
 ;; (run-command "foo-bar-command [args]")
@@ -85,40 +85,40 @@
 
 ;; Extra features
 ;; (xbindkey-function '(control a)
-;;      	   (lambda ()
-;;      	     (display "Hello from Scheme!")
-;;      	     (newline)))
+;;         (lambda ()
+;;           (display "Hello from Scheme!")
+;;           (newline)))
 
 ;; (xbindkey-function '(shift p)
-;;      	   (lambda ()
-;;      	     (run-command "xterm")))
+;;         (lambda ()
+;;           (run-command "xterm")))
 
 
 ;; Double click test
 ;; (xbindkey-function '(control w)
-;;      	   (let ((count 0))
-;;      	     (lambda ()
-;;      	       (set! count (+ count 1))
-;;      	       (if (> count 1)
-;;      		   (begin
-;;      		    (set! count 0)
-;;      		    (run-command "xterm"))))))
+;;         (let ((count 0))
+;;           (lambda ()
+;;             (set! count (+ count 1))
+;;             (if (> count 1)
+;;         (begin
+;;          (set! count 0)
+;;          (run-command "xterm"))))))
 
 ;; Time double click test:
 ;;  - short double click -> run an xterm
 ;;  - long  double click -> run an rxvt
 ;; (xbindkey-function '(shift w)
-;;      	   (let ((time (current-time))
-;;      		 (count 0))
-;;      	     (lambda ()
-;;      	       (set! count (+ count 1))
-;;      	       (if (> count 1)
-;;      		   (begin
-;;      		    (if (< (- (current-time) time) 1)
-;;      			(run-command "xterm")
-;;      			(run-command "rxvt"))
-;;      		    (set! count 0)))
-;;      	       (set! time (current-time)))))
+;;         (let ((time (current-time))
+;;       (count 0))
+;;           (lambda ()
+;;             (set! count (+ count 1))
+;;             (if (> count 1)
+;;         (begin
+;;          (if (< (- (current-time) time) 1)
+;;      (run-command "xterm")
+;;      (run-command "rxvt"))
+;;          (set! count 0)))
+;;             (set! time (current-time)))))
 
 
 ;; Chording keys test: Start differents program if only one key is
@@ -133,17 +133,17 @@
 ;;     (xbindkey-function key1 (lambda () (set! k1 #t)))
 ;;     (xbindkey-function key2 (lambda () (set! k2 #t)))
 ;;     (xbindkey-function (cons 'release key1)
-;;      	       (lambda ()
-;;      		 (if (and k1 k2)
-;;      		     (run-command cmd-k1-k2)
-;;      		     (if k1 (run-command cmd-k1)))
-;;      		 (set! k1 #f) (set! k2 #f)))
+;;             (lambda ()
+;;       (if (and k1 k2)
+;;           (run-command cmd-k1-k2)
+;;           (if k1 (run-command cmd-k1)))
+;;       (set! k1 #f) (set! k2 #f)))
 ;;     (xbindkey-function (cons 'release key2)
-;;      	       (lambda ()
-;;      		 (if (and k1 k2)
-;;      		     (run-command cmd-k2-k1)
-;;      		     (if k2 (run-command cmd-k2)))
-;;      		 (set! k1 #f) (set! k2 #f)))))
+;;             (lambda ()
+;;       (if (and k1 k2)
+;;           (run-command cmd-k2-k1)
+;;           (if k2 (run-command cmd-k2)))
+;;       (set! k1 #f) (set! k2 #f)))))
 ;; These are too buggy for it to be worth having, use alternate bindings
 
 ;; sends a tmux key to the terminal when the focused window is a terminal
@@ -157,16 +157,18 @@
 (define (start-worker)
   (set! worker-running #t)
   (set! worker-thread (begin-thread
-		   (while worker-running
-			  (usleep 1000)))))
+                       (while worker-running
+                              (usleep 1000)))))
 
 (define (enqueue-work thunk)
   (system-async-mark thunk worker-thread))
 
 (define (stop-worker)
   (enqueue-work (lambda ()
-		    (set! worker-running #f))))
+                  (set! worker-running #f))))
 
+;; TODO: Enable once re-sending keys to non-terminal windows
+;;       is fixed
 ;; (if (not worker-running)
 ;;   (start-worker))
 
@@ -177,150 +179,151 @@
     (let ((result 0))
       ;; (display (string-append (to-str (current-time)) ": grabbed: " xdotool_key "\n"))
       (set! result (system* (string-append
-			     (getenv "HOME")
-			     "/bin/focused-window-is-program")
-			    "terminal"))
+                             (getenv "HOME")
+                             "/bin/focused-window-is-program")
+                            "terminal"))
       (if (= result 0)
-	  (system* "tmux" "send-keys" tmux_key)
-	  (begin
-	    ;; (display (string-append (to-str (current-time)) ": will attempt to send back " xdotool_key "\n"))
-	    (ungrab-all-keys)
-	    (enqueue-work (lambda ()
-			    ;; (display (string-append (to-str (current-time)) ": sending " xdotool_key " to xdotool\n"))
-			    (yield)
-			    (usleep 5000)
-			    (system* "xdotool" "key" xdotool_key)
-			    (grab-all-keys)))
-	    )
-	  )
+          (system* "tmux" "send-keys" tmux_key)
+          (begin
+            (display (string-append (to-str (current-time)) ": will attempt to send back " xdotool_key "\n"))
+            ;; TODO: Try to make it work by using the grab-keys with a monitored
+            ;; code block, like in the main_ubuntu branch
+            ;; (ungrab-all-keys)
+            ;; (enqueue-work (lambda ()
+            ;; (display (string-append (to-str (current-time)) ": sending " xdotool_key " to xdotool\n"))
+            ;; (yield)
+            ;; (usleep 5000)
+            ;; (system* "xdotool" "key" xdotool_key)
+            ;; (grab-all-keys)))
+            ;;)
+            )
+          ))))
+
+  ;; re-sending keystrokes to the command-line turned out to be very
+  ;; flaky, not worth the trouble it causes. Keep this code for
+  ;; historical purposes, as reference for future implementations
+  ;; bind ctrl+;
+  (xbindkey-function (cons 'release '("m:0x4" "c:47"))
+                     (send-keys-to-tmux-or-x "C-\\;" "ctrl+semicolon"))
+
+  ;; bind ctrl+.
+  (xbindkey-function (cons 'release '("m:0x4" "c:60"))
+                     (send-keys-to-tmux-or-x "C-." "ctrl+period"))
+  ;; bind ctrl+,
+  (xbindkey-function (cons 'release '("m:0x4" "c:59"))
+                     (send-keys-to-tmux-or-x "C-," "ctrl+comma"))
+
+  ;; ctrl + home
+  ;; (xbindkey-function (cons 'release '("m:0x4" "c:110"))
+  ;; (send-keys-to-tmux-or-x "C-home" "ctrl+Home"))
+
+  ;; ctrl + end
+  ;; (xbindkey-function (cons 'release '("m:0x4" "c:115"))
+  ;; (send-keys-to-tmux-or-x "C-end" "ctrl+End"))
+
+  (define (release-modifiers)
+    (lambda ()
+      ;; (display "xbindkeys: Releasing modifiers" )
+      (run-command "~/bin/release-modifiers")
       )
     )
-  )
+  ;; ctrl + '
+  (xbindkey-function '(m:0x4 c:48) (release-modifiers))
+  ;; ctrl + shift + '
+  (xbindkey-function '(m:0x5 c:48) (release-modifiers))
+  ;; alt + '
+  (xbindkey-function '(m:0x8 c:48) (release-modifiers))
+  ;; alt + shift + '
+  (xbindkey-function '(m:0x9 c:48) (release-modifiers))
+  ;; ctrl + alt  + '
+  (xbindkey-function '(m:0xc c:48) (release-modifiers))
+  ;; ctrl + shift + alt  + '
+  (xbindkey-function '(m:0xd c:48) (release-modifiers))
 
-;; re-sending keystrokes to the command-line turned out to be very
-;; flaky, not worth the trouble it causes. Keep this code for
-;; historical purposes, as reference for future implementations
-;; bind ctrl+;
-;; (xbindkey-function (cons 'release '("m:0x4" "c:47"))
-;;		   (send-keys-to-tmux-or-x "C-\\;" "ctrl+semicolon"))
+  (define (to-str obj)
+    (format #f "~a" obj)
+    )
 
-;; bind ctrl+;
-;; (xbindkey-function (cons 'release '("m:0x4" "c:60"))
-;;		   (send-keys-to-tmux-or-x "C-." "ctrl+period"))
-
-;; ctrl + home
-;; (xbindkey-function (cons 'release '("m:0x4" "c:110"))
-		   ;; (send-keys-to-tmux-or-x "C-home" "ctrl+Home"))
-
-;; ctrl + end
-;; (xbindkey-function (cons 'release '("m:0x4" "c:115"))
-		   ;; (send-keys-to-tmux-or-x "C-end" "ctrl+End"))
-
-(define (release-modifiers)
-  (lambda ()
-    ;; (display "xbindkeys: Releasing modifiers" )
-    (run-command "~/bin/release-modifiers")
-  )
-)
-;; ctrl + '
-(xbindkey-function '(m:0x4 c:48) (release-modifiers))
-;; ctrl + shift + '
-(xbindkey-function '(m:0x5 c:48) (release-modifiers))
-;; alt + '
-(xbindkey-function '(m:0x8 c:48) (release-modifiers))
-;; alt + shift + '
-(xbindkey-function '(m:0x9 c:48) (release-modifiers))
-;; ctrl + alt  + '
-(xbindkey-function '(m:0xc c:48) (release-modifiers))
-;; ctrl + shift + alt  + '
-(xbindkey-function '(m:0xd c:48) (release-modifiers))
-
-(define (to-str obj)
-  (format #f "~a" obj)
-)
-
-;; executes a command when 2 key combinations happen
-;; the only problem with this, is that xbindkeys intercepts
-;; key2 no matter what
-(define (define-chord-keys-cmd key1 key2 cmd)
-  "Define chording key"
-  (let ((key2-registered #f))
-    (xbindkey-function key1 (lambda ()
-      ;;(display (string-append (to-str key1) " pressed\n"))
-      (if (not key2-registered)
-        (begin
-          ;;(display (string-append "registering " (to-str key2) "\n"))
-          (set! key2-registered #t)
-          (xbindkey-function key2 (lambda ()
-            ;;(display (string-append (to-str key2) " pressed\n"))
-            (run-command cmd)
-          ))
-        )
-      )
-    ))
-  )
-)
-
-;; ctrl + \ + left
-(define-chord-keys-cmd '(control c:51) '(control Left)
-  "~/projects/x-window-shortcuts/x-window-move left")
-;; ctrl + \ + right
-(define-chord-keys-cmd '(control c:51) '(control Right)
-  "~/projects/x-window-shortcuts/x-window-move right")
-;; ctrl + \ + up
-(define-chord-keys-cmd '(control c:51) '(control Up)
-  "~/projects/x-window-shortcuts/x-window-move up")
-;; ctrl + \ + down
-(define-chord-keys-cmd '(control c:51) '(control Down)
-  "~/projects/x-window-shortcuts/x-window-move down")
-;; ctrl + \ + pageup
-(define-chord-keys-cmd '(control c:51) '(control Prior)
-  "~/projects/x-window-shortcuts/x-window-move maximize")
-;; ctrl + \ + pagedown
-(define-chord-keys-cmd '(control c:51) '(control Next)
-  "~/projects/x-window-shortcuts/x-window-move minimize")
-;; ctrl + \ + comma
-(define-chord-keys-cmd '(control c:51) '(control comma)
-  "~/projects/x-window-shortcuts/x-window-move left-screen")
-;; ctrl + \ + period
-(define-chord-keys-cmd '(control c:51) '(control period)
-  "~/projects/x-window-shortcuts/x-window-move right-screen")
-
-(define (define-xdotool-remap source_guile_key target_xdotool_key)
-  (let ()
-    (xbindkey-function (cons 'release source_guile_key)
-      (lambda ()
-        (run-command (string-append "xdotool key --clearmodifiers " target_xdotool_key))
+  ;; executes a command when 2 key combinations happen
+  ;; the only problem with this, is that xbindkeys intercepts
+  ;; key2 no matter what
+  (define (define-chord-keys-cmd key1 key2 cmd)
+    "Define chording key"
+    (let ((key2-registered #f))
+      (xbindkey-function key1 (lambda ()
+                                ;;(display (string-append (to-str key1) " pressed\n"))
+                                (if (not key2-registered)
+                                    (begin
+                                      ;;(display (string-append "registering " (to-str key2) "\n"))
+                                      (set! key2-registered #t)
+                                      (xbindkey-function key2 (lambda ()
+                                                                ;;(display (string-append (to-str key2) " pressed\n"))
+                                                                (run-command cmd)
+                                                                ))
+                                      )
+                                    )
+                                ))
       )
     )
-  )
-)
 
-;; remaps Alt+Shift+2 to F2 key via xdotool
-(define-xdotool-remap '(m:0x9 c:11) "F2")
-;; remaps Alt+Shift+3 to F3 key via xdotool
-(define-xdotool-remap '(m:0x9 c:12) "F3")
-;; remaps Alt+Shift+4 to F4 key via xdotool
-(define-xdotool-remap '(m:0x9 c:13) "F4")
-;; remaps Alt+Shift+5 to F5 key via xdotool
-(define-xdotool-remap '(m:0x9 c:14) "F5")
+  ;; ctrl + \ + left
+  (define-chord-keys-cmd '(control c:51) '(control Left)
+    "~/projects/x-window-shortcuts/x-window-move left")
+  ;; ctrl + \ + right
+  (define-chord-keys-cmd '(control c:51) '(control Right)
+    "~/projects/x-window-shortcuts/x-window-move right")
+  ;; ctrl + \ + up
+  (define-chord-keys-cmd '(control c:51) '(control Up)
+    "~/projects/x-window-shortcuts/x-window-move up")
+  ;; ctrl + \ + down
+  (define-chord-keys-cmd '(control c:51) '(control Down)
+    "~/projects/x-window-shortcuts/x-window-move down")
+  ;; ctrl + \ + pageup
+  (define-chord-keys-cmd '(control c:51) '(control Prior)
+    "~/projects/x-window-shortcuts/x-window-move maximize")
+  ;; ctrl + \ + pagedown
+  (define-chord-keys-cmd '(control c:51) '(control Next)
+    "~/projects/x-window-shortcuts/x-window-move minimize")
+  ;; ctrl + \ + comma
+  (define-chord-keys-cmd '(control c:51) '(control comma)
+    "~/projects/x-window-shortcuts/x-window-move left-screen")
+  ;; ctrl + \ + period
+  (define-chord-keys-cmd '(control c:51) '(control period)
+    "~/projects/x-window-shortcuts/x-window-move right-screen")
 
-;; Example:
-;;   Shift + b:1                   start an xterm
-;;  Shift + b:3                   start an rxvt
-;;   Shift + b:1 then Shift + b:3  start gv
-;;   Shift + b:3 then Shift + b:1  start xpdf
+  (define (define-xdotool-remap source_guile_key target_xdotool_key)
+    (let ()
+      (xbindkey-function (cons 'release source_guile_key)
+                         (lambda ()
+                           (run-command (string-append "xdotool key --clearmodifiers " target_xdotool_key))
+                           )
+                         )
+      )
+    )
 
-;; (define-chord-keys '(shift "b:1") '(shift "b:3")
-;;   "xterm" "rxvt" "gv" "xpdf")
+  ;; remaps Alt+Shift+2 to F2 key via xdotool
+  (define-xdotool-remap '(m:0x9 c:11) "F2")
+  ;; remaps Alt+Shift+3 to F3 key via xdotool
+  (define-xdotool-remap '(m:0x9 c:12) "F3")
+  ;; remaps Alt+Shift+4 to F4 key via xdotool
+  (define-xdotool-remap '(m:0x9 c:13) "F4")
+  ;; remaps Alt+Shift+5 to F5 key via xdotool
+  (define-xdotool-remap '(m:0x9 c:14) "F5")
 
-;; Here the release order have no importance
-;; (the same program is started in both case)
-;; (define-chord-keys '(alt "b:1") '(alt "b:3")
-;;   "gv" "xpdf" "xterm" "xterm")
+  ;; Example:
+  ;;   Shift + b:1                   start an xterm
+  ;;  Shift + b:3                   start an rxvt
+  ;;   Shift + b:1 then Shift + b:3  start gv
+  ;;   Shift + b:3 then Shift + b:1  start xpdf
+
+  ;; (define-chord-keys '(shift "b:1") '(shift "b:3")
+  ;;   "xterm" "rxvt" "gv" "xpdf")
+
+  ;; Here the release order have no importance
+  ;; (the same program is started in both case)
+  ;; (define-chord-keys '(alt "b:1") '(alt "b:3")
+  ;;   "gv" "xpdf" "xterm" "xterm")
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; End of xbindkeys guile configuration ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-
