@@ -16,3 +16,10 @@ topic — you should cut yourself off.
 You see I'm not an expert like these guys. I'm an idiot and that's great,
 because I'm such an idiot, that I get learn a ton of things every day.
     -- SirActionSlacks
+%
+When you have software problems A and B, the complexity of solving A and B at
+the same time is C(A) * C(B), but if you solve them separately then the
+complexity is C(A) + C(B). Always split your problems into the smallest units
+possible.
+    -- Marcel Valdez, Lessons Learned
+
