@@ -41,6 +41,14 @@ bin/__latest_version.py
 bin/check-all-versions
 bin/verify-packages
 
+!.emacs
+!.emacs.d/
+!.emacs.d/lisp/
+!.emacs.d/lisp/*
+.emacs.d/lisp/at-office.el
+!.emacs.d/lisp/external
+!.emacs.d/lisp/external/*
+
 
 # In order to unignore a specific file under a directory:
 # 1. unignore the directory
