@@ -63,24 +63,19 @@
            (global-set-key (kbd "C-t C-d")
                            (lambda () (interactive) (multi-term-dedicated-toggle))))
   (progn (require 'in-tmux)))
-(require 'undo-tree)
-(require 'multiple-cursors)
+
 
 ;; start an emacs server so that new emacs ansi-term can open a new
 ;; buffer instead of opening emacs within emacs
 
-;;;; global editing settings and overrides
-(global-auto-complete-mode)
-(global-undo-tree-mode)
 ;; always enable identifications of JavaStyleWords
 (global-subword-mode)
 ;; always enable whitespace visualization
 (global-whitespace-mode)
 (setq whitespace-line-column 80)
+;; only highlight tab chars and trailing whitespace
 (setq whitespace-style '(tab-mark trailing lines-tail face))
-;; show the current line number in the status bar
 
-;;;; custom bindings
 ;; switch between windows quickly
 (global-unset-key (kbd "M-j"))
 (global-set-key (kbd "M-j") (lambda () (interactive) (other-window 1)))
@@ -93,24 +88,26 @@
 (global-unset-key (kbd "C-M-k"))
 (global-set-key (kbd "C-M-k") (lambda () (interactive) (other-frame -1)))
 
-;; remap undo-redo using undo-tree
+(with-library auto-complete (global-auto-complete-mode))
 (with-library undo-tree
-              (global-unset-key (kbd "C-/"))
-              (global-set-key (kbd "C-/")
-                              (lambda (interactive) (undo-tree-undo)))
-              (global-unset-key (kbd "C-."))
-              (global-set-key (kbd "C-.")
-                              (lambda () (interactive) (undo-tree-redo))))
+  ;; remap undo-redo using undo-tree
+  (global-undo-tree-mode)
+  (global-unset-key (kbd "C-/"))
+  (global-set-key (kbd "C-/")
+                  (lambda (interactive) (undo-tree-undo)))
+  (global-unset-key (kbd "C-."))
+  (global-set-key (kbd "C-.")
+                  (lambda () (interactive) (undo-tree-redo))))
 
-;;; start multiple-cursors bindings
-;; extended mode to mark instances, multiple M-3 simply add forward
-(global-set-key (kbd "M-3") 'mc/mark-more-like-this-extended)
-;; mark instances backwards of whatever is marked in the region
-(global-set-key (kbd "M-#") 'mc/mark-previous-like-this)
-;; mark all instances of whatever is marked in the region
-(global-set-key (kbd "C-x M-3") 'mc/mark-all-dwim)
-;; create a separate caret for every line under the cursor
-(global-set-key (kbd "C-x M-l") 'mc/edit-lines)
+(with-library multiple-cursors
+  ;; extended mode to mark instances, multiple M-3 simply add forward
+  (global-set-key (kbd "M-3") 'mc/mark-more-like-this-extended)
+  ;; mark instances backwards of whatever is marked in the region
+  (global-set-key (kbd "M-#") 'mc/mark-previous-like-this)
+  ;; mark all instances of whatever is marked in the region
+  (global-set-key (kbd "C-x M-3") 'mc/mark-all-dwim)
+  ;; create a separate caret for every line under the cursor
+  (global-set-key (kbd "C-x M-l") 'mc/edit-lines))
 
 (defun custom-java-mode-hook ()
   ;; TOOD: Make this only work for .java files, but not for other
@@ -142,6 +139,7 @@
  ;; Your init file should contain only one such instance.
  ;; If there is more than one, they won't work right.
  '(indent-tabs-mode nil)
+ '(c-basic-offset 2)
  '(tab-width 2)
  '(line-number-mode t)
  '(column-number-mode t)
