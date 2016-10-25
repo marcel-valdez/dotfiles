@@ -35,7 +35,10 @@
 (package-initialize)
 (add-to-list 'package-archives '("marmalade", "http://marmalade-repo.org/packages/"))
 (add-to-list 'package-archives '("melpa", "https://melpa.org/packages/"))
+(add-to-list 'package-archives '("elpa", "https://elpa.org/packages/"))
 
+;; TODO: look into the xclip package, which allows emacs to save to the
+;; when running inside the terminal via the xclip utility
 ;; core macros used for basic functionality
 (require 'marcel-core-macros)
 ;; loads packages only available at the office
@@ -138,15 +141,15 @@
  ;; If you edit it by hand, you could mess it up, so be careful.
  ;; Your init file should contain only one such instance.
  ;; If there is more than one, they won't work right.
- '(indent-tabs-mode nil)
  '(c-basic-offset 2)
- '(tab-width 2)
- '(line-number-mode t)
  '(column-number-mode t)
- '(show-paren-mode t)
- '(tool-bar-mode nil)
  '(custom-enabled-themes (quote (tango-dark)))
- '(package-selected-packages (quote (undo-tree))))
+ '(indent-tabs-mode nil)
+ '(line-number-mode t)
+ '(package-selected-packages (quote (undo-tree)))
+ '(show-paren-mode t)
+ '(tab-width 2)
+ '(tool-bar-mode nil))
 (custom-set-faces
  ;; custom-set-faces was added by Custom.
  ;; If you edit it by hand, you could mess it up, so be careful.
