@@ -166,12 +166,50 @@
 (define (stop-worker)
   (enqueue-work (lambda () (set! worker-running #f))))
 
-;; TODO: Enable once re-sending keys to non-terminal windows
-;;       is fixed
-;; (if (not worker-running)
+;; TODO: Enable once the delay and flakiness of dropping and grabbing
+;; keys is fixed
+;;(if (not worker-running)
 ;;   (start-worker))
 
 ;; -- end worker thread-code --
+
+(define keys-grabbed #t)
+
+(define (set-keys-grabbed new-value)
+  (if (eq? (not keys-grabbed) new-value)
+      (monitor
+       (if (eq? (not keys-grabbed) new-value)
+           (if new-value
+               (begin
+                 ;; (display (string-append (to-str (current-time)) ": grabbing all keys\n"))
+                 (grab-all-keys)
+                 (set! keys-grabbed #t))
+               (begin
+                 ;; (display (string-append (to-str (current-time)) ": ungrabbing all keys\n"))
+                 (ungrab-all-keys)
+                 (set! keys-grabbed #f))
+               )))))
+
+(define (ungrab-keys)
+  ;; (display (string-append (to-str (current-time)) ": attempting to ungrab keys\n"))
+  (set-keys-grabbed #f))
+
+
+(define (grab-keys)
+  ;; (display (string-append (to-str (current-time)) ": attempting to grab keys\n"))
+  (set-keys-grabbed #t))
+
+(define processing-x-do-tool #f)
+
+(define (process-x-do-tool thunk)
+  (if (not is-processing-x-do-tool)
+      (monitor
+       (if (not is-processing-x-do-tool) thunk))))
+
+(define (started-processing-x-do-tool) (set! processing-x-do-tool #t))
+(define (done-processing-x-do-tool) (set! processing-x-do-tool #f))
+(define (is-processing-x-do-tool) (eq? processing-x-do-tool #t))
+
 
 (define (send-keys-to-tmux-or-x tmux_key xdotool_key)
   (lambda ()
@@ -183,19 +221,20 @@
                             "terminal"))
       (if (= result 0)
           (system* "tmux" "send-keys" tmux_key)
-          (begin
-            (display (string-append (to-str (current-time)) ": will attempt to send back " xdotool_key "\n"))
-            ;; TODO: Try to make it work by using the grab-keys with a monitored
-            ;; code block, like in the main_ubuntu branch
-            ;; (ungrab-all-keys)
-            ;; (enqueue-work (lambda ()
-            ;; (display (string-append (to-str (current-time)) ": sending " xdotool_key " to xdotool\n"))
-            ;; (yield)
-            ;; (usleep 5000)
-            ;; (system* "xdotool" "key" xdotool_key)
-            ;; (grab-all-keys)))
-            ;;)
-            )))))
+          ;; TODO: Uncomment once the flakiness of dropping and grabbing keys is fixed
+          ;; (process-x-do-tool
+          ;;   (begin
+          ;;     (started-processing-x-do-tool)
+          ;;     (ungrab-keys)
+          ;;     (enqueue-work
+          ;;       (lambda ()
+          ;;         (usleep 5000)
+          ;;         (yield)
+          ;;         ;; (display (string-append (to-str (current-time)) ": sending " xdotool_key " to xdotool\n"))
+          ;;         (system* "xdotool" "key" xdotool_key)
+          ;;         (grab-keys)
+          ;;         (done-processing-x-do-tool)))))
+          ))))
 
 ;; re-sending keystrokes to the command-line turned out to be very
 ;; flaky, not worth the trouble it causes. Keep this code for
@@ -211,13 +250,14 @@
 (xbindkey-function (cons 'release '("m:0x4" "c:59"))
                    (send-keys-to-tmux-or-x "C-," "ctrl+comma"))
 
+;; TODO: Uncomment once the flakiness of dropping and grabbing keys is fixed
 ;; ctrl + home
-;; (xbindkey-function (cons 'release '("m:0x4" "c:110"))
-;; (send-keys-to-tmux-or-x "C-home" "ctrl+Home"))
-
+;;(xbindkey-function (cons 'release '("m:0x4" "c:110"))
+;;                   (send-keys-to-tmux-or-x "C-home" "ctrl+Home"))
+;;
 ;; ctrl + end
-;; (xbindkey-function (cons 'release '("m:0x4" "c:115"))
-;; (send-keys-to-tmux-or-x "C-end" "ctrl+End"))
+;;(xbindkey-function (cons 'release '("m:0x4" "c:115"))
+;;                   (send-keys-to-tmux-or-x "C-end" "ctrl+End"))
 
 (define (release-modifiers)
   (lambda ()
@@ -245,16 +285,18 @@
 (define (define-chord-keys-cmd key1 key2 cmd)
   "Define chording key"
   (let ((key2-registered #f))
-    (xbindkey-function key1 (lambda ()
-                              ;;(display (string-append (to-str key1) " pressed\n"))
-                              (if (not key2-registered)
-                                  (begin
-                                    ;;(display (string-append "registering " (to-str key2) "\n"))
-                                    (set! key2-registered #t)
-                                    (xbindkey-function key2
-                                                       (lambda ()
-                                                         ;;(display (string-append (to-str key2) " pressed\n"))
-                                                         (run-command cmd)))))))))
+    (xbindkey-function key1
+                       (lambda ()
+                         ;;(display (string-append (to-str key1) " pressed\n"))
+                         (if (not key2-registered)
+                             (begin
+                               ;;(display (string-append "registering " (to-str key2) "\n"))
+                               (set! key2-registered #t)
+                               (xbindkey-function key2
+                                                  (lambda ()
+                                                    ;;(display (string-append (to-str key2) " pressed\n"))
+                                                    (run-command cmd)))
+                               ))))))
 
 ;; ctrl + \ + left
 (define-chord-keys-cmd '(control c:51) '(control Left)
