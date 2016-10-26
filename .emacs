@@ -24,6 +24,8 @@
 ;; these are packages I could not install with package manager
 (let ((default-directory  "~/.emacs.d/lisp/"))
   (normal-top-level-add-subdirs-to-load-path))
+;; add custom themes to themes load path
+(add-to-list 'custom-theme-load-path "~/.emacs.d/lisp/themes")
 
 ;; Use the 'google' package by default.
 
@@ -144,6 +146,9 @@
  '(c-basic-offset 2)
  '(column-number-mode t)
  '(custom-enabled-themes (quote (tango-dark)))
+ '(custom-safe-themes
+   (quote
+    ("4badd47b5ba16df46b849137903f2210d344f3c7021e979ff8ed68b8c3827d84" default)))
  '(indent-tabs-mode nil)
  '(line-number-mode t)
  '(package-selected-packages (quote (undo-tree)))
@@ -158,3 +163,4 @@
  )
 (put 'upcase-region 'disabled nil)
 (put 'downcase-region 'disabled nil)
+(load-theme 'company-dark)
