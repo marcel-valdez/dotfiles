@@ -9,14 +9,14 @@ diff-lines() {
   local line=
   while read; do
     esc=$'\033'
-    if [[ $REPLY =~ ---\ (a/)?.* ]]; then
+    if [[ ${REPLY} =~ ---\ (a/)?.* ]]; then
       continue
-    elif [[ $REPLY =~ \+\+\+\ (b/)?([^[:blank:]$esc]+).* ]]; then
+    elif [[ ${REPLY} =~ \+\+\+\ (b/)?([^[:blank:]$esc]+).* ]]; then
       path=${BASH_REMATCH[2]}
-    elif [[ $REPLY =~ @@\ -[0-9]+(,[0-9]+)?\ \+([0-9]+)(,[0-9]+)?\ @@.* ]]; then
+    elif [[ ${REPLY} =~ @@\ -[0-9]+(,[0-9]+)?\ \+([0-9]+)(,[0-9]+)?\ @@.* ]]; then
       line=${BASH_REMATCH[2]}
-    elif [[ $REPLY =~ ^($esc\[[0-9;]+m)*([\ +-]) ]]; then
-      echo "$path:$line:$REPLY"
+    elif [[ ${REPLY} =~ ^(${esc}\[[0-9;]+m)*([\ +-]) ]]; then
+      echo "${path}:${line}:${REPLY}"
       if [[ ${BASH_REMATCH[2]} != - ]]; then
         ((line++))
       fi
@@ -27,21 +27,21 @@ diff-lines() {
 # start git functions
 
 git-diff-lines() {
-  git diff $@ | diff-lines
+  git diff "$@" | diff-lines
 }
 
 g-diff-lines() {
-  git-diff-lines $@
+  git-diff-lines "$@"
 }
 
 git-branch-out() {
   new_branch_name=$1
   treeish=$2
-  git checkout -b $1 $2
+  git checkout -b ${new_branch_name} ${treeish}
 }
 
 g-branch-out() {
-  git-branch-out $1 $2
+  git-branch-out "$@"
 }
 
 # end git functions
@@ -50,11 +50,11 @@ g-branch-out() {
 
 node-check-use() {
   node_version=$(node --version 2>/dev/null)
-  if [ "$node_version" != "v$NODE_VERSION" ]; then
+  if [ "${node_version}" != "v${NODE_VERSION}" ]; then
     node_version_installed=$(nvm ls 2>/dev/null | grep $NODE_VERSION)
-    if [ "$node_version_installed" == "" ]; then
+    if [ "${node_version_installed}" == "" ]; then
       echo Node v$NODE_VERSION is not installed, installing now.
-      nvm install "v$NODE_VERSION"
+      nvm install "v${NODE_VERSION}"
     fi
 
     if [ "$1" == "--silent" ]; then
@@ -90,33 +90,12 @@ npm-lint() {
   npm run lint
 }
 
-# end npm functions
-
-mlocate-here() {
-  directory="$2"
-  if [ "$directory" == "" ]; then
-    directory="$(pwd)/"
-  fi
-  mlocate -b "$1" | grep --color=never "^$directory"
-}
-
-run-step() {
-  $1
-  __result=$?
-  time=$(date +%H:%M)
-  if [ "$__result" == "0" ]; then
-    lemonbar-show --fg "#99FF99" "($time) <$1> done ($2)"
-  else
-    lemonbar-show --fg "#C45454" "($time) <$1> failed ($2)"
-  fi
-}
 
 npm-run-all() {
   time=$(date +%H:%M)
-  lemonbar-show --fg "#FFFF00" "($time) Running npm-run-all"
-
+  lemonbar-show --fg "#FFFF00" "(${time}) Running npm-run-all"
   run-step "npm install" "1/5"
-  if [ "$__result" == "1" ]; then
+  if [ ! ${__result} -eq 0 ]; then
     exit 1
   fi
 
@@ -124,6 +103,27 @@ npm-run-all() {
   run-step "npm run test-tools" "3/5"
   run-step "npm run lint" "4/5"
   run-step "npm run validateLicenses" "5/5"
+}
+
+# end npm functions
+
+mlocate-here() {
+  directory=$2
+  if [ -z "${directory}" ]; then
+    directory="$(pwd)/"
+  fi
+  mlocate -b "$1" | grep --color=never "^${directory}"
+}
+
+run-step() {
+  eval "$1"
+  __result=$?
+  time=$(date +%H:%M)
+  if [ "${__result}" == "0" ]; then
+    lemonbar-show --fg "#99FF99" "(${time}) <$1> done ($2)"
+  else
+    lemonbar-show --fg "#C45454" "(${time}) <$1> failed ($2)"
+  fi
 }
 
 function top-n() {
@@ -140,16 +140,11 @@ function top-ten() {
 }
 
 function java-package-to-path() {
-  package="$1"
-  if [ "$package" == "" ]; then
-    package=$(cat)
-  fi
-
-  echo "$package" | sed 's/\./\//g'
+  get-arg-or-stdin "$@" | sed 's/\./\//g'
 }
 
 function copy-to-clip() {
-  get-arg-or-stdin $* | perl -pe 'chomp if eof' | xclip -sel clip
+  get-arg-or-stdin "$@" | perl -pe 'chomp if eof' | xclip -sel clip
 }
 
 function paste-clip() {
@@ -157,8 +152,8 @@ function paste-clip() {
 }
 
 function get-arg-or-stdin() {
-  # if there is less than one argument, then echo from stdin, otherwise echo all arguments
-  ( [ $# -lt 1 ] && echo $(cat)) || echo "$*"
+  # if there are no arguments, then echo from stdin, otherwise echo arguments
+  ([ $# -eq 0 ] && cat) || echo "$@"
 }
 
 function tmux-to-clip() {
@@ -166,7 +161,7 @@ function tmux-to-clip() {
 }
 
 function copy-to-tmux() {
-  tmux set-buffer "$(get-arg-or-stdin $*)"
+  tmux set-buffer "$(get-arg-or-stdin $@)"
 }
 
 function history-cmd-only() {
@@ -186,22 +181,23 @@ function tmux-goto-session-client() {
 }
 
 function is-ssh-session() {
-  ([ -n "$SSH_CLIENT" ] || [ -n "$SSH_TTY" ] || [ -n "$SSH_CONNECTION" ]) && echo "true"
+  ([ -n "${SSH_CLIENT}" ] || [ -n "${SSH_TTY}" ] || [ -n "${SSH_CONNECTION}" ]) && echo "true"
 }
 
 function get-ssh-relay-ip() {
-  connection_string=$(([ "$SSH_CLIENT" != "" ] && echo $SSH_CLIENT) || echo $SSH_CONNECTION)
-  echo $connection_string | cut -d' ' -f1
+  connection_string=$(([ -n "${SSH_CLIENT}" ] && echo "${SSH_CLIENT}")|| echo "${SSH_CONNECTION}")
+  echo "${connection_string}" | cut -d' ' -f1
 }
 
 function get-ssh-relay-hostname() {
   relay_ip=$(get-ssh-relay-ip)
-  if [ "$relay_ip" != "" ]; then
-    nslookup $relay_ip | grep -o 'name =.*'  | cut -d'=' -f2 | sed 's/ //g' | sed 's/\.$//'
+  if [ -n "${relay_ip}" ]; then
+    nslookup "${relay_ip}" | grep -o 'name =.*'  | cut -d'=' -f2 | sed 's/ //g' | sed 's/\.$//'
   fi
 }
 
 function ps-nice() {
+  # TODO: move to its own script file
   format="-o pid -o tty -o start -o args"
   sort="--sort=-comm"
   config="axw"
@@ -239,29 +235,29 @@ function ps-nice() {
   ps ${format}\
     ${sort}\
     ${config}\
-    $@
+    "$@"
 }
 
 function emacs() {
-  if [[ "$TERM" =~ "eterm" ]]; then
+  if [[ "${TERM}" =~ "eterm" ]]; then
     /usr/bin/emacsclient
   else
-    /usr/bin/emacs --no-window-system $@
+    /usr/bin/emacs --no-window-system "$@"
   fi
 }
 
 function google-emacs() {
-  if [[ "$TERM" =~ "eterm" ]]; then
+  if [[ "${TERM}" =~ "eterm" ]]; then
     /usr/bin/emacsclient
   else
-    /usr/bin/google-emacs --no-window-system $@
+    /usr/bin/google-emacs --no-window-system "$@"
   fi
 }
 
 # force myself to use emacs, not nano
 function nano() {
   [ "$1" == "-F" ] && shift
-  emacs $@
+  emacs "$@"
 }
 
 # shows the shell's keyboard shortcuts
