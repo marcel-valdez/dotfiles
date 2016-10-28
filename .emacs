@@ -39,13 +39,15 @@
 (add-to-list 'package-archives '("melpa", "https://melpa.org/packages/"))
 (add-to-list 'package-archives '("elpa", "https://elpa.org/packages/"))
 
-;; TODO: look into the xclip package, which allows emacs to save to the
-;; when running inside the terminal via the xclip utility
 ;; core macros used for basic functionality
 (require 'marcel-core-macros)
 ;; loads packages only available at the office
 (with-library at-office)
-
+;; If we are in TMUX within an X environment
+(if (and (getenv "TMUX") (getenv "DISPLAY"))
+    ;; use xclip for copy-pasting
+    (with-library xclip
+      (xclip-mode 1)))
 ;; if running in a separate X window
 (if (display-graphic-p)
     (progn (require 'multi-term)
@@ -151,7 +153,7 @@
     ("4badd47b5ba16df46b849137903f2210d344f3c7021e979ff8ed68b8c3827d84" default)))
  '(indent-tabs-mode nil)
  '(line-number-mode t)
- '(package-selected-packages (quote (undo-tree)))
+ '(package-selected-packages (quote (xclip undo-tree)))
  '(show-paren-mode t)
  '(tab-width 2)
  '(tool-bar-mode nil))
