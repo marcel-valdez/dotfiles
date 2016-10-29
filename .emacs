@@ -42,12 +42,14 @@
 (global-unset-key (kbd "M-C-k"))
 (global-set-key (kbd "M-C-k") (lambda () (interactive) (other-frame -1)))
 ;; remap undo-redo using undo-tree
-(with-library undo-tree-undo
+(with-library undo-tree
               (global-unset-key (kbd "C-/"))
-              (global-set-key (kbd "C-/") ((interactive) (undo-tree-undo)))
+              (global-set-key (kbd "C-/")
+                              (lambda () (interactive) (undo-tree-undo)))
               (global-unset-key (kbd "C-."))
               (global-set-key (kbd "C-.")
-                              (lambda ()(interactive) (undo-tree-redo))))
+                              (lambda () (interactive) (undo-tree-redo))))
+
 ;; mark instances forward of whatever is marked in the region
 (with-library multiple-cursors
               (global-unset-key (kbd "M-3"))
