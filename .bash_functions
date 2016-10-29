@@ -65,7 +65,7 @@ function nano() {
 
 # shows the shell's keyboard shortcuts
 function bind-show-shortcuts() {
-  bind -p | grep -v "not bound" | grep -v "self-insert"
+  bind -p | tail -n +1 | grep -v "not bound" | grep -v "self-insert"
 }
 
 # shows the shell's settings
