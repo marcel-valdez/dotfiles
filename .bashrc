@@ -158,10 +158,14 @@ if ! shopt -oq posix; then
 fi
 
 if [[ "$(uname)" =~ "Linux" ]]; then
-  export GIT_EDITOR=nano
-  export EDITOR=nano
+  export GIT_EDITOR="emacs -nw"
+  export EDITOR=${GIT_EDITOR}
+  if [[ "${TERM}" =~ "eterm" ]]; then
+      export GIT_EDITOR="emacsclient"
+      export EDITOR=${GIT_EDITOR}
+  fi
   # if we are not in a tmux session
-  if [ -z ${TMUX} ]; then
+  if [ -z ${TMUX} ] && [[ ! "${TERM}" =~ "eterm" ]]; then
     # initialize environment if running for the first time
     [ is_first_time_starting_tmux ] && initialize_environment
     # this will make the terminal attach to an existing tmux session or create one
