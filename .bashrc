@@ -318,8 +318,10 @@ if [ -d "/cygdrive/d/static/tools" ] ; then
 fi
 
 if [ "$(expr substr $(uname) 1 6)" == "CYGWIN" ]; then
-  export GIT_EDITOR=nano
-  if [ "$TERM" == "xterm" ]; then
-    tmux attach
+  export EDITOR="emacs -nw"
+  [[ "${TERM}" =~ "eterm" ]] && export EDITOR="emacsclient"
+  export GIT_EDITOR=${EDITOR}
+  if [ -z "${TMUX}" ] && [[ ! "${TERM}" =~ "eterm" ]] ; then
+    tmux new -s default >&/dev/null || tmux attach -t default
   fi
 fi
