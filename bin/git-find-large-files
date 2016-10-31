@@ -1,0 +1,23 @@
+#!/usr/bin/env ruby
+ 
+require 'tempfile'
+ 
+tail_length = ARGV[0] || 10
+ 
+largest_files = `git verify-pack -v .git/objects/pack/pack-*.idx | sort -k 3 -n | tail -#{tail_length}`
+ 
+Tempfile.open('all_git_objects.txt') do |f|
+  system("git rev-list --objects --all > #{f.path}")
+  names = File.readlines(f.path)
+ 
+  largest_files.split(/\n/).each do |line|
+    sha = line.split(/\s/).first
+ 
+    matches = names.select { |name| name[/#{sha}/i] }
+    matches.each do |match|
+      file_name = match.split(/\s/).last
+      file_name << " EXISTS!" if File.exist?(file_name)
+      puts file_name
+    end
+  end
+end

@@ -1,0 +1,13 @@
+#!/usr/bin/env bash
+
+dir_a=$1
+dir_b=$2
+
+dir_a_escaped=$(echo $dir_a | sed "s/\//\\\\\//g")
+dir_b_escaped=$(echo $dir_b | sed "s/\//\\\\\//g")
+
+for file_a in $(find $dir_a/* ! -type l)
+do
+  file_b=$(echo $file_a | sed "s/$dir_a_escaped/$dir_b_escaped/")
+  diff -rq $file_a $file_b
+done
