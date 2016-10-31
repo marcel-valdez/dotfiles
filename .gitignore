@@ -7,8 +7,13 @@
 !.gitignore
 !.bash*
 !bin/
-
+!bin/*
+!.emacs
+!.emacs.d/
+!.emacs.d/lisp/
+!.emacs.d/lisp/**
 # specifically exclude
 
 .bash_history
 *.bak
+*~
