@@ -65,13 +65,18 @@ $if Bash
   #Space: magic-space
 $endif
 
-# alt-right and alt-left to move around
+# alt+left
 "[D": backward-word
+# alt+right
 "[C": forward-word
+# ctrl+left
+"\eOD": backward-word
+# ctrl+right
+"\eOC": forward-word
 # it seems that alt+right also sends alt+alt
 # which caused the auto-completion command to
 # execute, by doing this we stop that from
 # happening
 "\e\e":
-
+# cygwin specific
 "\C-V": paste-from-clipboard
