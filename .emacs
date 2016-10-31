@@ -2,13 +2,7 @@
 
 ;;; Commentary:
 
-;; Welcome to Emacs (http://go/emacs).
-;;
-;; If you see this file, your homedir was just created on this workstation.
-;; That means either you are new to Google (in that case, welcome!) or you
-;; got yourself a faster machine.
-;;
-;; Either way, the main goal of this configuration is to help you be more
+;; The main goal of this configuration is to help you be more
 ;; productive; if you have ideas, praise or complaints, direct them to
 ;; emacs-users@google.com (http://g/emacs-users).  We'd especially like to hear
 ;; from you if you can think of ways to make this configuration better for the
@@ -17,7 +11,6 @@
 ;; If you want to learn more about Emacs at Google, see http://go/emacs.
 
 ;;; Code:
-
 ;; load ~/.emacs.d/lisp scripts (these are mine)
 (add-to-list 'load-path "~/.emacs.d/lisp")
 ;; load all subdirectories in ~/emacs.d/lisp
@@ -26,8 +19,6 @@
   (normal-top-level-add-subdirs-to-load-path))
 ;; add custom themes to themes load path
 (add-to-list 'custom-theme-load-path "~/.emacs.d/lisp/themes")
-
-;; Use the 'google' package by default.
 
 ;; Added by Package.el.  This must come before configurations of
 ;; installed packages.  Don't delete this line.  If you don't want it,
@@ -42,12 +33,12 @@
 ;; core macros used for basic functionality
 (require 'marcel-core-macros)
 ;; loads packages only available at the office
+;; uses the 'google package by default.
 (with-library at-office)
 ;; If we are in TMUX within an X environment
 (if (and (getenv "TMUX") (getenv "DISPLAY"))
     ;; use xclip for copy-pasting
-    (with-library xclip
-      (xclip-mode 1)))
+    (with-library xclip (xclip-mode 1)))
 ;; if running in a separate X window
 (if (display-graphic-p)
     (progn (require 'multi-term)
