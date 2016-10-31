@@ -45,42 +45,42 @@ env=~/.ssh/agent.env
 #       (for example, when using agent-forwarding over SSH).
 
 agent_is_running() {
-    if [ "$SSH_AUTH_SOCK" ]; then
-        # ssh-add returns:
-        #   0 = agent running, has keys
-        #   1 = agent running, no keys
-        #   2 = agent not running
-        ssh-add -l >/dev/null 2>&1 || [ $? -eq 1 ]
-    else
-        false
-    fi
+  if [ "$SSH_AUTH_SOCK" ]; then
+      # ssh-add returns:
+      #   0 = agent running, has keys
+      #   1 = agent running, no keys
+      #   2 = agent not running
+      ssh-add -l >/dev/null 2>&1 || [ $? -eq 1 ]
+  else
+      false
+  fi
 }
 
 agent_has_keys() {
-    ssh-add -l >/dev/null 2>&1
+  ssh-add -l >/dev/null 2>&1
 }
 
 agent_load_env() {
-    . "$env" >/dev/null
+  . "$env" >/dev/null
 }
 
 agent_start() {
-    (umask 077; ssh-agent >"$env")
-    . "$env" >/dev/null
+  (umask 077; ssh-agent >"$env")
+  . "$env" >/dev/null
 }
 
 if [ "$SESSION" != "screen" ]; then
 
-  if ! agent_is_running; then
-    agent_load_env
-  fi
+    if ! agent_is_running; then
+        agent_load_env
+    fi
 
-  if ! agent_is_running; then
-    agent_start
-    ssh-add
-  elif ! agent_has_keys; then
-    ssh-add
-  fi
+    if ! agent_is_running; then
+        agent_start
+        ssh-add
+    elif ! agent_has_keys; then
+        ssh-add
+    fi
 fi
 
 unset env
@@ -141,7 +141,7 @@ shopt -s cdspell
 # If this shell is interactive, turn on programmable completion enhancements.
 # Any completions you add in ~/.bash_completion are sourced last.
 case $- in
-  *i*) [[ -f /etc/bash_completion ]] && . /etc/bash_completion ;;
+    *i*) [[ -f /etc/bash_completion ]] && . /etc/bash_completion ;;
 esac
 
 
@@ -159,85 +159,17 @@ export HISTIGNORE=$'[ \t]*:&:[fb]g:exit:ls' # Ignore the ls command as well
 # Whenever displaying the prompt, write the previous line to disk
 export PROMPT_COMMAND="history -a"
 
+# Functions
+# #########
+
+# Some example functions
+# function settitle() { echo -ne "\e]2;$@\a\e]1;$@\a"; }
+source ~/bin/functions
+
 # Aliases
 # #######
-
-
-# b) function cd_func
-# This function defines a 'cd' replacement function capable of keeping, 
-# displaying and accessing history of visited directories, up to 10 entries.
-# To use it, uncomment it, source this file and try 'cd --'.
-# acd_func 1.0.5, 10-nov-2004
-# Petar Marinov, http:/geocities.com/h2428, this is public domain
- cd_func ()
- {
-   local x2 the_new_dir adir index
-   local -i cnt
-
-   if [[ $1 ==  "--" ]]; then
-     dirs -v
-     return 0
-   fi
-
-   the_new_dir=$1
-   [[ -z $1 ]] && the_new_dir=$HOME
-
-   if [[ ${the_new_dir:0:1} == '-' ]]; then
-     #
-     # Extract dir N from dirs
-     index=${the_new_dir:1}
-     [[ -z $index ]] && index=1
-     adir=$(dirs +$index)
-     [[ -z $adir ]] && return 1
-     the_new_dir=$adir
-   fi
-
-    #
-   # '~' has to be substituted by ${HOME}
-   [[ ${the_new_dir:0:1} == '~' ]] && the_new_dir="${HOME}${the_new_dir:1}"
-
-   #
-   # Now change to the new dir and add to the top of the stack
-   pushd "${the_new_dir}" > /dev/null
-   [[ $? -ne 0 ]] && return 1
-   the_new_dir=$(pwd)
-
-   #
-   # Trim down everything beyond 11th entry
-   popd -n +11 2>/dev/null 1>/dev/null
-
-   #
-   # Remove any other occurence of this dir, skipping the top of the stack
-   for ((cnt=1; cnt <= 10; cnt++)); do
-     x2=$(dirs +${cnt} 2>/dev/null)
-     [[ $? -ne 0 ]] && return 0
-     [[ ${x2:0:1} == '~' ]] && x2="${HOME}${x2:1}"
-     if [[ "${x2}" == "${the_new_dir}" ]]; then
-       popd -n +$cnt 2>/dev/null 1>/dev/null
-       cnt=cnt-1
-     fi
-   done
-
-   return 0
- }
-
- alias cd=cd_func
-
- function syncdirs() {
-
-  source_dir=$(realpath "$1")
-  dest_dir=$(realpath "$2")
-
-  yes | cp -r --update "$source_dir"/* "$dest_dir"/
- }
-
- function getpid() {
-   ps -aW | grep $1 | egrep -o --max-count=1 '[0-9]{3,6}' | uniq
- }
-
- function search() {
-  find . -iregex $1
- }
+# cd_func is sourced from ~/bin/functions
+alias cd=cd_func
 
 # Some example alias instructions
 # If these are enabled they will be used instead of any instructions
@@ -246,59 +178,49 @@ export PROMPT_COMMAND="history -a"
 # \rm will call the real rm not the alias.
 
 # Interactive operation...
- alias rm='rm -i'
- alias cp='cp -i'
- alias mv='mv -i'
+alias rm='rm -i'
+alias cp='cp -i'
+alias mv='mv -i'
 
 # Default to human readable figures
- alias df='df -h'
- alias du='du -h'
+alias df='df -h'
+alias du='du -h'
 
 # Misc :)
- alias less='less -r'                          # raw control characters
- alias whence='type -a'                        # where, of a sort
- alias grep='grep --color'                     # show differences in colour
+alias less='less -r'                          # raw control characters
+alias whence='type -a'                        # where, of a sort
+alias grep='grep --color'                     # show differences in colour
 
 # Some shortcuts for different directory listings
- alias ls='ls -hF --color=tty'                 # classify files in colour
- alias dir='ls --color=auto --format=vertical'
- alias vdir='ls --color=auto --format=long'
- alias ll='ls -l'                              # long list
- alias la='ls -A'                              # all but . and ..
- alias l='ls -CF'                              #
- alias top_ten="history | awk '{a[\$2]++}END{for(i in a){print a[i] \" \" i}}' | sort -rn | head" # print top ten used commands
- alias gstatus='git status'
- alias g='git'
+alias ls='ls -hF --color=tty'                 # classify files in colour
+alias dir='ls --color=auto --format=vertical'
+alias vdir='ls --color=auto --format=long'
+alias ll='ls -l'                              # long list
+alias la='ls -A'                              # all but . and ..
+alias l='ls -CF'                              #
 
 # Custom Aliases
- alias wget_page='wget -S -qO - '
+alias wget_page='wget -S -qO - '
+
 # custom git aliases
- alias git='/usr/bin/git'
- alias gstatus='git status'
- alias gcommit='git commit'
- alias gadd='git add'
- alias gpush='git push'
+alias git='/usr/bin/git'
+alias gstatus='git status'
+alias gcommit='git commit'
+alias gadd='git add'
+alias gpush='git push'
 # custom shell aliases
- alias bashrc_load='source $HOME/.bashrc'
- alias bashrc_edit='nano $HOME/.bashrc'
- alias nano='nano -F'
- alias py='python'
- alias winpath='cygpath -a -w'
- alias git='/usr/bin/git'
- alias rbundle='/usr/bin/bundle.bat'
- alias bexec='/usr/bin/bundle.bat exec'
- alias pyhttp='python -m SimpleHTTPServer'
- alias remind-hr='rubykron --in 1 --message'
- alias remind-30='rubykron --in 0.5 --message'
- alias webserver='python -m SimpleHTTPServer'
-
-
-# Functions
-# #########
-
-# Some example functions
-# function settitle() { echo -ne "\e]2;$@\a\e]1;$@\a"; }
- source ~/bin/functions
+alias bashrc_load='source $HOME/.bashrc'
+alias bashrc_edit='nano $HOME/.bashrc'
+alias nano='nano -F'
+alias py='python'
+alias winpath='cygpath -a -w'
+alias git='/usr/bin/git'
+alias rbundle='/usr/bin/bundle.bat'
+alias bexec='/usr/bin/bundle.bat exec'
+alias pyhttp='python -m SimpleHTTPServer'
+alias remind-hr='rubykron --in 1 --message'
+alias remind-30='rubykron --in 0.5 --message'
+alias webserver='python -m SimpleHTTPServer'
 
 # UTF-8
 #######
@@ -314,14 +236,14 @@ export LESSCHARSET='utf-8'
 # PATH=$PATH:/cygdrive/c/ProgramData/chocolatey/bin
 
 if [ -d "/cygdrive/d/static/tools" ] ; then
-  PATH=/cygdrive/d/static/tools:$PATH
+    PATH=/cygdrive/d/static/tools:$PATH
 fi
 
 if [ "$(expr substr $(uname) 1 6)" == "CYGWIN" ]; then
-  export EDITOR="emacs -nw"
-  [[ "${TERM}" =~ "eterm" ]] && export EDITOR="emacsclient"
-  export GIT_EDITOR=${EDITOR}
-  if [ -z "${TMUX}" ] && [[ ! "${TERM}" =~ "eterm" ]] ; then
-    tmux new -s default >&/dev/null || tmux attach -t default
-  fi
+    export EDITOR="emacs -nw"
+    [[ "${TERM}" =~ "eterm" ]] && export EDITOR="emacsclient"
+    export GIT_EDITOR=${EDITOR}
+    if [ -z "${TMUX}" ] && [[ ! "${TERM}" =~ "eterm" ]] ; then
+        tmux new -s default >&/dev/null || tmux attach -t default
+    fi
 fi
