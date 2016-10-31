@@ -65,4 +65,13 @@ $if Bash
   #Space: magic-space
 $endif
 
+# alt-right and alt-left to move around
+"[D": backward-word
+"[C": forward-word
+# it seems that alt+right also sends alt+alt
+# which caused the auto-completion command to
+# execute, by doing this we stop that from
+# happening
+"\e\e":
+
 "\C-V": paste-from-clipboard
