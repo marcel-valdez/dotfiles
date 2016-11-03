@@ -11,6 +11,8 @@
 ;; If you want to learn more about Emacs at Google, see http://go/emacs.
 
 ;;; Code:
+(setq inhibit-startup-screen t)
+
 ;; load ~/.emacs.d/lisp scripts (these are mine)
 (add-to-list 'load-path "~/.emacs.d/lisp")
 ;; load all subdirectories in ~/emacs.d/lisp
@@ -30,6 +32,8 @@
 (add-to-list 'package-archives '("melpa", "https://melpa.org/packages/"))
 (add-to-list 'package-archives '("elpa", "https://elpa.org/packages/"))
 
+;; TODO: cancel auto-complete mode when company-mode is enabled, as they
+;; interfere
 ;; core macros used for basic functionality
 (require 'marcel-core-macros)
 ;; loads packages only available at the office
