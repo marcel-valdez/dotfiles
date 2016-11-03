@@ -7,6 +7,8 @@
 (add-to-list 'package-archives
              '("melpa" . "https://melpa.org/packages/"))
 
+(setq inhibit-startup-screen t)
+
 ;; initialize packages
 (require 'undo-tree)
 (require 'auto-complete)
