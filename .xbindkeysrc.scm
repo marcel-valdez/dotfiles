@@ -328,14 +328,15 @@
                      (lambda ()
                        (run-command (string-append "xdotool key --clearmodifiers " target_xdotool_key)))))
 
+;; I am doing this via a keyboard macro
 ;; remaps Alt+Shift+2 to F2 key via xdotool
-(define-xdotool-remap '(m:0x9 c:11) "F2")
+;; (define-xdotool-remap '(m:0x9 c:11) "F2")
 ;; remaps Alt+Shift+3 to F3 key via xdotool
-(define-xdotool-remap '(m:0x9 c:12) "F3")
+;; (define-xdotool-remap '(m:0x9 c:12) "F3")
 ;; remaps Alt+Shift+4 to F4 key via xdotool
-(define-xdotool-remap '(m:0x9 c:13) "F4")
+;; (define-xdotool-remap '(m:0x9 c:13) "F4")
 ;; remaps Alt+Shift+5 to F5 key via xdotool
-(define-xdotool-remap '(m:0x9 c:14) "F5")
+;; (define-xdotool-remap '(m:0x9 c:14) "F5")
 
 ;; Example:
 ;;   Shift + b:1                   start an xterm
