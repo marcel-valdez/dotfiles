@@ -37,16 +37,25 @@
 (global-set-key (kbd "M-C-j") (lambda () (interactive) (other-frame 1)))
 (global-unset-key (kbd "M-C-k"))
 (global-set-key (kbd "M-C-k") (lambda () (interactive) (other-frame -1)))
+
+(with-library semantic
+  (setq top-level-semantic-c-include-paths
+        '("/cygdrive/c/Program Files (x86)/Arduino For Microduino/hardware/Microduino"
+          "/usr/include"
+          "/cygdrive/c/Users/marce/OneDrive/Documentos/Arduino/libraries"))
+  (setq semantic-c-dependency-system-include-path
+        (add-subdirs-of-all-top-level-dirs top-level-semantic-c-include-paths)))
+
 ;; remap undo-redo using undo-tree
 (with-library undo-tree
   ;; global editing settings and overrides
   ;; use undo-tree instead of built-in undo
   (global-undo-tree-mode)
   (global-unset-key (kbd "C-/"))
-  (global-set-key (kbd "C-/") ((interactive) (undo-tree-undo)))
+  (global-set-key (kbd "C-/") (lambda () (interactive) (undo-tree-undo)))
   (global-unset-key (kbd "C-."))
   (global-set-key (kbd "C-.")
-                  (lambda ()(interactive) (undo-tree-redo))))
+                  (lambda () (interactive) (undo-tree-redo))))
 ;; mark instances forward of whatever is marked in the region
 (with-library multiple-cursors
               (global-unset-key (kbd "M-3"))
@@ -86,7 +95,7 @@
         (global-set-key (kbd "C-t C-d")
                         (lambda () (interactive) (multi-term-dedicated-toggle)))))
   (progn (with-library in-tmux)))
-;; TODO: Add recursive subdirectories to semantic-c-dependency-system-include-path
+
 (custom-set-variables
  ;; custom-set-variables was added by Custom.
  ;; If you edit it by hand, you could mess it up, so be careful.
@@ -99,11 +108,6 @@
  '(package-selected-packages
    (quote
     (multi-term ac-c-headers ac-clang csharp-mode dos undo-tree multiple-cursors company-arduino auto-complete)))
- '(semantic-c-dependency-system-include-path
-   (quote
-    ("/cygdrive/c/Program Files (x86)/Arduino For Microduino/hardware/Microduino"
-     "/usr/include"
-     "/cygdrive/c/Users/marce/OneDrive/Documentos/Arduino/libraries")))
  '(show-paren-mode t)
  '(show-trailing-whitespace t))
 (custom-set-faces
@@ -113,3 +117,4 @@
  ;; If there is more than one, they won't work right.
  '(default ((t (:family "Source Code Pro" :foundry "outline" :slant normal :weight normal :height 113 :width normal)))))
 (put 'upcase-region 'disabled nil)
+
