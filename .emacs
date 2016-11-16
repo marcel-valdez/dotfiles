@@ -10,17 +10,19 @@
 (setq inhibit-startup-screen t)
 
 ;; initialize packages
+(require 'marcel-macros)
 (require 'undo-tree)
 (require 'auto-complete)
 (require 'multiple-cursors)
 (require 'whitespace)
 ;; re-binds certain keys when inside a TMUX session
 (require 'in-tmux)
-(require 'marcel-macros)
+
 
 ;;;; global editing settings and overrides
 ;; use undo-tree instead of built-in undo
-(global-undo-tree-mode)
+(with-library undo-tree
+  (global-undo-tree-mode))
 ;; always enable auto-complete
 (global-auto-complete-mode)
 ;; always enable identification of JavaStyleWords
@@ -31,6 +33,8 @@
 (setq whitespace-line-column 80)
 ;; show tabs, trailing whitespace and long lines (+80)
 (setq whitespace-style '(tab-mark trailing lines-tail face))
+;; automatically refresh file if they are changed from underneath
+(global-auto-revert-mode)
 
 ;;;; custom bindings
 ;; switch between windows quickly
@@ -51,6 +55,15 @@
               (global-unset-key (kbd "C-."))
               (global-set-key (kbd "C-.")
                               (lambda () (interactive) (undo-tree-redo))))
+;; puts all backup files in .emacs.d/backup directory rather than on
+;; the same folder as the file being edited
+(setq backup-directory-alist '(("." . "~/.emacs.d/backup"))
+      backup-by-copying t ; don't delink hardlinks
+      version-control t ; user version numbers on backups
+      delete-old-versions t ; automatically delete old backups
+      kept-new-versions 20 ; how many of the pre-saved versions to keep
+      kept-old-versions ; how many of the post-saved versions to keep
+      )
 
 ;; mark instances forward of whatever is marked in the region
 (with-library multiple-cursors
