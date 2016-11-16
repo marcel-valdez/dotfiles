@@ -1,13 +1,13 @@
 (provide 'marcel-macros)
 
 (defmacro with-library (symbol &rest body)
-  `(condition-case err
-       (progn
-         (require ',symbol)
-         ,@body)
-     (error
-      (message
-       (format "Failed to configure package or library <%s>\n%s" ',symbol err))
-      nil)))
+  `(when
+       (condition-case err
+           (progn (require ',symbol) t)
+         (error
+          (message
+           (format "Failed to configure package <%s>\n%s" ',symbol err))
+          nil))
+     ,@body))
 
 (put 'with-library 'lisp-indent-function 1)
