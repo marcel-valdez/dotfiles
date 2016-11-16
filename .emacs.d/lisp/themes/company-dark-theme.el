@@ -32,7 +32,8 @@
    '(company-tooltip-common
      ((t :inherit font-lock-constant-face)))
 
- '(font-lock-comment-face ((t (:foreground "#888888" :slant italic))))
+   ;; modifies the comment fonts
+   ;;'(font-lock-comment-face ((t (:foreground "#888888" :slant italic))))
 
 ))
 
