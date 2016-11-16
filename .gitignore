@@ -32,6 +32,7 @@ bin/mail-notify-data
 bin/rebaser
 bin/update-package
 bin/g3-*
+bin/g4-*
 bin/magicbuild
 bin/magicjar
 # Applications that must be installed separately
