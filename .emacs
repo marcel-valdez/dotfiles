@@ -45,7 +45,7 @@
     (with-library xclip (xclip-mode 1)))
 ;; if running in a separate X window
 (if (display-graphic-p)
-    (progn (require 'multi-term)
+    (with-library multi-term
            ;; start an emacs server so editors use an emacs buffer
            (server-start)
            ;; start multi-term custom configurations
@@ -64,14 +64,23 @@
            ;; toggle showing/hiding the dedicated terminal window
            (global-set-key (kbd "C-t C-d")
                            (lambda () (interactive) (multi-term-dedicated-toggle))))
-  (progn (require 'in-tmux)))
+  (require 'in-tmux))
 
+;; puts all backup files in the .emacs.d/backup directory, rather than on the
+;; same folder as the file being edited
+(setq backup-directory-alist '(("." . "~/.emacs.d/backup"))
+      backup-by-copying t    ; Don't delink hardlinks
+      version-control t      ; Use version numbers on backups
+      delete-old-versions t  ; Automatically delete excess backups
+      kept-new-versions 20   ; how many of the newest versions to keep
+      kept-old-versions 5    ; and how many of the old
+      )
 
-;; start an emacs server so that new emacs ansi-term can open a new
-;; buffer instead of opening emacs within emacs
 
 ;; always enable identifications of JavaStyleWords
 (global-subword-mode)
+;; always enable refresh files from disk
+(global-auto-revert-mode)
 ;; always enable whitespace visualization
 (global-whitespace-mode)
 (setq whitespace-line-column 80)
@@ -83,6 +92,15 @@
 (global-set-key (kbd "M-j") (lambda () (interactive) (other-window 1)))
 (global-unset-key (kbd "M-k"))
 (global-set-key (kbd "M-k") (lambda () (interactive) (other-window -1)))
+
+;; swap windows
+(with-library kbd-shortcut-functions
+  (global-set-key (kbd "C-x t")
+                  (lambda () (interactive) (rotate-windows 1)))
+  ;; this one is not very useful, and we may want to re-use C-x T
+  ;; to mean something else related to window management
+  (global-set-key (kbd "C-x T")
+                  (lambda () (interactive) (rotate-windows -1))))
 
 ;; switch between frames quickly
 (global-unset-key (kbd "C-M-j"))
@@ -145,7 +163,7 @@
  '(custom-enabled-themes (quote (tango-dark)))
  '(custom-safe-themes
    (quote
-    ("4badd47b5ba16df46b849137903f2210d344f3c7021e979ff8ed68b8c3827d84" default)))
+    ("6068d911f0ad3f9e6834d4849038ef3a317510f23683ff9656da7d49a5ab3ed5" "d4890c4d8d262c61decb7c0e43b1dc5c92b378e9acada6c04d9e94f00cc70ead" "4badd47b5ba16df46b849137903f2210d344f3c7021e979ff8ed68b8c3827d84" default)))
  '(indent-tabs-mode nil)
  '(line-number-mode t)
  '(package-selected-packages (quote (xclip undo-tree)))
