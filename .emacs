@@ -68,7 +68,7 @@
 
 ;; puts all backup files in the .emacs.d/backup directory, rather than on the
 ;; same folder as the file being edited
-(setq backup-directory-alist '(("." . "~/.emacs.d/backup"))
+(setq backup-directory-alist '(("." . "~/.emacs.d/backup/"))
       backup-by-copying t    ; Don't delink hardlinks
       version-control t      ; Use version numbers on backups
       delete-old-versions t  ; Automatically delete excess backups
