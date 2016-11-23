@@ -8,26 +8,24 @@ options = {}
 OptionParser.new do |opts|
   opts.banner = "remind-me [options]"
 
-  opts.on("-i", "--in N", Float, "Hours to wait before reminding.") do |in_hours|
-    options[:start_time] = Time.now + (in_hours * 3600)
-  end
-
-  opts.on("-s", "--start TIME", Time, "Time at which to trigger reminder.") do |start_time|
+  opts.on("-s", "--start TIME", "Time at which to trigger reminder (see: man at)") do |start_time|
     options[:start_time] = start_time
   end
 
-  opts.on("-m", "--message MSG", "Message for the reminder.") do |message|
+  opts.on("-m", "--message MSG", "Message for the reminder") do |message|
     options[:message] = message
   end
 
-  opts.on("-t", "--title [TITLE]", "Title for the reminder in task scheduler.") do |title|
+  opts.on("-t", "--title [TITLE]", "Title for the reminder in task scheduler") do |title|
     options[:title] = title
+  end
+
+  opts.on("-a", "--alarm", "Whether to make a beep sound with the reminder") do |alarm|
+    options[:alarm] = true
   end
 end.parse!
 
-if options[:title].nil?
-  options[:title] = "'task-#{Random.rand(10000)}'"
-end
+options[:title] = "task-#{Random.rand(10000)}" if options[:title].nil?
 
 if options[:message].nil?
   puts "No message specified. Use the -h or --help options for more information."
@@ -39,9 +37,19 @@ if options[:start_time].nil?
   exit(1)
 end
 
-msg_cmd = %Q{C:\\Windows\\System32\\msg.exe marcel.valdez '#{options[:message]}'}
-start_time = options[:start_time].strftime "%H:%M"
-task_cmd = %Q{schtasks /create /TN #{options[:title]} /sc ONCE /ST #{start_time} /TR "#{msg_cmd}"}
+alarm_snd = ""
+if !options[:alarm].nil?
+  alarm_snd = "#{Dir.home}/bin/exec-ntimes 10 #{Dir.home}/bin/beep"
+end
+
+escaped_msg_cmd = %Q{"/usr/bin/notify-send '"'#{options[:title]}'"' '"'#{options[:message]}'"'; #{alarm_snd}"}
+task_cmd = %Q{echo #{escaped_msg_cmd} | /usr/bin/at #{options[:start_time]}}
 
 result = `#{task_cmd}`
-puts result
+if $?.success?
+  STDOUT.puts result
+  exit(0)
+else
+  STDERR.puts result
+  exit(1)
+end
