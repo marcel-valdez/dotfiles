@@ -26,6 +26,13 @@
   ;; show tabs, trailing whitespace and long lines (+80)
   (setq whitespace-style '(tab-mark trailing lines-tail face)))
 
+(with-library projectile
+  (projectile-global-mode)
+  (setq projectile-indexing-method 'alien)
+  )
+
+(with-library auto-highlight-symbol
+  global-auto-highlight-symbol-mode t)
 ;;;; custom bindings
 ;; switch between windows quickly
 (global-unset-key (kbd "M-j"))
@@ -107,7 +114,7 @@
  '(indent-tabs-mode nil)
  '(package-selected-packages
    (quote
-    (multi-term ac-c-headers ac-clang csharp-mode dos undo-tree multiple-cursors company-arduino auto-complete)))
+    (auto-highlight-symbol markdown-mode markdown-mode+ markdown-preview-mode markdownfmt helm helm-projectile projectile multi-term ac-c-headers ac-clang csharp-mode dos undo-tree multiple-cursors company-arduino auto-complete)))
  '(show-paren-mode t)
  '(show-trailing-whitespace t))
 (custom-set-faces
