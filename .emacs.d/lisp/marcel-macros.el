@@ -5,7 +5,7 @@
        (condition-case err
            (progn (require ',symbol) t)
          (error
-          (mesage (format "Package or library %s is missing.\n%s" ',symbol err))
+          (message (format "Package or library %s is missing.\n%s" ',symbol err))
           nil))
      ,@body))
 
