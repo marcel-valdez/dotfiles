@@ -31,6 +31,8 @@
 (global-whitespace-mode)
 ;; configure recommened column width
 (setq whitespace-line-column 80)
+;; show column number on status bar
+(column-number-mode)
 ;; show tabs, trailing whitespace and long lines (+80)
 (setq whitespace-style '(tab-mark trailing lines-tail face))
 ;; automatically refresh file if they are changed from underneath
@@ -57,12 +59,12 @@
                               (lambda () (interactive) (undo-tree-redo))))
 ;; puts all backup files in .emacs.d/backup directory rather than on
 ;; the same folder as the file being edited
-(setq backup-directory-alist '(("." . "~/.emacs.d/backup"))
+(setq backup-directory-alist '(("." . "~/.emacs.d/backup/"))
       backup-by-copying t ; don't delink hardlinks
       version-control t ; user version numbers on backups
       delete-old-versions t ; automatically delete old backups
       kept-new-versions 20 ; how many of the pre-saved versions to keep
-      kept-old-versions ; how many of the post-saved versions to keep
+      kept-old-versions 5; how many of the post-saved versions to keep
       )
 
 ;; mark instances forward of whatever is marked in the region
