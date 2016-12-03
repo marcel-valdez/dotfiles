@@ -16,13 +16,14 @@ gnome-session --session=gnome-fallback &
 
 vnc_index=$(echo "$DISPLAY" | grep -o '[0-9]')
 export TMUX_INIT_SESSION="vnc-${vnc_index}"
+export TMUX=""
 [ -x "${HOME}/.xinitrc" ] && "${HOME}/.xinitrc"
 
 ## visual components
 # none so far
 
 # common applications
-gnome-terminal --display "${DISPLAY}"
+gnome-terminal --display "${DISPLAY}" &
 
 ## user installed applications
 type kupfer >/dev/null 2>&1 && kupfer &
