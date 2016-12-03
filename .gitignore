@@ -35,6 +35,7 @@ bin/g3-*
 bin/g4-*
 bin/magicbuild
 bin/magicjar
+bin/*#*
 # Applications that must be installed separately
 bin/FoxitReader
 bin/__check_version.py
@@ -85,4 +86,4 @@ bin/verify-packages
 **/*.tmp
 *.log
 **/*.log
-
+.*#
