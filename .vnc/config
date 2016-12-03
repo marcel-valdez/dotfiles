@@ -2,8 +2,11 @@
 ## in this file. See the following manpages for more: vncserver(1) Xvnc(1).
 ## Several common ones are shown below. Uncomment and modify to your liking.
 ##
-# securitytypes=vncauth,tlsvnc
+ securitytypes=vncauth,tlsvnc,tlsplain
 # desktop=sandbox
  geometry=1920x1080
+ depth=16
+# vncpasswd to update the password
+ passwordfile=~/.vnc/passwd
 # localhost
 # alwaysshared
