@@ -226,7 +226,7 @@ log_debug "Loaded NVM"
 log_debug "Loading RVM"
 [[ -s "$HOME/.rvm/scripts/rvm" ]] && source "$HOME/.rvm/scripts/rvm"
 log_debug "Loaded RVM"
-
+export PATH="$PATH:$HOME/.rvm/bin" # Add RVM to PATH for scripting
 
 # This sets up the default node version and loads it
 log_debug "Loading node.js"
