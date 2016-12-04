@@ -50,6 +50,7 @@ bin/verify-packages
 .emacs.d/lisp/at-office.el
 !.emacs.d/lisp/external
 !.emacs.d/lisp/external/*
+.emacs.d/lisp/external/helm/
 !.emacs.d/lisp/themes
 !.emacs.d/lisp/themes/*
 
