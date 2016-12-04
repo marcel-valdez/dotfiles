@@ -32,6 +32,7 @@
 (add-to-list 'package-archives '("melpa", "https://melpa.org/packages/"))
 (add-to-list 'package-archives '("elpa", "https://elpa.org/packages/"))
 
+
 ;; TODO: cancel auto-complete mode when company-mode is enabled, as they
 ;; interfere
 ;; core macros used for basic functionality
@@ -66,6 +67,12 @@
                            (lambda () (interactive) (multi-term-dedicated-toggle))))
   (require 'in-tmux))
 
+(with-library helm-config
+  (helm-mode 1)
+  (global-set-key (kbd "C-x C-f") 'helm-find-files)
+  (global-set-key (kbd "M-s o") 'helm-occur)
+  (global-set-key (kbd "M-x") 'helm-M-x)
+  (global-set-key (kbd "C-x C-b") 'helm-buffers-list))
 ;; puts all backup files in the .emacs.d/backup directory, rather than on the
 ;; same folder as the file being edited
 (setq backup-directory-alist '(("." . "~/.emacs.d/backup/"))
@@ -108,7 +115,7 @@
 (global-unset-key (kbd "C-M-k"))
 (global-set-key (kbd "C-M-k") (lambda () (interactive) (other-frame -1)))
 
-(with-library auto-complete (global-auto-complete-mode))
+;;(with-library auto-complete (global-auto-complete-mode))
 (with-library undo-tree
   ;; remap undo-redo using undo-tree
   (global-undo-tree-mode)
@@ -166,7 +173,7 @@
     ("6068d911f0ad3f9e6834d4849038ef3a317510f23683ff9656da7d49a5ab3ed5" "d4890c4d8d262c61decb7c0e43b1dc5c92b378e9acada6c04d9e94f00cc70ead" "4badd47b5ba16df46b849137903f2210d344f3c7021e979ff8ed68b8c3827d84" default)))
  '(indent-tabs-mode nil)
  '(line-number-mode t)
- '(package-selected-packages (quote (xclip undo-tree)))
+ '(package-selected-packages (quote (async xclip undo-tree)))
  '(show-paren-mode t)
  '(tab-width 2)
  '(tool-bar-mode nil))
