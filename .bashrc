@@ -195,11 +195,11 @@ if [ "$(expr substr $(uname) 1 5)" == "Linux" ]; then
     export EDITOR="emacs --no-window-system"
     export GIT_EDITOR=$EDITOR
   fi
-  # if ther terminal has not been initialized yet
+  # if the terminal has not been initialized yet
   if [ -z "${TERMINAL_SESSION_INITIALIZED}" ]; then
     # This is slow, so we do not want to do it for every TMUX pane
     log_debug "Loading SSH session"
-    source "$HOME/lib/ssh-persist-session.sh"
+    source "${HOME}/lib/ssh-persist-session.sh"
     log_debug "Loaded SSH session"
     export TERMINAL_SESSION_INITIALIZED="true"
   fi
