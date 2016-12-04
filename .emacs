@@ -6,25 +6,46 @@
              '("marmalade" . "https://marmalade-repo.org/packages/"))
 (add-to-list 'package-archives
              '("melpa" . "https://melpa.org/packages/"))
-
+(add-to-list 'package-archives '("elpa", "https://elpa.org/packages/"))
 (setq inhibit-startup-screen t)
 
 ;; initialize packages
 (require 'marcel-macros)
-(require 'undo-tree)
-(require 'auto-complete)
-(require 'multiple-cursors)
-(require 'whitespace)
 ;; re-binds certain keys when inside a TMUX session
-(require 'in-tmux)
+(if (display-graphic-p)
+    (with-library multi-term
+           ;; start an emacs server so editors use an emacs buffer
+           (server-start)
+           ;; start multi-term custom configurations
+           (global-unset-key (kbd "C-t"))
+           (add-to-list 'term-unbind-key-list "C-t")
+           (setq multi-term-program "/bin/bash")
+           ;; start new terminal
+           (global-set-key (kbd "C-t C-n")
+                           (lambda () (interactive) (multi-term)))
+           ;; switch to next terminal within same buffer
+           (global-set-key (kbd "C-t <C-tab>")
+                           (lambda () (interactive) (multi-term-next)))
+           ;; switch to previous terminal within same buffer
+           (global-set-key (kbd "C-t <C-iso-lefttab>")
+                           (lambda () (interactive) (multi-term-prev)))
+           ;; toggle showing/hiding the dedicated terminal window
+           (global-set-key (kbd "C-t C-d")
+                           (lambda () (interactive) (multi-term-dedicated-toggle))))
+  (with-library in-tmux))
 
+(with-library multiple-cursors)
+(with-library whitespace)
 
 ;;;; global editing settings and overrides
 ;; use undo-tree instead of built-in undo
 (with-library undo-tree
   (global-undo-tree-mode))
 ;; always enable auto-complete
-(global-auto-complete-mode)
+;; (global-auto-complete-mode) ;; auto-compelete interferes with the superior
+;; company-mode
+(with-library company-mode
+  (add-hook 'after-init-hook 'global-company-mode))
 ;; always enable identification of JavaStyleWords
 (global-subword-mode)
 ;; always enable whitespace visualization
@@ -49,6 +70,32 @@
 (global-set-key (kbd "M-C-j") (lambda () (interactive) (other-frame 1)))
 (global-unset-key (kbd "M-C-k"))
 (global-set-key (kbd "M-C-k") (lambda () (interactive) (other-frame -1)))
+
+;; configure helm
+(with-library helm-config
+  (helm-mode 1)
+  (global-set-key (kbd "C-x C-f") 'helm-find-files)
+  (global-set-key (kbd "M-s o") 'helm-occur)
+  (global-set-key (kbd "M-x") 'helm-M-x)
+  (global-set-key (kbd "C-x C-b") 'helm-buffers-list))
+
+;; configure rotate-window
+(with-library rotate
+  (global-set-key (kbd "C-x t")
+                  (lambda () (interactive) (rotate-window)))
+  ;; switch to vertical split layout
+  (global-set-key (kbd "C-x M-\\") 'rotate:even-horizontal)
+  ;; switch to horizontal split layout
+  (global-set-key (kbd "C-x M--") 'rotate:even-vertical)
+  ;; cycle through layouts
+  (global-set-key (kbd "C-x l")
+                  (lambda () (interactive) (rotate-layout))))
+;; cycle through window sizes
+(with-library cycle-resize
+  (global-set-key (kbd "C-x -") 'cycle-resize-window-vertically)
+  (global-set-key (kbd "C-x \\") 'cycle-resize-window-horizontally)
+  (setq cycle-resize-steps '(75 66 50 33)))
+
 ;; remap undo-redo using undo-tree
 (with-library undo-tree
               (global-unset-key (kbd "C-/"))
@@ -57,6 +104,7 @@
               (global-unset-key (kbd "C-."))
               (global-set-key (kbd "C-.")
                               (lambda () (interactive) (undo-tree-redo))))
+
 ;; puts all backup files in .emacs.d/backup directory rather than on
 ;; the same folder as the file being edited
 (setq backup-directory-alist '(("." . "~/.emacs.d/backup/"))
@@ -81,17 +129,20 @@
               (global-unset-key (kbd "C-x M-l"))
               (global-set-key (kbd "C-x M-l") 'mc/edit-lines))
 
+
 (custom-set-variables
- ;; custom-set-variables was added by Custom.
- ;; If you edit it by hand, you could mess it up, so be careful.
- ;; Your init file should contain only one such instance.
- ;; If there is more than one, they won't work right.
+ ;; custom-set-variables was added by custom.
+ ;; if you edit it by hand, you could mess it up, so be careful.
+ ;; your init file should contain only one such instance.
+ ;; if there is more than one, they won't work right.
  '(indent-tabs-mode nil)
  '(show-paren-mode t)
  '(show-trailing-whitespace t))
 (custom-set-faces
- ;; custom-set-faces was added by Custom.
- ;; If you edit it by hand, you could mess it up, so be careful.
- ;; Your init file should contain only one such instance.
- ;; If there is more than one, they won't work right.
+ ;; custom-set-faces was added by custom.
+ ;; if you edit it by hand, you could mess it up, so be careful.
+ ;; your init file should contain only one such instance.
+ ;; if there is more than one, they won't work right.
  )
+(put 'downcase-region 'disabled nil)
+(put 'upcase-region 'disabled nil)
