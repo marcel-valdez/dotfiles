@@ -184,3 +184,6 @@ fi
 
 export NVM_DIR="/home/marcel/.nvm"
 [ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"  # This loads nvm
+# This sets up the default node version and loads it
+export NODE_VERSION="7.2.0"
+node-check-use --silent
