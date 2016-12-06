@@ -35,7 +35,28 @@
   (with-library in-tmux))
 
 (with-library multiple-cursors)
-(with-library whitespace)
+
+;; set whitespace visualization
+(with-library whitespace
+  (global-whitespace-mode)
+  (setq show-trailing-whitespace t)
+  (setq whitespace-style '(tab-mark trailing lines-tail face))
+  (defun set-prog-column-limit () (setq-local whitespace-line-column 80))
+  (add-hook 'prog-mode-hook 'set-prog-column-limit)
+  (defun set-text-column-limit () (setq-local whitespace-line-column 100))
+  (add-hook 'text-mode-hook 'set-text-column-limit))
+
+;; set indentation configuration
+(defun set-custom-indent ()
+  (setq-local indent-tabs-mode nil)
+  (setq-local c-basic-offset 2)
+  (setq-local js-indent-level 2)
+  (setq-local indent-tabs-mode nil)
+  (setq-local cperl-indent-level 2)
+  (setq-local tab-width 2)
+  (setq-local standard-indent 2))
+(add-hook 'prog-mode-hook 'set-custom-indent)
+
 
 ;;;; global editing settings and overrides
 ;; use undo-tree instead of built-in undo
@@ -44,18 +65,12 @@
 ;; always enable auto-complete
 ;; (global-auto-complete-mode) ;; auto-compelete interferes with the superior
 ;; company-mode
-(with-library company-mode
+(with-library company
   (add-hook 'after-init-hook 'global-company-mode))
 ;; always enable identification of JavaStyleWords
 (global-subword-mode)
-;; always enable whitespace visualization
-(global-whitespace-mode)
-;; configure recommened column width
-(setq whitespace-line-column 80)
 ;; show column number on status bar
 (column-number-mode)
-;; show tabs, trailing whitespace and long lines (+80)
-(setq whitespace-style '(tab-mark trailing lines-tail face))
 ;; automatically refresh file if they are changed from underneath
 (global-auto-revert-mode)
 
@@ -129,20 +144,17 @@
               (global-unset-key (kbd "C-x M-l"))
               (global-set-key (kbd "C-x M-l") 'mc/edit-lines))
 
-
 (custom-set-variables
- ;; custom-set-variables was added by custom.
- ;; if you edit it by hand, you could mess it up, so be careful.
- ;; your init file should contain only one such instance.
- ;; if there is more than one, they won't work right.
- '(indent-tabs-mode nil)
- '(show-paren-mode t)
- '(show-trailing-whitespace t))
+ ;; custom-set-variables was added by Custom.
+ ;; If you edit it by hand, you could mess it up, so be careful.
+ ;; Your init file should contain only one such instance.
+ ;; If there is more than one, they won't work right.
+ '(show-paren-mode t))
 (custom-set-faces
- ;; custom-set-faces was added by custom.
- ;; if you edit it by hand, you could mess it up, so be careful.
- ;; your init file should contain only one such instance.
- ;; if there is more than one, they won't work right.
+ ;; custom-set-faces was added by Custom.
+ ;; If you edit it by hand, you could mess it up, so be careful.
+ ;; Your init file should contain only one such instance.
+ ;; If there is more than one, they won't work right.
  )
 (put 'downcase-region 'disabled nil)
 (put 'upcase-region 'disabled nil)
