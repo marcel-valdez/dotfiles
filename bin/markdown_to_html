@@ -1,5 +1,9 @@
 #!/bin/bash
 
+input_file=$1
+output_file=$2
+[ -z ${output_file} ] && output_file=${input_file/.md/.html}
+
 expanded_input_path=$(readlink -f $1)
 expanded_output_path=$(readlink -f $2)
 output_file=$expanded_output_path
