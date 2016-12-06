@@ -1,5 +1,17 @@
 #!/usr/bin/env bash
 
+
+# alert function for long running commands.  Use like so:
+#   sleep 10; alert
+function alert() {
+  msg="Terminal"
+  [ $? -eq 0 ] && msg="Error"
+  prevous_cmd="$(history | tail -n2 | head -n1 | sed -e 's/  */ /g' | cut -d' ' -f3-)"
+  notify-send --urgency=low\
+              -i "${msg}"\
+              "${previous_cmd}"
+}
+
 function open-bg() {
   filename=$(basename $1)
   logfile="/tmp/$USER-$filename.log"
