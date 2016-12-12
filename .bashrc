@@ -189,7 +189,7 @@ export SUBLIME_PROJECTS_FOLDER="$HOME/sublime_projects"
 
 if [ "$(expr substr $(uname) 1 5)" == "Linux" ]; then
   if [[ "$TERM" =~ "eterm" ]]; then
-    export EDITOR="emacsclient"
+    export EDITOR="emacsclient --socket-name=server${DISPLAY}"
     export GIT_EDITOR=$EDITOR
   else
     export EDITOR="emacs --no-window-system"

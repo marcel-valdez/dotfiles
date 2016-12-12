@@ -47,24 +47,25 @@
 ;; if running in a separate X window
 (if (display-graphic-p)
     (with-library multi-term
-           ;; start an emacs server so editors use an emacs buffer
-           (server-start)
-           ;; start multi-term custom configurations
-           (global-unset-key (kbd "C-t"))
-           (add-to-list 'term-unbind-key-list "C-t")
-           (setq multi-term-program "/bin/bash")
-           ;; start new terminal
-           (global-set-key (kbd "C-t C-n")
-                           (lambda () (interactive) (multi-term)))
-           ;; switch to next terminal within same buffer
-           (global-set-key (kbd "C-t <C-tab>")
-                           (lambda () (interactive) (multi-term-next)))
-           ;; switch to previous terminal within same buffer
-           (global-set-key (kbd "C-t <C-iso-lefttab>")
-                           (lambda () (interactive) (multi-term-prev)))
-           ;; toggle showing/hiding the dedicated terminal window
-           (global-set-key (kbd "C-t C-d")
-                           (lambda () (interactive) (multi-term-dedicated-toggle))))
+      ;; start an emacs server so editors use an emacs buffer
+      (setq-local server-name (concatenate 'string "server" (getenv "DISPLAY")))
+      (server-start)
+      ;; start multi-term custom configurations
+      (global-unset-key (kbd "C-t"))
+      (add-to-list 'term-unbind-key-list "C-t")
+      (setq multi-term-program "/bin/bash")
+      ;; start new terminal
+      (global-set-key (kbd "C-t C-n")
+                      (lambda () (interactive) (multi-term)))
+      ;; switch to next terminal within same buffer
+      (global-set-key (kbd "C-t <C-tab>")
+                      (lambda () (interactive) (multi-term-next)))
+      ;; switch to previous terminal within same buffer
+      (global-set-key (kbd "C-t <C-iso-lefttab>")
+                      (lambda () (interactive) (multi-term-prev)))
+      ;; toggle showing/hiding the dedicated terminal window
+      (global-set-key (kbd "C-t C-d")
+                      (lambda () (interactive) (multi-term-dedicated-toggle))))
   (require 'in-tmux))
 
 (with-library helm-config
