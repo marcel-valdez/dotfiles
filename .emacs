@@ -158,6 +158,19 @@
   ))
 
 (add-hook 'java-mode-hook 'custom-java-mode-hook)
+
+;; set indentation configuration
+(defun set-custom-indent ()
+  (setq-local standard-indent 2)
+  (setq-local tab-width 2)
+  (setq-local indent-tabs-mode nil)
+  (setq-local cperl-indent-level 2)
+  (setq-local c-basic-offset 2)
+  (setq-local js2-basic-offset 2)
+  (setq-local js2-bounce-indent-p t)
+  (setq-local js-indent-level 2))
+(add-hook 'prog-mode-hook 'set-custom-indent)
+
 ;;; .emacs ends here
 
 ;; theme configuration starts here
@@ -172,11 +185,9 @@
  '(custom-safe-themes
    (quote
     ("6068d911f0ad3f9e6834d4849038ef3a317510f23683ff9656da7d49a5ab3ed5" "d4890c4d8d262c61decb7c0e43b1dc5c92b378e9acada6c04d9e94f00cc70ead" "4badd47b5ba16df46b849137903f2210d344f3c7021e979ff8ed68b8c3827d84" default)))
- '(indent-tabs-mode nil)
  '(line-number-mode t)
  '(package-selected-packages (quote (windresize async xclip undo-tree)))
  '(show-paren-mode t)
- '(tab-width 2)
  '(tool-bar-mode nil))
 (custom-set-faces
  ;; custom-set-faces was added by Custom.
