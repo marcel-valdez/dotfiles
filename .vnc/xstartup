@@ -1,12 +1,17 @@
 #!/bin/sh
 
+STARTUP_LOG="${HOME}/.vnc/startup.log"
+touch "${STARTUP_LOG}"
+function log () {
+  echo "vnc startup: $1" >> "${STARTUP_LOG}"
+}
+
 ## Environment variables
 unset SESSION_MANAGER
 unset DBUS_SESSION_BUS_ADDRESS
 # export XKL_MODMAP_DISABLE=1
 
 ## global sessions and configuration
-touch "${HOME}/.vnc/.startup.log"
 [ -x /etc/vnc/xstartup ] && /etc/vnc/xstartup
 [ -r "${HOME}/.Xresources" ] && xrdb "${HOME}/.Xresources"
 
@@ -14,7 +19,7 @@ touch "${HOME}/.vnc/.startup.log"
 vncconfig -iconic &
 gnome-session --session=gnome-fallback &
 
-vnc_index=$(echo "$DISPLAY" | grep -o '[0-9]')
+vnc_index=$(echo "${DISPLAY}" | grep -o '[0-9]')
 export TMUX_INIT_SESSION="vnc-${vnc_index}"
 export TMUX=""
 [ -x "${HOME}/.xinitrc" ] && "${HOME}/.xinitrc"
