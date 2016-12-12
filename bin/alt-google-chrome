@@ -1,8 +1,26 @@
 #!/usr/bin/env bash
 
+while [ $# -gt 0 ]; do
+  case "$1" in
+    -i|--index)
+      profile_index="$2"
+      shift
+      ;;
+    -l|--log-file)
+      log_file="$2"
+      shift
+      ;;
+    -h|--help)
+      usage
+      exit 0
+      ;;
+  esac
+  shift
+done
 
+[ -z "${profile_index}" ] && profile_index=$(echo "$DISPLAY" | grep -o '[0-9]')
+[ -z "${log_file}" ] && log_file=/dev/null
 
-profile_index=$(echo "$DISPLAY" | grep -o '[0-9]')
-google-chrome --user-data-dir="$HOME/.alt-google-chrome-profile$profile_index" > /dev/null 2>&1 &
+google-chrome --user-data-dir="${HOME}/.alt-google-chrome-profile${profile_index}" &> "${log_file}" &
 echo "Launching google chrome with alternative profile"
-echo "This may take a few seconds"
+echo "This may take a few seconds..."
