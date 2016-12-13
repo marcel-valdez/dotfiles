@@ -168,7 +168,8 @@
   (setq-local c-basic-offset 2)
   (setq-local js2-basic-offset 2)
   (setq-local js2-bounce-indent-p t)
-  (setq-local js-indent-level 2))
+  (setq-local js-indent-level 2)
+  (setq-local graphviz-dot-indent-width 2))
 (add-hook 'prog-mode-hook 'set-custom-indent)
 
 ;;; .emacs ends here
