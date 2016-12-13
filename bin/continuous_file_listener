@@ -1,3 +1,29 @@
 #!/usr/bin/env bash
+script_name="$(basename "${BASH_SOURCE[0]}")"
 script_dir="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
-python "$script_dir/continuous_file_listener.py" "$1" "$2" "$3" "$4" "$5" "$6" "$7" "$8" "$9"
+function usage() {
+  cat << END
+  This script executes a command every time a file is changed, and gives you the
+  output of the execution of the command using ncurses
+
+  ${script_name} <file> <command> [arg1 arg2 arg3 ... argN]
+  file: The file to listen for changes
+  command: The command to execute every time the file changes
+  arg1 arg2 arg3 ... argN: Arguments for the command
+
+  Example:
+  ${script_name} /tmp/markdown.md pandoc markdown.md -f html -o markdown.html
+END
+}
+
+file=$1
+shift
+if [! -e "${file}" ]; then
+  echo "File ${file} does not exist, cannot listen to it"
+  exit 1
+fi
+
+cmd="$1"
+shift
+
+python "$script_dir/continuous_file_listener.py" "${file}" "${cmd}" "$@"
