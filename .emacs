@@ -50,6 +50,8 @@
 (defun set-custom-indent ()
   (setq-local indent-tabs-mode nil)
   (setq-local c-basic-offset 2)
+  (setq-local js2-basic-offset 2)
+  (setq-local js2-bounce-indent-p t)
   (setq-local js-indent-level 2)
   (setq-local indent-tabs-mode nil)
   (setq-local cperl-indent-level 2)
