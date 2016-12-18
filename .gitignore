@@ -16,6 +16,7 @@
 !.gitignore
 !.emacs
 !.xbindkeysrc.scm
+!.quotes.conkyrc
 !lib/
 
 # include the bin folder

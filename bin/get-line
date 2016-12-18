@@ -1,0 +1,24 @@
+# !/bin/bash
+
+# Gets an indexed line counting from the bottom to the top
+# unless the option -i (inverse) is given, then it
+# gets an indexed line counting from the top to the bottom.
+
+while [ $# -gt 0 ]; do
+    case $1 in
+      -i|--inverse)
+        invert="true"
+        ;;
+      *)
+        line=$1
+        ;;
+    esac
+    shift
+done
+
+
+if [ "${invert}" == "true" ]; then
+  head "-${line}" | tail -1
+else
+  tail "-${line}" | head -1
+fi
