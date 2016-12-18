@@ -32,3 +32,5 @@ gnome-terminal --display "${DISPLAY}" &
 
 ## user installed applications
 type kupfer >/dev/null 2>&1 && kupfer &
+
+conky -d -c "${HOME}/.quotes.conkyrc"
