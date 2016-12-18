@@ -55,4 +55,4 @@ show_graph_scale no
 show_graph_range no
 
 TEXT
-${exec get-quote ~/.quotes 2}
+${exec get-quote ~/.quotes}
