@@ -1,0 +1,51 @@
+#!/usr/bin/env bash
+
+function debug() {
+  if [ ! -z "${DEBUG}" ]; then
+    echo "$@"
+  fi
+}
+
+quotes_file="$1"
+next_quote="$2"
+
+if [ -z "${quotes_file}" ]; then
+ quotes_file="${HOME}/.quotes"
+fi
+
+cat -n "${quotes_file}" |\
+    grep -Eo '+[[:digit:]]+[[:space:]]+%$' |\
+    sed 's/\t/ /g' > /tmp/.tmp.quotes
+
+echo "$(($(cat "${quotes_file}" | wc -l)+1)) %" >> /tmp/.tmp.quotes
+
+total_num_quotes=$(cat "/tmp/.tmp.quotes" | wc -l)
+
+if [ -z "${next_quote}" ]; then
+  next_quote=$(shuf -i "1-${total_num_quotes}" -n 1)
+elif [ ! "${next_quote}" -eq "${total_num_quotes}" ]; then
+  next_quote=$((${next_quote}%${total_num_quotes}))
+fi
+
+debug "total_num_quotes: ${total_num_quotes}"
+debug "next_quote: ${next_quote}"
+
+function get-quote-line () {
+  cat "/tmp/.tmp.quotes" | get-line -i $1 | cut -d' ' -f1
+}
+
+quote_end_line=$(($(get-quote-line ${next_quote})-1))
+if [ ${next_quote} -eq 1 ]; then
+  quote_start_line=1
+else
+  prev_quote=$((${next_quote}-1))
+  debug "prev quote: ${prev_quote}"
+  quote_start_line=$(($(get-quote-line ${prev_quote})+1))
+fi
+
+debug "start line: ${quote_start_line}"
+debug "end line: ${quote_end_line}"
+
+cat ${quotes_file} \
+    | head "-${quote_end_line}" \
+    | tail "-$((${quote_end_line} - ${quote_start_line} + 1))"
