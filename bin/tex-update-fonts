@@ -1,0 +1,6 @@
+#!/usr/bin/env bash
+
+echo "Updates user-specific fonts, has to be executed whenever fonts are updated"
+echo "in the system"
+
+mktexlsr && updmap
