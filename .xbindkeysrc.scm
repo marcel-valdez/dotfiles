@@ -69,15 +69,15 @@
 (define (bg-start)
   (set! bg-run #t)
   (set! bg-thread (begin-thread
-		   (while bg-run
-			  (usleep 1000)))))
+         (while bg-run
+           (usleep 1000)))))
 
 (define (bg-enqueue thunk)
   (system-async-mark thunk bg-thread))
 
 (define (bg-stop)
   (bg-enqueue (lambda ()
-		(set! bg-run #f))))
+      (set! bg-run #f))))
 
 (bg-start)
 
@@ -88,16 +88,16 @@
   (if (eq? (not keys-grabbed) new-value)
       (monitor
        (if (eq? (not keys-grabbed) new-value)
-	   (if new-value
-	       (begin
-		 ;; (display "grabbing all keys\n")
-		 (grab-all-keys)
-		 (set! keys-grabbed #t))
-	       (begin
-		 ;; (display "ungrabbing all keys\n")
-		 (ungrab-all-keys)
-		 (set! keys-grabbed #f)
-	       ))))))
+      (if new-value
+          (begin
+       ;; (display "grabbing all keys\n")
+       (grab-all-keys)
+       (set! keys-grabbed #t))
+          (begin
+       ;; (display "ungrabbing all keys\n")
+       (ungrab-all-keys)
+       (set! keys-grabbed #f)
+          ))))))
 
 (define (ungrab-keys)
   ;; (display "attempting to ungrab keys\n")
@@ -112,31 +112,31 @@
   (let ((result 0))
     ;; (display (string-append "grabbed: " xdotool_key "\n"))
     (set! result (system* (string-append
-			   (getenv "HOME")
-			   "/bin/focused-window-is-program")
-			  "terminal"))
+            (getenv "HOME")
+            "/bin/focused-window-is-program")
+           "terminal"))
     (if (= result 0)
-	(system* "tmux" "send-keys" tmux_key)
-	(begin
-	  (ungrab-keys)
-	  ;; (display (string-append "will attempt to send back " xdotool_key "\n"))
-	  (bg-enqueue (lambda ()
-			(yield)
-			(system* "xdotool" "key" xdotool_key)
-			(grab-keys)))
-	  )
-	)
+   (system* "tmux" "send-keys" tmux_key)
+   (begin
+     (ungrab-keys)
+     ;; (display (string-append "will attempt to send back " xdotool_key "\n"))
+     (bg-enqueue (lambda ()
+         (yield)
+         (system* "xdotool" "key" xdotool_key)
+         (grab-keys)))
+     )
+   )
     )
   )
 
 
 ;; bind ctrl+;
  (xbindkey-function (cons 'release '("m:0x4" "c:47"))
-		   (lambda () (remap-when-terminal "C-\\;" "ctrl+semicolon")))
+          (lambda () (remap-when-terminal "C-\\;" "ctrl+semicolon")))
 
 ;; bind ctrl+.
 (xbindkey-function '("m:0x4" "c:60")
-		   (lambda () (remap-when-terminal "C-." "ctrl+period")))
+          (lambda () (remap-when-terminal "C-." "ctrl+period")))
 
 
 ;; set directly keycode (here control + f with my keyboard)
@@ -159,40 +159,40 @@
 
 ;; Extra features
 ;; (xbindkey-function '(control a)
-;;      	   (lambda ()
-;;      	     (display "Hello from Scheme!")
-;;      	     (newline)))
+;;            (lambda ()
+;;              (display "Hello from Scheme!")
+;;              (newline)))
 
 ;; (xbindkey-function '(shift p)
-;;      	   (lambda ()
-;;      	     (run-command "xterm")))
+;;            (lambda ()
+;;              (run-command "xterm")))
 
 
 ;; Double click test
 ;; (xbindkey-function '(control w)
-;;      	   (let ((count 0))
-;;      	     (lambda ()
-;;      	       (set! count (+ count 1))
-;;      	       (if (> count 1)
-;;      		   (begin
-;;      		    (set! count 0)
-;;      		    (run-command "xterm"))))))
+;;            (let ((count 0))
+;;              (lambda ()
+;;                (set! count (+ count 1))
+;;                (if (> count 1)
+;;                (begin
+;;                 (set! count 0)
+;;                 (run-command "xterm"))))))
 
 ;; Time double click test:
 ;;  - short double click -> run an xterm
 ;;  - long  double click -> run an rxvt
 ;; (xbindkey-function '(shift w)
-;;      	   (let ((time (current-time))
-;;      		 (count 0))
-;;      	     (lambda ()
-;;      	       (set! count (+ count 1))
-;;      	       (if (> count 1)
-;;      		   (begin
-;;      		    (if (< (- (current-time) time) 1)
-;;      			(run-command "xterm")
-;;      			(run-command "rxvt"))
-;;      		    (set! count 0)))
-;;      	       (set! time (current-time)))))
+;;            (let ((time (current-time))
+;;              (count 0))
+;;              (lambda ()
+;;                (set! count (+ count 1))
+;;                (if (> count 1)
+;;                (begin
+;;                 (if (< (- (current-time) time) 1)
+;;                 (run-command "xterm")
+;;                 (run-command "rxvt"))
+;;                 (set! count 0)))
+;;                (set! time (current-time)))))
 
 
 ;; Chording keys test: Start differents program if only one key is
@@ -207,17 +207,17 @@
 ;;     (xbindkey-function key1 (lambda () (set! k1 #t)))
 ;;     (xbindkey-function key2 (lambda () (set! k2 #t)))
 ;;     (xbindkey-function (cons 'release key1)
-;;      	       (lambda ()
-;;      		 (if (and k1 k2)
-;;      		     (run-command cmd-k1-k2)
-;;      		     (if k1 (run-command cmd-k1)))
-;;      		 (set! k1 #f) (set! k2 #f)))
+;;                (lambda ()
+;;              (if (and k1 k2)
+;;                  (run-command cmd-k1-k2)
+;;                  (if k1 (run-command cmd-k1)))
+;;              (set! k1 #f) (set! k2 #f)))
 ;;     (xbindkey-function (cons 'release key2)
-;;      	       (lambda ()
-;;      		 (if (and k1 k2)
-;;      		     (run-command cmd-k2-k1)
-;;      		     (if k2 (run-command cmd-k2)))
-;;      		 (set! k1 #f) (set! k2 #f)))))
+;;                (lambda ()
+;;              (if (and k1 k2)
+;;                  (run-command cmd-k2-k1)
+;;                  (if k2 (run-command cmd-k2)))
+;;              (set! k1 #f) (set! k2 #f)))))
 
 
 ;; Example:
