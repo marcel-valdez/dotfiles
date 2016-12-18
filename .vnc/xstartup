@@ -31,6 +31,6 @@ export TMUX=""
 gnome-terminal --display "${DISPLAY}" &
 
 ## user installed applications
-type kupfer >/dev/null 2>&1 && kupfer &
+type kupfer &>/dev/null && kupfer &
 
-conky -d -c "${HOME}/.quotes.conkyrc"
+type conky && conky -X "${DISPLAY}" -d -c "${HOME}/.quotes.conkyrc"
