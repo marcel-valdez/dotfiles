@@ -1,23 +1,23 @@
 #!/usr/bin/env bash
 
 BAR="/usr/bin/lemonbar"
-if [ ! -e "$BAR" ]; then
-  BAR="$HOME/repositories/bar/lemonbar"
+if [ ! -e "${BAR}" ]; then
+  BAR="${HOME}/repositories/bar/lemonbar"
 fi
 
-FIFO="$HOME/tmp/lemonbar-fifo"
-if [ ! -e "$FIFO" ]; then
-  if [ ! -d "$HOME/tmp" ]; then
-    mkdir $HOME/tmp
+FIFO="${HOME}/tmp/lemonbar-fifo"
+if [ ! -e "${FIFO}" ]; then
+  if [ ! -d "${HOME}/tmp" ]; then
+    mkdir ${HOME}/tmp
   fi
 
-  mkfifo $FIFO
+  mkfifo ${FIFO}
 fi
 
 SCRIPT="$(basename $0)"
 function usage() {
   echo "Launches the lemonbar"
-  echo "$SCRIPT [-h|--help] [-s|--single-big-screen] [--]"
+  echo "${SCRIPT} [-h|--help] [-s|--single-big-screen] [--]"
   echo "  help: displays this message and exits with code 0"
   echo "  single-big-screen: treats the system as a single big screen with dual monitors"
   echo "                    (both the same size)"
@@ -52,7 +52,7 @@ while [ $# -gt 0 ]; do
 done
 
 if [ "$custom_options" == "false" ]; then
-tail -f $FIFO | $BAR -f "-*-clean-*-r-normal-*-17-*-100-100-*-*-*-*" -a 1 -F "#FF000000" -B "#FFcccccc" -g "620x18+$center_offset+2"
+  tail -f ${FIFO} | ${BAR} -f "-*-clean-*-r-normal-*-17-*-100-100-*-*-*-*" -a 1 -F "#FF000000" -B "#FFcccccc" -g "620x18+$center_offset+2"
 else
-  tail -f $FIFO | $BAR "$1" "$2" "$3" "$4" "$5" "$6" "$7" "$8" "$9" | bash
+  tail -f ${FIFO} | ${BAR} "$1" "$2" "$3" "$4" "$5" "$6" "$7" "$8" "$9" | bash
 fi
