@@ -48,13 +48,15 @@
 
 ;; set indentation configuration
 (defun set-custom-indent ()
-  (setq-local indent-tabs-mode nil)
-  (setq-local c-basic-offset 2)
   (setq-local js2-basic-offset 2)
   (setq-local js2-bounce-indent-p t)
   (setq-local js-indent-level 2)
-  (setq-local indent-tabs-mode nil)
   (setq-local cperl-indent-level 2)
+  (setq-local sh-basic-offset 2)
+  (setq-local sh-indentation 2)
+  (setq-local smie-indent-basic 2)
+  (setq-local c-basic-offset 2)
+  (setq-local indent-tabs-mode nil)
   (setq-local tab-width 2)
   (setq-local standard-indent 2))
 (add-hook 'prog-mode-hook 'set-custom-indent)
