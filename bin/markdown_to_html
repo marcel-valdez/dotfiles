@@ -1,8 +1,9 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
-source ~/bin/functions
-expanded_input_path=`readlink -f $1`
-expanded_output_path=`readlink -f $2`
-output_file=$expanded_output_path`
-input_file=$expanded_input_path`
-pandoc --from=markdown --to=html --output=$output_file $input_file
+input_file=$1
+output_file=$2
+[ -z ${output_file} ] && output_file=${input_file%.md}.html
+
+markdown-to -t html "${input_file}" "${output_file}"
+
+pandoc --from=markdown --to=html --output=${output_file} ${input_file}

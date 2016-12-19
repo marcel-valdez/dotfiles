@@ -1,0 +1,42 @@
+#!/usr/bin/env bash
+
+function usage() {
+  echo "markdown-to <[-t|--type] type> <input file> [output file]"
+  echo "type: one of pdf, html"
+  echo "input file: The markdown file to process"
+  echo "output file: The name of the output file to produce"
+}
+
+while [ $# -gt 0 ]; do
+  case $1 in
+    -t|--type)
+      type=$2
+      shift
+      ;;
+    *)
+      break
+  esac
+  shift
+done
+
+if [ -z "${type}" ]; then
+  echo "You must specify the output type"
+  usage
+  exit 1
+fi
+
+input_file=$1
+output_file=$2
+[ -z ${output_file} ] && output_file="${input_file%.md}.${type}"
+
+input_file=$(readlink -f "${input_file}")
+output_file=$(readlink -f "${output_file}")
+
+case ${type} in
+  pdf)
+    pandoc --from=markdown --to=latex --output="${output_file}" "${input_file}"
+  ;;
+  html)
+    pandoc --from=markdown --to=html --output="${output_file}" "${input_file}"
+  ;;
+esac
