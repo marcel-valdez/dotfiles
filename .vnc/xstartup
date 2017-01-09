@@ -24,13 +24,11 @@ export TMUX_INIT_SESSION="vnc-${vnc_index}"
 export TMUX=""
 [ -x "${HOME}/.xinitrc" ] && "${HOME}/.xinitrc"
 
-## visual components
-# none so far
-
 # common applications
 gnome-terminal --display "${DISPLAY}" &
 
 ## user installed applications
 type kupfer &>/dev/null && kupfer &
 
+## visual components
 type conky && conky -X "${DISPLAY}" -d -c "${HOME}/.quotes.conkyrc"
