@@ -18,7 +18,7 @@ END
 
 file=$1
 shift
-if [! -e "${file}" ]; then
+if [ ! -e "${file}" ]; then
   echo "File ${file} does not exist, cannot listen to it"
   exit 1
 fi
