@@ -212,16 +212,20 @@ function ps-nice() {
   while [[ $# -gt 0 ]]; do
     case $1 in
       --use-headers)
-      use_headers="true"
-      ;;
+        use_headers="true"
+        ;;
 
       --full-command)
-      full_command="true"
-      ;;
+        full_command="true"
+        ;;
+
+      --show-size)
+        size="true"
+        ;;
 
       *)
-      break
-      ;;
+        break
+        ;;
 
     esac
     shift
@@ -233,6 +237,10 @@ function ps-nice() {
 
   if [ "${full_command}" == "true" ]; then
     config="${config}w"
+  fi
+
+  if [ ! -z "${size}" ]; then
+    format="-o pid -o size -o tty -o start -o args"
   fi
 
   ps ${format}\
