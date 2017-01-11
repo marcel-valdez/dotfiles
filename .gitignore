@@ -19,6 +19,8 @@
 !.Xmodmap
 !.xinitrc
 !.xsession
+!.xprofile
+!.xsessionrc
 !.quotes
 !.quotes.conkyrc
 
