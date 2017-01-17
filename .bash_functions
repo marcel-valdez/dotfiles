@@ -65,6 +65,8 @@ node-check-use() {
         nvm use "${NODE_VERSION}"
         ;;
     esac
+    # put the path to the node executable
+    which node > ~/.node_exec
   fi
 }
 
