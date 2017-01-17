@@ -3,8 +3,8 @@
 
 SCRIPT=$(basename "${BASH_SOURCE[0]}")
 function usage() {
-  echo "$SCRIPT sets up an alarm later in time"
-  echo "$SCRIPT [-number-of-beeps|-n] <time-spec>"
+  echo "${SCRIPT} sets up an alarm later in time"
+  echo "${SCRIPT} [--number-of-beeps|-n <number of beeps>] <time-spec>"
   echo "number-of-beeps: Number of times the computer should beep (and wake you up)"
 }
 
@@ -23,4 +23,13 @@ do
   shift
 done
 
-echo "for i in \$(seq 1 $beeps); do $HOME/bin/beep; sleep 2; done" | at $*
+
+read -d '' code <<EOF
+ for i in \$(seq 1 ${beeps})
+ do
+   ${HOME}/bin/beep
+   sleep 2
+ done
+EOF
+
+echo "${code}" | at "$@"
