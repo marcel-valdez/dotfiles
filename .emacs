@@ -68,6 +68,9 @@
                       (lambda () (interactive) (multi-term-dedicated-toggle))))
   (require 'in-tmux))
 
+(setq browse-url-browser-function 'browse-url-generic)
+(setq browse-url-generic-program "~/modules/chrome-remote-scripts/open-cantata-url")
+
 (with-library helm-config
   (helm-mode 1)
   (global-set-key (kbd "C-x C-f") 'helm-find-files)
