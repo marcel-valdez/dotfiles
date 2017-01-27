@@ -8,7 +8,7 @@ function usage() {
 }
 
 beeps=10
-while [ $# -gt 1 ]; do
+while [ $# -gt 0 ]; do
   case "$1" in
     -n|--number-of-beeps)
       beeps=$2
@@ -18,12 +18,17 @@ while [ $# -gt 1 ]; do
       message=$2
       shift
       ;;
+    -h|--help)
+      usage
+      exit
+      ;;
     *)
       break
       ;;
   esac
   shift
 done
+
 
 title="set-alarm notification"
 if [ -z "${message}" ]; then
