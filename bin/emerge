@@ -1,0 +1,25 @@
+#!/usr/bin/env bash
+
+ancestor=$1
+theirs=$2
+yours=$3
+merge_result=$4
+
+lisp_code=$(cat << EOF
+(progn
+  (defun ediff-write-merge-buffer ()
+    (let ((file ediff-merge-store-file))
+      (set-buffer ediff-buffer-C)
+      (write-region (point-min) (point-max) file)
+      (message "Merge buffer saved in %s" file)
+      (set-buffer-modified-p nil)
+      (set-for 1)))
+  (setq ediff-quit-hook 'kill-emacs
+    ediff-quit-merge-hook 'ediff-write-merge-buffer)
+  (ediff-merge-files-with-ancestor "${yours}" "${theirs}"
+                                  "${ancestor}" nil "${merge_result}"))
+EOF
+)
+
+/usr/bin/emacs -Q --eval "${lisp_code}"
+
