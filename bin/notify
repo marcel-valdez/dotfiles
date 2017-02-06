@@ -1,8 +1,10 @@
 #!/usr/bin/env ruby
 
+require 'shellwords'
+
 if ARGV.size < 2
   puts 'Title and message must be specified. Usage:'
-  puts '  notify title message'
+  puts '  notify <title> <message>'
   exit 1
 end
 
@@ -17,5 +19,5 @@ if File.exists?("/usr/bin/gntp-send")
   cmd = "gntp-send -s localhost \"#{title}\" \"#{message}\""
 end
 
-`echo #{title} #{message} >> $HOME/.logs/notify.log`
+`echo #{Shellwords.escape(title)} #{Shellwords.escape(message)} >> $HOME/.logs/notify.log`
 `#{cmd}`

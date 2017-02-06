@@ -7,7 +7,7 @@ function usage() {
   echo "number-of-beeps: Number of times the computer should beep (and wake you up)"
 }
 
-beeps=10
+beeps=5
 while [ $# -gt 0 ]; do
   case "$1" in
     -n|--number-of-beeps)
@@ -36,11 +36,7 @@ if [ -z "${message}" ]; then
 fi
 
 script=$(cat << EOF
-for i in \$(seq ${beeps}); do
-  ${HOME}/bin/beep
-  sleep 2
-done
-
+${HOME}/bin/beep ${beeps} &
 ${HOME}/bin/notify "${title}" "${message}"
 EOF
 )

@@ -1,3 +1,11 @@
 #!/usr/bin/env bash
 
-mplayer -noconsolecontrols  -really-quiet ~/res/beep.mp3 &>/dev/null
+repetitions=$1
+[ -z "${repetitions}" ] && repetitions=1
+
+for i in $(seq ${repetitions}); do
+  mplayer -noconsolecontrols -really-quiet ~/res/beep.mp3 &>/dev/null
+  [ ${repetitions} -gt 1 ] && sleep 1
+done
+
+exit 0
