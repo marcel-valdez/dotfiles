@@ -119,6 +119,12 @@
 (global-unset-key (kbd "C-M-k"))
 (global-set-key (kbd "C-M-k") (lambda () (interactive) (other-frame -1)))
 
+;; split windows with sensible keys
+(global-unset-key (kbd "C-x |"))
+(global-set-key (kbd "C-x |") (lambda () (interactive) (split-window-horizontally)))
+(global-unset-key (kbd "C-x _"))
+(global-set-key (kbd "C-x _") (lambda () (interactive) (split-window-vertically)))
+
 ;;(with-library auto-complete (global-auto-complete-mode))
 (with-library undo-tree
   ;; remap undo-redo using undo-tree
