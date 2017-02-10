@@ -87,7 +87,7 @@ fi
 log_debug "Loaded .google* sources"
 
 # set a fancy prompt (non-color, unless we know we "want" color)
-case "$TERM" in
+case "${TERM}" in
   xterm-color) color_prompt=yes;;
 esac
 
@@ -96,7 +96,7 @@ esac
 # should be on the output of commands, not on the prompt
 #force_color_prompt=yes
 
-if [ -n "$force_color_prompt" ]; then
+if [ -n "${force_color_prompt}" ]; then
   if [ -x /usr/bin/tput ] && tput setaf 1 >&/dev/null; then
     # We have color support; assume it's compliant with Ecma-48
     # (ISO/IEC-6429). (Lack of such support is extremely rare, and such
@@ -107,20 +107,23 @@ if [ -n "$force_color_prompt" ]; then
   fi
 fi
 
+# custom: It is 2017, colored prompt is ALWAYS available
 color_prompt=yes
 
 log_debug "Setting PS1 (prompt)"
-__function_exists=$((type g3-client-name >&/dev/null && echo "yes") || echo "no")
-if [ "$__function_exists" == "yes" ]; then
+g3_functions_exist=$(type g3-client-name >&/dev/null && echo "yes")
+if [ "$g3_functions_exist" == "yes" ]; then
   __PS1_SUFFIX='$(g3-client-name)\n\$ '
 else
   __PS1_SUFFIX='\n\$ '
 fi
 
+[ -z ${PS1_HOST} ] && PS1_HOST=$(hostname) && PS1_HOST=${PS1_HOST/.mtv.*/}
+
 if [ "$color_prompt" = yes ]; then
-  PS1='${debian_chroot:+($debian_chroot)}\[\033[01;32m\]@\h\[\033[00m\]:\[\033[01;34m\]\w\[\033[00m\]'$__PS1_SUFFIX
+  PS1='${debian_chroot:+($debian_chroot)}\[\033[01;32m\]@${PS1_HOST}\[\033[00m\]:\[\033[01;34m\]\w\[\033[00m\]'$__PS1_SUFFIX
 else
-  PS1='${debian_chroot:+($debian_chroot)}@\h:\w'$__PS1_SUFFIX
+  PS1='${debian_chroot:+($debian_chroot)}@${PS1_HOST}:\w'$__PS1_SUFFIX
 fi
 
 unset color_prompt force_color_prompt
@@ -128,7 +131,7 @@ unset color_prompt force_color_prompt
 # If this is an xterm set the title to user@host:dir
 case "$TERM" in
 xterm*|rxvt*)
-  PS1="\[\e]0;${debian_chroot:+($debian_chroot)}@\h: \w\a\]$PS1"
+  PS1="\[\e]0;${debian_chroot:+($debian_chroot)}@${PS1_HOST}: \w\a\]$PS1"
   ;;
 *)
   ;;
@@ -235,3 +238,7 @@ log_debug "Loaded node.js"
 
 # Reads the pending log buffer
 log-buffer --read
+export http_proxy=''
+export https_proxy=''
+export ftp_proxy=''
+export socks_proxy=''
