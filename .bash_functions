@@ -299,3 +299,15 @@ function show-shell-settings() {
 function show-shell-capabilities() {
   bind-show-capabilities
 }
+
+function wait-for-process() {
+  for pid in "$@"
+  do
+    # skip pid if process does not exist
+    [ -z "$(pgrep "${pid}")"  ] && continue
+
+    wait ${pid} &>/dev/null ||\
+      tail --pid=${pid} -f &>/dev/null ||\
+      echo "Failed to wait for process ${pid}" 1>&2
+  done
+}
