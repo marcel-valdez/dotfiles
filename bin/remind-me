@@ -39,7 +39,7 @@ end
 
 alarm_snd = ""
 if !options[:alarm].nil?
-  alarm_snd = "#{Dir.home}/bin/exec-ntimes 10 #{Dir.home}/bin/beep"
+  alarm_snd = "#{Dir.home}/bin/beep 5"
 end
 
 escaped_msg_cmd = %Q{"/usr/bin/notify-send '"'#{options[:title]}'"' '"'#{options[:message]}'"'; #{alarm_snd}"}

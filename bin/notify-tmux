@@ -2,8 +2,8 @@
 
 SCRIPT="$(basename $0)"
 function usage() {
-  echo "$SCRIPT displays a notification message in tmux"
-  echo "$SCRIPT [-h|--help] [-c|--count] [-n|--nostdout] [title] message"
+  echo "${SCRIPT} displays a notification message in tmux"
+  echo "${SCRIPT} [-h|--help] [-c|--count] [-n|--nostdout] [title] message"
   echo "  message: The message to display"
   echo "  count: Number of times to blink when showing the message."
   echo "         Default: 10"
@@ -49,10 +49,10 @@ if [ "$2" != "" ]; then
   message="$2"
 fi
 
-for i in $(seq 1 $count)
+for i in $(seq 1 ${count})
 do
-  tmux display-message "$(date '+%H:%M:%S') $title$message"
+  tmux display-message "$(date '+%H:%M:%S') ${title}${message}"
   sleep 2
 done
 
-tmux display-message -p "$(date '+%H:%M:%S') $title$message"
+tmux display-message -p "$(date '+%H:%M:%S') ${title}${message}"
