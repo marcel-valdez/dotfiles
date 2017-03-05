@@ -145,3 +145,15 @@ npm-lint() {
   node-check-use
   npm run lint
 }
+
+git-rm-forever() {
+  if [ "$1" == "--help" ]; then
+    echo Removes a file completely from the repository history
+    exit 1
+  fi
+
+  file="$1"
+  git filter-branch --force --index-filter \
+      "git rm --cached --ignore-unmatch ${file}" \
+      --prune-empty --tag-name-filter cat -- --all
+}
