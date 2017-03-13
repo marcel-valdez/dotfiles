@@ -253,17 +253,17 @@ function ps-nice() {
 
 function emacs() {
   if [[ "${TERM}" =~ "eterm" ]]; then
-    /usr/bin/emacsclient
+    /usr/bin/emacsclient &>/tmp/emacs-${USER}-${RANDOM}.log
   else
-    /usr/bin/emacs --no-window-system "$@"
+    /usr/bin/emacs --no-window-system "$@" &>/tmp/emacs-${USER}-${RANDOM}.log
   fi
 }
 
 function google-emacs() {
   if [[ "${TERM}" =~ "eterm" ]]; then
-    /usr/bin/emacsclient
+    /usr/bin/emacsclient &> /tmp/google-emacs-${USER}-${RANDOM}.log
   else
-    /usr/bin/google-emacs --no-window-system "$@"
+    /usr/bin/google-emacs --no-window-system "$@" &> /tmp/google-emacs-${USER}-${RANDOM}.log
   fi
 }
 
