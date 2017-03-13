@@ -1,6 +1,9 @@
 #!/usr/bin/env bash
 
-# this file does not seem to be executed during cinnamon session initialization
+# this file is the second one to execute in the X startup process,
+# and is probably executed once there is a windowing environment
+# available
+echo "Executed .xsessionrc during initialization" >> ~/.xstartup.log
 
 if [ -f "${HOME}/.xsession" ]; then
   source "${HOME}/.xsession"
