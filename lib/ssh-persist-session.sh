@@ -82,6 +82,7 @@ if ! agent_is_running; then
   agent_start
   ssh-add
 else
+  echo "SSH Agent is already running"
   if ! agent_has_keys; then
     echo "Adding all keys to ssh-agent"
     ssh-add
