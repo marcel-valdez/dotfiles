@@ -11,6 +11,6 @@ function today() {
 # available
 echo "$(today) $(now) Executed .xsessionrc during initialization" >> ~/.xstartup.log
 
-if [ -f "${HOME}/.xsession" ]; then
+if [[ -f "${HOME}/.xsession" ]]; then
   source "${HOME}/.xsession"
 fi
