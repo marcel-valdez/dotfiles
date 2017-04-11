@@ -1,0 +1,37 @@
+#!/usr/bin/env bash
+
+TYPES=(pdf doc html docx odt)
+
+while [[ $# -gt 0 ]]; do
+  case $1 in
+    -o|--output|--to)
+      output_file=$2
+      shift
+      ;;
+    -f|--from|--file)
+      input_file=$2
+      shift
+      ;;
+    *)
+      output_type=$1
+      ;;
+  esac
+  shift
+done
+
+input_dir=$(dirname "${input_file}")
+input_with_ext=$(basename "${input_file}")
+input_no_ext="${input_with_ext%.*}"
+input_ext="${input_with_ext##*.}"
+
+if [[ -z "${output_file}" ]] && [[ -z "${output_type}" ]]; then
+  echo "You must specify the output input WITH extension or the output type of the document." >&2
+  exit 1
+fi
+
+[[ -z "${output_file}" ]] && output_file="${input_no_ext}.${output_type}"
+[[ -z "${output_type}" ]] && output_type="${output_file##*.}"
+
+[[ "${input_ext}" == "md" ]] && input_ext="markdown"
+
+pandoc --from="${input_ext}" --to="${output_type}" --output="${output_file}" "${input_file}"
