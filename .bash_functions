@@ -1,5 +1,12 @@
 #!/bin/bash
 
+__debug() {
+  if [[ ! -z ${DEBUG} ]]; then
+    echo "$@"
+  fi
+}
+
+
 now() {
   date "+%H:%M:%S"
 }
@@ -199,6 +206,61 @@ function get-ssh-relay-hostname() {
   if [ -n "${relay_ip}" ]; then
     nslookup "${relay_ip}" | grep -o 'name =.*'  | cut -d'=' -f2 | sed 's/ //g' | sed 's/\.$//'
   fi
+}
+
+function __process-ps-lines() {
+  lines="$(cat)"
+  byte_limit="$(numfmt --to=none --from=si $1 2>/dev/null)"
+  __debug "__process-ps-lines: byte_limit=${byte_limit}"
+  readarray -t lines_array <<<"${lines}"
+  for line in "${lines_array[@]}"
+  do
+    elements=(${line//:/ })
+    kb_size="${elements[0]}"
+    if [[ "${kb_size}" == "SIZE"  ]]; then
+      echo "${line}"
+    else
+      byte_size=$(echo "${kb_size} * 1024" | bc)
+      elements=("${elements[@]/$kb_size}")
+      human_size="$(numfmt --to=si ${byte_size})"
+      if [[ "${byte_size}" -gt "${byte_limit}"  ]] || [[ -z "${byte_limit}" ]]; then
+        echo "${human_size} ${elements[@]}"
+      fi
+    fi
+  done
+}
+
+function ps-show-memory-hogs() {
+  procs=25
+  command_format=comm
+  while [[ $# -gt 0 ]]; do
+    case $1 in
+      -n|--number)
+        procs=$2
+        shift
+        ;;
+      -f|--full-command)
+        command_format="args"
+        shift
+        ;;
+      -s|--short-command)
+        # this is the default
+        ;;
+      -l|--limit-size)
+        limit=$2
+        shift
+        ;;
+      *)
+        echo "Ignoring unkown parameter: $1" >&2
+        ;;
+    esac
+    shift
+  done
+  __debug "procs=${procs}"
+  __debug "limit=${limit}"
+
+  ps -A -o size -o pid -o "${command_format}" --sort=-size \
+    | __process-ps-lines "${limit}" | head "-${procs}"
 }
 
 function ps-nice() {
