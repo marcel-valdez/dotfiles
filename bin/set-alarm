@@ -13,12 +13,15 @@ while [ $# -lt 1 ]
 do
   case "$1" in
     -n|--number-of-beeps)
-    beeps=$2
-    shift
-    ;;
+      beeps=$2
+      shift
+      ;;
+    --help)
+      usage
+      ;;
     *)
-    break
-    ;;
+      break
+      ;;
   esac
   shift
 done
