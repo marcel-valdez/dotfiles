@@ -9,7 +9,7 @@ function usage() {
 }
 
 beeps=10
-while [ $# -lt 1 ]
+while [ $# -gt 0 ]
 do
   case "$1" in
     -n|--number-of-beeps)
