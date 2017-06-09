@@ -111,7 +111,9 @@
   ;; this one is not very useful, and we may want to re-use C-x T
   ;; to mean something else related to window management
   (global-set-key (kbd "C-x T")
-                  (lambda () (interactive) (rotate-windows -1))))
+                  (lambda () (interactive) (rotate-windows -1)))
+  (global-set-key (kbd "M-<up>") 'move-text-up)
+  (global-set-key (kbd "M-<down>") 'move-text-down))
 
 ;; switch between frames quickly
 (global-unset-key (kbd "C-M-j"))
