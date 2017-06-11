@@ -9,7 +9,7 @@ if ARGV.size < 2
 end
 
 now = Time.now
-time = "#{now.hour}:#{now.min}"
+time = "#{'%02d' % now.hour}:#{'%02d' % now.min}"
 title = "#{time} #{ARGV[0]}"
 message = ARGV[1]
 
