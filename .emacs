@@ -58,7 +58,8 @@
   (setq-local c-basic-offset 2)
   (setq-local indent-tabs-mode nil)
   (setq-local tab-width 2)
-  (setq-local standard-indent 2))
+  (setq-local standard-indent 2)
+  (setq-local css-indent-offset 2))
 (add-hook 'prog-mode-hook 'set-custom-indent)
 
 
