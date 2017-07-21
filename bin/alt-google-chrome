@@ -1,0 +1,31 @@
+#!/usr/bin/env bash
+
+declare -a chrome_args
+while [ $# -gt 0 ]; do
+  case "$1" in
+    -i|--index)
+      profile_index="$2"
+      shift
+      ;;
+    -l|--log-file)
+      log_file="$2"
+      shift
+      ;;
+    --remote-debugging)
+      chrome_args+=("--remote-debugging-port=9222")
+      ;;
+    -h|--help)
+      usage
+      exit 0
+      ;;
+  esac
+  shift
+done
+
+[ -z "${profile_index}" ] && profile_index=$(echo "$DISPLAY" | grep -o '[0-9]')
+[ -z "${log_file}" ] && log_file=/dev/null
+chrome_args+=("--user-data-dir=${HOME}/.alt-google-chrome-profile${profile_index}")
+
+google-chrome "${chrome_args[@]}" &> "${log_file}" &
+echo "Launching google chrome with alternative profile"
+echo "This may take a few seconds..."
