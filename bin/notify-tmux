@@ -1,0 +1,62 @@
+#!/usr/bin/env bash
+
+SCRIPT="$(basename $0)"
+function usage() {
+  echo "${SCRIPT} displays a notification message in tmux"
+  echo "${SCRIPT} [-h|--help] [-c|--count] [-n|--nostdout] [title] message"
+  echo "  message: The message to display"
+  echo "  count: Number of times to blink when showing the message."
+  echo "         Default: 10"
+  echo "  stdout: Don't show the message in the standard output"
+  echo "  help: Displays this message on the terminal"
+}
+
+count=10
+stdout="true"
+while [ $# -gt 0 ]; do
+  arg="$1"
+  case $arg in
+    --help|-h)
+    usage
+    exit 0
+    ;;
+    --count|-c)
+    shift
+    count=$1
+    ;;
+    --n|--nostdout)
+    stdout="false"
+    ;;
+    *)
+    break
+    ;;
+  esac
+  shift
+done
+
+if [ "$1" == "" ]; then
+  echo ""
+  echo "  ERROR: Missing message parameter"
+  echo ""
+  usage
+  exit 1
+fi
+
+title=""
+message="$1"
+if [ "$2" != "" ]; then
+  title="$1 "
+  message="$2"
+fi
+
+display_message="$(date '+%H:%M:%S') ${title}${message}"
+
+echo "${display_message}" >> /tmp/notify-tmux-${USER}.log
+
+for i in $(seq 1 ${count})
+do
+  tmux display-message "${display_message}"
+  sleep 2
+done
+
+tmux display-message -p "${display_message}" &
