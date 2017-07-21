@@ -79,6 +79,10 @@
 (global-auto-revert-mode)
 
 ;;;; custom bindings
+;; move a line up-down easily
+(global-set-key (kbd "M-<up>") 'move-text-up)
+(global-set-key (kbd "M-<down>") 'move-text-down)
+
 ;; switch between windows quickly
 (global-unset-key (kbd "M-j"))
 (global-set-key (kbd "M-j") (lambda () (interactive) (other-window 1)))
