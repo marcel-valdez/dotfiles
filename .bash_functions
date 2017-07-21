@@ -102,6 +102,21 @@ function show-shell-capabilities() {
   bind-show-capabilities
 }
 
+# this function reduces the horrible lag spikes caused by the NetworkManager
+# scanning the wifi network in the background when using a 802.11AC enabled
+# wireless network interface.
+# NOTE: if this solution does not work well enough, you can alternatively
+# switch from NetworkManager to wicd (manual configuration).
+function wifi-pause-background-scan() {
+  sudo killall -STOP NetworkManager
+  echo "Disabled background wi-fi network scan by pausing the NetworkManager process"
+}
+
+function wifi-enable-background-scan() {
+  sudo killall -CONT NetworkManager
+  echo "Enabled background wi-fi network scan by signaling the NetworkManager process"
+}
+
 
 # start npm functions
 node-check-use() {
