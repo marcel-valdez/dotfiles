@@ -1,3 +1,27 @@
 #!/usr/bin/env bash
 # Used by p4/Perforce $P4MERGE environment variable to use beyond compare for merging
-/usr/bin/bcompare $2 $3 $1 $4
+
+# theirs was theirs
+# center was ours --> however this was also the output file (so... strange, unless they want us to output to a tmp file?)
+# right was base
+# output was dunno
+
+# git:LOCAL: 2 [our current code]
+ours=$3
+# git:REMOTE: 3 [what we are trying to merge on top of]
+theirs=$2
+# git:BASE: 1 [what both LOCAL and REMOTE have in the common branch]
+base=$1
+# git:MERGED: 4 [output file]
+output=$4
+
+if [ -z "${output}" ]; then
+  echo "There is no output field set." >&2
+fi
+
+/usr/bin/bcompare \
+  -lefttitle="Theirs: ${theirs}"\
+  -centertitle="Base: ${base}"\
+  -righttitle="Ours: ${ours}"\
+  -outputtitle="Result: ${output}"\
+  ${theirs} ${ours} ${base} ${output}
