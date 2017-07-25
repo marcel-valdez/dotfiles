@@ -49,10 +49,14 @@ if [ "$2" != "" ]; then
   message="$2"
 fi
 
+display_message="$(date '+%H:%M:%S') ${title}${message}"
+
+echo "${display_message}" >> "/tmp/notify-tmux-${USER}.log"
+
 for i in $(seq 1 ${count})
 do
-  tmux display-message "$(date '+%H:%M:%S') ${title}${message}"
+  tmux display-message "${display_message}"
   sleep 2
 done
 
-tmux display-message -p "$(date '+%H:%M:%S') ${title}${message}"
+tmux display-message -p "${display_message}"
