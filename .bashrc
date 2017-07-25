@@ -113,17 +113,17 @@ color_prompt=yes
 log_debug "Setting PS1 (prompt)"
 g3_functions_exist=$(type g3-client-name >&/dev/null && echo "yes")
 if [ "$g3_functions_exist" == "yes" ]; then
-  __PS1_SUFFIX='$(g3-client-name)\n\$ '
+  PS1_SUFFIX='$(g3-client-ps1)\n$ '
 else
-  __PS1_SUFFIX='\n\$ '
+  PS1_SUFFIX='\n\$ '
 fi
 
 [ -z ${PS1_HOST} ] && PS1_HOST=$(hostname) && PS1_HOST=${PS1_HOST/.mtv.*/}
 
-if [ "$color_prompt" = yes ]; then
-  PS1='${debian_chroot:+($debian_chroot)}\[\033[01;32m\]@${PS1_HOST}\[\033[00m\]:\[\033[01;34m\]\w\[\033[00m\]'$__PS1_SUFFIX
+if [ "${color_prompt}" = yes ]; then
+  PS1='${debian_chroot:+($debian_chroot)}\[\033[01;32m\]@${PS1_HOST}\[\033[00m\]:\[\033[01;34m\]\w\[\033[00m\]'${PS1_SUFFIX}
 else
-  PS1='${debian_chroot:+($debian_chroot)}@${PS1_HOST}:\w'$__PS1_SUFFIX
+  PS1='${debian_chroot:+($debian_chroot)}@${PS1_HOST}:\w'${PS1_SUFFIX}
 fi
 
 unset color_prompt force_color_prompt
