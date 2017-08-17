@@ -111,9 +111,9 @@ fi
 color_prompt=yes
 
 log_debug "Setting PS1 (prompt)"
-g3_functions_exist=$(type g3-client-name >&/dev/null && echo "yes")
-if [ "$g3_functions_exist" == "yes" ]; then
-  PS1_SUFFIX='$(g3-client-ps1)\n$ '
+g4_functions_exist=$(type g4-client-name >&/dev/null && echo "yes")
+if [ "${g4_functions_exist}" == "yes" ]; then
+  PS1_SUFFIX='$(g4-client-ps1)\n$ '
 else
   PS1_SUFFIX='\n\$ '
 fi
