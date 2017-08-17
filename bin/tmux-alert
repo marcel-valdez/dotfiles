@@ -5,11 +5,12 @@ function usage() {
   echo "${SCRIPT} displays an alert using the window title on tmux. The window"
   echo "title changes to current time plus the first 8 characters of a message."
   echo
-  echo "${SCRIPT} [-h|--help] [--window|-w]  [title] message"
+  echo "${SCRIPT} [-h|--help] [--window|-w <window_id>] [--private|-p]  [title] message"
   echo "  window: the window to display the message on, otherwise the window in"
   echo "          which the command was called is used."
   echo "  title: Used for logging only"
   echo "  message: The first 8 characters are set as the window title"
+  echo "  private: Hide title and/or message contents"
   echo "  help: Displays this message on the terminal"
 }
 
@@ -19,17 +20,26 @@ while [ $# -gt 0 ]; do
     --help|-h)
       usage
       exit 0
-    ;;
+      ;;
     --window|-w)
       shift
       window=$1
-    ;;
+      ;;
+    --private|-p)
+      shift
+      private="true"
+      ;;
     *)
       break
-    ;;
+      ;;
   esac
   shift
 done
+
+function privatize_notification() {
+  message="New notification"
+  title=
+}
 
 [[ -z ${window} ]] && window=${TMUX_PANE}
 title=$1
@@ -44,7 +54,8 @@ process_window=$(tmux display-message -t"${TMUX_PANE}" -p -F '#{window_id}')
 # only display alert if the current window isn't focused
 if [[ "${focused_window}" != "${process_window}" ]]; then
   # announce message over tmux
-  notify-tmux --nostdout --count 3 "${title}" "${message}"
+  [[ "${private}" == "true" ]] && privatize_notification
+  notify-tmux --nostdout --count 3 "${title}" "${message}" &
   # set window title
   tmux rename-window -t "${window}" "${now} ${message:0:8}"
   # trigger the tmux bell [only works for current tmux window == ${window}]
