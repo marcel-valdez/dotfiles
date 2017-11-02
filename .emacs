@@ -40,6 +40,8 @@
 ;; loads packages only available at the office
 ;; uses the 'google package by default.
 (with-library at-office)
+(with-library flycheck
+  (global-flycheck-mode))
 ;; If we are in TMUX within an X environment
 (if (and (getenv "TMUX") (getenv "DISPLAY"))
     ;; use xclip for copy-pasting
