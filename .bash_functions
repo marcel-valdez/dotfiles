@@ -192,6 +192,20 @@ function tmux-goto-session-client() {
   g4d $(tmux-session-name)
 }
 
+function tmux-window-set-name() {
+  tmux rename-window "$1"
+}
+
+function tmux-window-name() {
+  tmux display-message -p '#W'
+}
+
+function tmux-window-bell-on-activity() {
+  local setting=$1
+  [[ -z "${setting}" ]] && setting="on"
+  tmux set-window-option monitor-activity "${setting}"
+}
+
 function is-ssh-session() {
   ([ -n "${SSH_CLIENT}" ] || [ -n "${SSH_TTY}" ] || [ -n "${SSH_CONNECTION}" ]) && echo "true"
 }
