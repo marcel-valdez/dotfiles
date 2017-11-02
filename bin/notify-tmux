@@ -34,7 +34,10 @@ while [ $# -gt 0 ]; do
   shift
 done
 
-if [[ "$1" == "" ]] && [[ "$#" -lt 2 ]]; then
+title=""
+message="$1"
+
+if [[ "${message}" == "" ]] && [[ "$#" -lt 2 ]]; then
   echo ""
   echo "  ERROR: Missing message parameter"
   echo ""
@@ -42,8 +45,6 @@ if [[ "$1" == "" ]] && [[ "$#" -lt 2 ]]; then
   exit 1
 fi
 
-title=""
-message="$1"
 if [ "$2" != "" ]; then
   title="$1 "
   message="$2"
