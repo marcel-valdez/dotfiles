@@ -1,6 +1,18 @@
 #!/usr/bin/env bash
 
 TYPES=(pdf doc html docx odt)
+SCRIPT="$(basename $0)"
+
+function usage() {
+  echo "${SCRIPT} converts a markdown formatted file to one of ${TYPES[@]}" >&2
+  echo "${SCRIPT} [-h|--help] [-o|--output|--to output_file] \
+<-f|--from|--file input_file> <-t|--type output_type>" >&2
+  echo "  --help: Displays this help message." >&2
+  echo "  output_file: The output file after conversion. Default is the name of\
+the input file with the extensions changed to the output type." >&2
+  echo "  input_file: The input markdown file to convert." >&2
+  echo "  output_type: The type of output format. One of ${TYPES[@]}" >&2
+}
 
 while [[ $# -gt 0 ]]; do
   case $1 in
@@ -12,9 +24,18 @@ while [[ $# -gt 0 ]]; do
       input_file=$2
       shift
       ;;
-    *)
-      output_type=$1
+    -h|--help)
+      usage
+      exit 0
       ;;
+    -t|--type)
+      output_type=$2
+      shift
+      ;;
+    *)
+      echo "Unknown parameter: $1" >&2
+      usage
+      exit 1
   esac
   shift
 done
