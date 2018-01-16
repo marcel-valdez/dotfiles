@@ -17,7 +17,8 @@ unset DBUS_SESSION_BUS_ADDRESS
 
 ## sessions and configurations
 vncconfig -iconic &
-gnome-session --session=gnome-fallback &
+# gnome-session --session=gnome-fallback &
+cinnamon-session-cinnamon2d --failsafe --display="${DISPLAY}"
 
 vnc_index=$(echo "${DISPLAY}" | grep -o '[0-9]')
 export TMUX_INIT_SESSION="vnc-${vnc_index}"
