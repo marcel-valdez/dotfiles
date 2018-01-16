@@ -193,7 +193,12 @@ function tmux-goto-session-client() {
 }
 
 function tmux-window-set-name() {
-  tmux rename-window "$1"
+  if [[ "$2" == "-n" ]]; then
+    local short_name="$1"
+  else
+    local short_name=$(echo "$1" | cut -c 1-30)
+  fi
+  tmux rename-window "${short_name}"
 }
 
 function tmux-window-name() {
