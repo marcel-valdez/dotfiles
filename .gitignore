@@ -36,6 +36,7 @@ bin/rebaser
 bin/update-package
 bin/g3-*
 bin/g4-*
+lib/g4-*
 bin/magicbuild
 bin/magicjar
 bin/*#*
@@ -91,3 +92,4 @@ bin/verify-packages
 *.log
 **/*.log
 .*#
+*#
