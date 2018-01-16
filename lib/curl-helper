@@ -1,0 +1,22 @@
+## To use this library on a bash session, you just have to source it.
+
+function curl::post_json() {
+  # TODO: Add the capability to specify multiple header values via
+  #       multiple parameters. e.g.
+  # --header "MyHeader: MyValue Other" --header "OtherHeader: Value"
+  # TODO: In order to make it possible to perform multiple types of
+  #       curl operations, we should probably refactor into:
+  #       curl::post, curl::post_json, curl::get, curl::get_json, etc
+  #       maybe even curl::post json or curl post json?
+  if [[ "$1" == "--help" ]]; then
+    echo "Make a POST request to a host using the given JSON payload"
+    echo "curl::post_json <host> <payload>"
+    return 1
+  fi
+
+
+  curl -s -H "Content-Type: application/json"\
+    -H "Authorization: Bearer cki1m3mi33jbs6ocd9j4yfecv8al5ssq"\
+    -X POST "$1"\
+    --data "$2"
+}
