@@ -59,5 +59,7 @@ if [[ "${focused_window}" != "${process_window}" ]]; then
   # set window title
   tmux rename-window -t "${window}" "${now} ${message:0:8}"
   # trigger the tmux bell [only works for current tmux window == ${window}]
+  # Useful when you are in the correct window, but another pane is maximized
   echo -n -e "\a"
+  # tmux run -t "${window}" 'echo -n -e "\a"'
 fi
