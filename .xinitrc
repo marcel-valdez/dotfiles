@@ -1,6 +1,9 @@
 #!/usr/bin/env bash
 
-source ~/.bash_functions
+function now() {
+  date "+%H:%M:%S"
+}
+
 function today() {
   ~/bin/today
 }

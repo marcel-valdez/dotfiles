@@ -1,10 +1,12 @@
 #!/usr/bin/env bash
 
-source ~/.bash_functions
+function now() {
+  date "+%H:%M:%S"
+}
+
 function today() {
   ~/bin/today
 }
-
 
 # this file is the second one to execute in the X startup process,
 # and is probably executed once there is a windowing environment
