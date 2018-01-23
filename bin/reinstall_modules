@@ -1,10 +1,32 @@
-#!/bin/bash
+#!/usr/bin/env bash
+
+function load_driver() {
+  local SUCCESS_CODE=0
+  local ERROR_CODE=1
+  local driver_name="$1"
+  echo "Trying to load driver ${driver_name}..."
+  sudo modprobe "${driver_name}"
+  if [[ $? -eq ${SUCCESS_CODE} ]]; then
+    echo "Successfully loaded driver ${driver_name}."
+    return ${SUCCESS_CODE}
+  else
+    echo "Loading driver ${driver_name} was unsuccessful."
+    return ${ERROR_CODE}
+  fi
+}
 
 function reinstall_wireless() {
-  cd ~/modules/rtl8812AU_8821AU_linux
+  local SUCCESS_CODE=0
+  local ERROR_CODE=1
+  cd "${HOME}/modules/rtl8812AU_8821AU_linux"
   make
   sudo make install
-  # sometimes 8812au works, sometimes rtl8812au works
-  sudo modprobe 8812au || sudo modprobe rtl8812au
+  # sometimes 8812au works...
+  load_driver 8812au
+  if [[ $? -eq ${ERROR_CODE} ]]; then
+    # sometimes rtl8812au works...
+    load_driver rtl8812au
+    return $?
+  fi
   cd -
 }
