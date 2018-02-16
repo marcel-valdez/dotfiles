@@ -1,30 +1,29 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
-__debug() {
+function __debug() {
   if [[ ! -z ${DEBUG} ]]; then
     echo "$@"
   fi
 }
 
-
-now() {
+function now() {
   date "+%H:%M:%S"
 }
 
-diff-lines() {
+function diff-lines() {
   local path=
   local line=
   while read; do
     esc=$'\033'
-    if [[ ${REPLY} =~ ---\ (a/)?.* ]]; then
+    if [[ "${REPLY}" =~ ---\ (a/)?.* ]]; then
       continue
-    elif [[ ${REPLY} =~ \+\+\+\ (b/)?([^[:blank:]$esc]+).* ]]; then
-      path=${BASH_REMATCH[2]}
-    elif [[ ${REPLY} =~ @@\ -[0-9]+(,[0-9]+)?\ \+([0-9]+)(,[0-9]+)?\ @@.* ]]; then
-      line=${BASH_REMATCH[2]}
-    elif [[ ${REPLY} =~ ^(${esc}\[[0-9;]+m)*([\ +-]) ]]; then
+    elif [[ "${REPLY}" =~ \+\+\+\ (b/)?([^[:blank:]$esc]+).* ]]; then
+      path="${BASH_REMATCH[2]}"
+    elif [[ "${REPLY}" =~ @@\ -[0-9]+(,[0-9]+)?\ \+([0-9]+)(,[0-9]+)?\ @@.* ]]; then
+      line="${BASH_REMATCH[2]}"
+    elif [[ "${REPLY}" =~ ^(${esc}\[[0-9;]+m)*([\ +-]) ]]; then
       echo "${path}:${line}:${REPLY}"
-      if [[ ${BASH_REMATCH[2]} != - ]]; then
+      if [[ "${BASH_REMATCH[2]}" != - ]]; then
         ((line++))
       fi
     fi
@@ -33,21 +32,21 @@ diff-lines() {
 
 # start git functions
 
-git-diff-lines() {
+function git-diff-lines() {
   git diff "$@" | diff-lines
 }
 
-g-diff-lines() {
+function g-diff-lines() {
   git-diff-lines "$@"
 }
 
-git-branch-out() {
+function git-branch-out() {
   new_branch_name=$1
   treeish=$2
   git checkout -b ${new_branch_name} ${treeish}
 }
 
-g-branch-out() {
+function g-branch-out() {
   git-branch-out "$@"
 }
 
@@ -55,7 +54,7 @@ g-branch-out() {
 
 # start npm functions
 
-node-check-use() {
+function node-check-use() {
   node_version=$(node --version 2>/dev/null)
   if [ "${node_version}" != "v${NODE_VERSION}" ]; then
     node_version_installed=$(nvm ls 2>/dev/null | grep "${NODE_VERSION}")
