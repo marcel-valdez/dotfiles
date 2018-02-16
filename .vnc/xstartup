@@ -24,13 +24,16 @@ vnc_index=$(echo "${DISPLAY}" | grep -o '[0-9]')
 export TMUX_INIT_SESSION="vnc-${vnc_index}"
 export TMUX=""
 [ -x "${HOME}/.xinitrc" ] && "${HOME}/.xinitrc"
-
-# common applications
-gnome-terminal --display "${DISPLAY}" &
-
-## user installed applications
-type kupfer &>/dev/null && kupfer &
-xbindkeys_autostart
+[ -x "${HOME}/.xsession" ] && "${HOME}/.xsession"
 
 ## visual components
-type conky && conky -X "${DISPLAY}" -d -c "${HOME}/.quotes.conkyrc"
+type conky &>/dev/null && \
+    conky --display="${DISPLAY}" --config="${HOME}/.quotes.conkyrc"\
+          --double-buffer --daemonize &>>${STARTUP_LOG}
+
+# common applications
+gnome-terminal --display "${DISPLAY}" &>>${STARTUP_LOG} &
+
+## user installed applications
+type kupfer &>/dev/null && kupfer &>>${STARTUP_LOG} &
+xbindkeys_autostart &>>${STARTUP_LOG}
