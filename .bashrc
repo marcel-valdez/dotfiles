@@ -63,26 +63,26 @@ fi
 # See /usr/share/doc/bash-doc/examples in the bash-doc package.
 
 log_debug "Loading .bash* sources"
-if [ -f "$HOME/.bash_aliases" ]; then
-  source "$HOME/.bash_aliases"
+if [ -f "${HOME}/.bash_aliases" ]; then
+  source "${HOME}/.bash_aliases"
 fi
 
-if [ -f "$HOME/.bash_functions" ]; then
-  source "$HOME/.bash_functions"
+if [ -f "${HOME}/.bash_functions" ]; then
+  source "${HOME}/.bash_functions"
 fi
 log_debug "Loaded .bash* sources"
 
 log_debug "Loading .google* sources"
-if [ -f "$HOME/.googlerc" ]; then
-  source "$HOME/.googlerc"
+if [ -f "${HOME}/.googlerc" ]; then
+  source "${HOME}/.googlerc"
 fi
 
-if [ -f "$HOME/.google_aliases" ]; then
-  source "$HOME/.google_aliases"
+if [ -f "${HOME}/.google_aliases" ]; then
+  source "${HOME}/.google_aliases"
 fi
 
-if [ -f "$HOME/.google_functions" ]; then
-  source "$HOME/.google_functions"
+if [ -f "${HOME}/.google_functions" ]; then
+  source "${HOME}/.google_functions"
 fi
 log_debug "Loaded .google* sources"
 
