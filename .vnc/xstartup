@@ -18,7 +18,7 @@ unset DBUS_SESSION_BUS_ADDRESS
 ## sessions and configurations
 vncconfig -iconic &
 # gnome-session --session=gnome-fallback &
-cinnamon-session-cinnamon2d --failsafe --display="${DISPLAY}"
+cinnamon-session-cinnamon2d --failsafe --display="${DISPLAY}" &
 
 vnc_index=$(echo "${DISPLAY}" | grep -o '[0-9]')
 export TMUX_INIT_SESSION="vnc-${vnc_index}"
@@ -30,6 +30,7 @@ gnome-terminal --display "${DISPLAY}" &
 
 ## user installed applications
 type kupfer &>/dev/null && kupfer &
+xbindkeys_autostart
 
 ## visual components
 type conky && conky -X "${DISPLAY}" -d -c "${HOME}/.quotes.conkyrc"
