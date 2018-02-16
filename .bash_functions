@@ -102,19 +102,27 @@ function show-shell-capabilities() {
   bind-show-capabilities
 }
 
-# this function reduces the horrible lag spikes caused by the NetworkManager
+# This function reduces the horrible lag spikes caused by the NetworkManager
 # scanning the wifi network in the background when using a 802.11AC enabled
 # wireless network interface.
 # NOTE: if this solution does not work well enough, you can alternatively
 # switch from NetworkManager to wicd (manual configuration).
 function wifi-pause-background-scan() {
-  sudo killall -STOP NetworkManager
-  echo "Disabled background wi-fi network scan by pausing the NetworkManager process"
+  sudo killall -STOP NetworkManager &>/dev/null ||\
+    sudo killall -STOP wicd &>/dev/null
+  if [[ "$?" != "0" ]]; then
+        echo "Neither a NetworkManager nor a wicd process found to STOP." >&2
+  fi
+  echo "Disabled background wi-fi network scan by pausing the NetworkManager/wicd process"
 }
 
 function wifi-enable-background-scan() {
-  sudo killall -CONT NetworkManager
-  echo "Enabled background wi-fi network scan by signaling the NetworkManager process"
+  sudo killall -CONT NetworkManager &>/dev/null ||\
+    sudo killall -CONT wicd &>/dev/null
+  if [[ "$?" != "0" ]]; then
+    echo "Neither a NetworkManager nor a wicd process found to CONTinue." >&2
+  fi
+  echo "Enabled background wi-fi network scan by signaling the NetworkManager/wicd process"
 }
 
 
