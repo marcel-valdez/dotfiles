@@ -36,8 +36,8 @@ shopt -s histappend
 shopt -s checkwinsize
 
 # for setting history length see HISTSIZE and HISTFILESIZE in bash(1)
-export HISTSIZE=30000
-export HISTFILESIZE=60000
+export HISTSIZE=100000
+export HISTFILESIZE=200000
 # history -a: append this session's new history elements to the history file
 # history -c: clear this session's history list
 # history -r: read the history file's entries and make them the current history list
