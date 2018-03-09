@@ -73,6 +73,19 @@
 (setq browse-url-browser-function 'browse-url-generic)
 (setq browse-url-generic-program "~/modules/chrome-remote-scripts/open-cantata-url")
 
+;; Command history configuration
+(savehist-mode 1)
+;; Save search strings across sessions
+(setq savehist-additional-variables (list 'search-ring 'regexp-search-ring))
+;; end: Command history configuration
+
+;; desktop package configuration
+(setq desktop-auto-save-timeout 10)
+(setq desktop-path (list "~/.emacs.d/desktop-save/default"))
+;; don't auto-load/auto-save previously stored desktop
+(desktop-save-mode 0)
+;; end: desktop package configuration
+
 (with-library helm-config
   (helm-mode 1)
   (global-set-key (kbd "C-x C-f") 'helm-find-files)
@@ -151,7 +164,7 @@
   (global-set-key (kbd "C-x M-l") 'mc/edit-lines))
 
 (defun custom-java-mode-hook ()
-  ;; TOOD: Make this only work for .java files, but not for other
+  ;; TODO: Make this only work for .java files, but not for other
   ;;       types of files opened after entering java-mode
   (setq whitespace-line-column 100)
   (let ((oldmap (cdr (assoc 'java-mode minor-mode-map-alist)))
