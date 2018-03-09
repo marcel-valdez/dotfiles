@@ -37,3 +37,5 @@ gnome-terminal --display "${DISPLAY}" &>>${STARTUP_LOG} &
 ## user installed applications
 type kupfer &>/dev/null && kupfer &>>${STARTUP_LOG} &
 xbindkeys_autostart &>>${STARTUP_LOG}
+[[ type xmodmap &>/dev/null ]] && [[ -f "${HOME}/.Xmodmap_vnc" ]] &&\
+    xmodmap -display "${DISPLAY}" "${HOME}/.Xmodmap_vnc"
