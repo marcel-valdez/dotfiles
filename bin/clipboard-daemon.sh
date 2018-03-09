@@ -13,7 +13,7 @@ while [ true ]; do
   paste_buffer=$(nc -l "${HOST}" "${PORT}") # wait for next paste to clipboard
   for display in ${displays_array[@]} # paste to all available displays
   do
-    echo ${paste_buffer} | xclip -selection clipboard --display ":${display}"
+    echo ${paste_buffer} | xclip -selection clipboard -display ":${display}"
     if [[ $? -gt 0 ]]; then
       echo "$(today) $(date '+%H:%M:%S'): Failed to copy contents to \
 remote SSH clipboard at display :${display}" &>> /tmp/clipboard-daemon.log
