@@ -1,15 +1,17 @@
 ;; package installer settings
 (add-to-list 'load-path (concat (getenv "HOME") "/.emacs.d/lisp/"))
+(add-to-list 'load-path (concat (getenv "HOME") "/.emacs.d/lisp/external/emacs-jedi/"))
 
 (package-initialize)
 (add-to-list 'package-archives
-             '("marmalade" . "https://marmalade-repo.org/packages/"))
+             '("marmalade" . "http://marmalade-repo.org/packages/"))
 (add-to-list 'package-archives
              '("melpa" . "https://melpa.org/packages/"))
 (add-to-list 'package-archives '("elpa", "https://elpa.org/packages/"))
 (setq inhibit-startup-screen t)
 
 ;; initialize packages
+(require 'better-defaults)
 (require 'marcel-macros)
 ;; re-binds certain keys when inside a TMUX session
 (if (display-graphic-p)
@@ -35,6 +37,8 @@
   (with-library in-tmux))
 
 (with-library multiple-cursors)
+(with-library flycheck)
+(with-library elpy)
 
 ;; set whitespace visualization
 (with-library whitespace
@@ -72,6 +76,16 @@
 ;; company-mode
 (with-library company
   (add-hook 'after-init-hook 'global-company-mode))
+
+(with-library jedi
+  (defun jedi:python-mode-hook ()
+    (company-mode nil)
+    (auto-complete-mode t)
+    (elpy-mode t)
+    (setq jedi:setup-keys t)
+    (setq jedi:complete-on-dot t))
+  (add-hook 'python-mode-hook 'jedi:setup)
+  (add-hook 'python-mode-hook 'jedi:python-mode-hook))
 ;; always enable identification of JavaStyleWords
 (global-subword-mode)
 ;; show column number on status bar
@@ -158,12 +172,15 @@
  ;; If you edit it by hand, you could mess it up, so be careful.
  ;; Your init file should contain only one such instance.
  ;; If there is more than one, they won't work right.
+ '(package-selected-packages
+   (quote
+    (undo-tree rotate rjsx-mode multiple-cursors multi-term markdownfmt markdown-toc markdown-preview-mode helm-projectile helm-git-grep helm-git gtags gitignore-mode gitconfig-mode flycheck-tip flycheck-package cycle-resize company-quickhelp auto-complete)))
  '(show-paren-mode t))
 (custom-set-faces
  ;; custom-set-faces was added by Custom.
  ;; If you edit it by hand, you could mess it up, so be careful.
  ;; Your init file should contain only one such instance.
  ;; If there is more than one, they won't work right.
- )
+ '(ac-candidate-face ((t (:inherit popup-face)))))
 (put 'downcase-region 'disabled nil)
 (put 'upcase-region 'disabled nil)
