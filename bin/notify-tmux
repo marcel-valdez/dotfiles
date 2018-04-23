@@ -15,36 +15,36 @@ count=10
 stdout="true"
 while [ $# -gt 0 ]; do
   arg="$1"
-  case $arg in
-    --help|-h)
-    usage
-    exit 0
-    ;;
-    --count|-c)
-    shift
-    count=$1
-    ;;
-    --n|--nostdout)
-    stdout="false"
-    ;;
-    *)
-    break
-    ;;
-  esac
   shift
+  case ${arg} in
+    --help|-h)
+      usage
+      exit 0
+      ;;
+    --count|-c)
+      count=$1
+      shift
+      ;;
+    --n|--nostdout)
+      stdout="false"
+      ;;
+    *)
+      break
+      ;;
+  esac
 done
 
 if [ "$1" == "" ]; then
-  echo ""
+  echo
   echo "  ERROR: Missing message parameter"
-  echo ""
+  echo
   usage
   exit 1
 fi
 
 title=""
 message="$1"
-if [ "$2" != "" ]; then
+if [[ "$2" != "" ]]; then
   title="$1 "
   message="$2"
 fi
