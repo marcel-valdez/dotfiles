@@ -35,3 +35,8 @@ bin/dex
 bin/mail-notify-data
 *.swp
 *.pyc
+
+# ignore emacs backup files
+*#
+**/*#*
+**/*#*#
