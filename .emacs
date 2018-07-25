@@ -40,6 +40,7 @@
 ;; loads packages only available at the office
 ;; uses the 'google package by default.
 (with-library at-office)
+(with-library helm-xref)
 (with-library flycheck
   (global-flycheck-mode))
 ;; If we are in TMUX within an X environment
@@ -91,7 +92,10 @@
   (global-set-key (kbd "C-x C-f") 'helm-find-files)
   (global-set-key (kbd "M-s o") 'helm-occur)
   (global-set-key (kbd "M-x") 'helm-M-x)
-  (global-set-key (kbd "C-x C-b") 'helm-buffers-list))
+  (global-set-key (kbd "C-x C-b") 'helm-buffers-list)
+  (set-face-attribute 'helm-selection nil
+;;                      :background "purple"
+                      :foreground "white"))
 ;; puts all backup files in the .emacs.d/backup directory, rather than on the
 ;; same folder as the file being edited
 (setq backup-directory-alist '(("." . "~/.emacs.d/backup/"))
@@ -223,7 +227,7 @@
  ;; If you edit it by hand, you could mess it up, so be careful.
  ;; Your init file should contain only one such instance.
  ;; If there is more than one, they won't work right.
- )
+ '(clang-include-fixer-highlight ((t (:background "white")))))
 (put 'upcase-region 'disabled nil)
 (put 'downcase-region 'disabled nil)
 (load-theme 'company-dark)
