@@ -8,6 +8,7 @@ keycode  32 = o O o O
 keycode  36 = Return NoSymbol Return
 ! Adaptation for the Kinesis Advantage
 !keycode  37 = Menu NoSymbol Menu
+! Original value for keycode 37
 keycode  37 = Control_L NoSymbol Control_L
 keycode  38 = a A a A
 keycode  49 = grave asciitilde grave asciitilde
@@ -28,6 +29,7 @@ keycode  75 = F9 F9 F9 F9 F9 F9 XF86Switch_VT_9
 keycode  76 = F10 F10 F10 F10 F10 F10 XF86Switch_VT_10
 keycode  77 = Num_Lock NoSymbol Num_Lock
 ! Ergo configuration, this is normally Scroll lock
+!keycode 78 = Scroll_Lock NoSymbol Scroll_Lock
 keycode  78 = Multi_key NoSymbol Multi_key
 keycode  92 = ISO_Level3_Shift NoSymbol ISO_Level3_Shift
 keycode  95 = F11 F11 F11 F11 F11 F11 XF86Switch_VT_11
