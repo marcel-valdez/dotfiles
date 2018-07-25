@@ -43,6 +43,9 @@
 (with-library helm-xref)
 (with-library flycheck
   (global-flycheck-mode))
+
+;; Remove the menu bar (get one extra line of real estate
+(menu-bar-mode -1)
 ;; If we are in TMUX within an X environment
 (if (and (getenv "TMUX") (getenv "DISPLAY"))
     ;; use xclip for copy-pasting
@@ -69,7 +72,7 @@
       ;; toggle showing/hiding the dedicated terminal window
       (global-set-key (kbd "C-t C-d")
                       (lambda () (interactive) (multi-term-dedicated-toggle))))
-  (require 'in-tmux))
+  (with-library in-tmux))
 
 (setq browse-url-browser-function 'browse-url-generic)
 (setq browse-url-generic-program "~/modules/chrome-remote-scripts/open-cantata-url")
@@ -150,11 +153,11 @@
 (with-library undo-tree
   ;; remap undo-redo using undo-tree
   (global-undo-tree-mode)
-  (global-unset-key (kbd "C-/"))
-  (global-set-key (kbd "C-/")
-                  (lambda (interactive) (undo-tree-undo)))
-  (global-unset-key (kbd "C-."))
-  (global-set-key (kbd "C-.")
+  (global-unset-key (kbd "M-z"))
+  (global-set-key (kbd "M-z")
+                  (lambda () (interactive) (undo-tree-undo)))
+  (global-unset-key (kbd "M-Z"))
+  (global-set-key (kbd "M-Z")
                   (lambda () (interactive) (undo-tree-redo))))
 
 (with-library multiple-cursors
@@ -217,7 +220,7 @@
  '(custom-safe-themes
    (quote
     ("6068d911f0ad3f9e6834d4849038ef3a317510f23683ff9656da7d49a5ab3ed5" "d4890c4d8d262c61decb7c0e43b1dc5c92b378e9acada6c04d9e94f00cc70ead" "4badd47b5ba16df46b849137903f2210d344f3c7021e979ff8ed68b8c3827d84" default)))
- '(graphviz-dot-indent-width 2)
+ '(graphviz-dot-indent-width 2 t)
  '(line-number-mode t)
  '(package-selected-packages (quote (windresize async xclip undo-tree)))
  '(show-paren-mode t)
