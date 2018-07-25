@@ -1,6 +1,7 @@
-(provide 'in-tmux)
 
-;; remaps certain keys if we are inside a TMUX session
+;;; Commentary:
+;;; Remaps certain keys if we are inside a TMUX session
+;;; Code:
 (if (getenv "TMUX")
     (progn
       (let ((x 2) (tkey ""))
@@ -210,3 +211,6 @@
           (format "\e[%d;%du" (nth 1 bind) (nth 0 bind)) (nth 2 bind)))
       )
   )
+
+(provide 'in-tmux)
+;;; in-tmux.el ends here

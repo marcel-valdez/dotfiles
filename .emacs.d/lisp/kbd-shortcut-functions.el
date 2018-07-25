@@ -1,7 +1,8 @@
-(provide 'kbd-shortcut-functions)
 
+;;; Code:
 (defun rotate-windows (arg)
-  "Rotate your windows; use the prefix argument to rotate the other direction"
+  "Rotate your windows; use the prefix argument to rotate the other direction.
+ARG number of lines to move."
   (interactive "P")
   (if (not (> (count-windows) 1))
       (message "You can't rotate a single window!")
@@ -22,34 +23,38 @@
             (set-window-buffer-start-and-point w2 b1 s1 p1)))))))
 
 (defun move-text-internal (arg)
-   (cond
-    ((and mark-active transient-mark-mode)
-     (if (> (point) (mark))
-            (exchange-point-and-mark))
-     (let ((column (current-column))
-              (text (delete-and-extract-region (point) (mark))))
-       (forward-line arg)
-       (move-to-column column t)
-       (set-mark (point))
-       (insert text)
-       (exchange-point-and-mark)
-       (setq deactivate-mark nil)))
-    (t
-     (beginning-of-line)
-     (when (or (> arg 0) (not (bobp)))
-       (forward-line)
-       (when (or (< arg 0) (not (eobp)))
-            (transpose-lines arg))
-       (forward-line -1)))))
+  "ARG number of lines to move the text."
+  (cond
+   ((and mark-active transient-mark-mode)
+    (if (> (point) (mark))
+        (exchange-point-and-mark))
+    (let ((column (current-column))
+          (text (delete-and-extract-region (point) (mark))))
+      (forward-line arg)
+      (move-to-column column t)
+      (set-mark (point))
+      (insert text)
+      (exchange-point-and-mark)
+      (setq deactivate-mark nil)))
+   (t
+    (beginning-of-line)
+    (when (or (> arg 0) (not (bobp)))
+      (forward-line)
+      (when (or (< arg 0) (not (eobp)))
+        (transpose-lines arg))
+      (forward-line -1)))))
 
 (defun move-text-down (arg)
-   "Move region (transient-mark-mode active) or current line
-  arg lines down."
+   "Move region (transient-mark-mode active) or current line arg lines down.
+ARG number of lines to move the text"
    (interactive "*p")
    (move-text-internal arg))
 
 (defun move-text-up (arg)
-   "Move region (transient-mark-mode active) or current line
-  arg lines up."
+   "Move region (transient-mark-mode active) or current line arg lines up.
+ARG number of lines to move the text"
    (interactive "*p")
    (move-text-internal (- arg)))
+
+(provide 'kbd-shortcut-functions)
+;;; kbd-shortcut-functions.el ends here
