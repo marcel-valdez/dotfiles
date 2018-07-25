@@ -6,6 +6,14 @@ function __debug() {
   fi
 }
 
+# Gets a random decimal number made up of 0-N bytes specified by the user.
+# So, for example, random 1 produces a decimal between 0-255
+function random() {
+  local num_bytes=$1
+  [[ ${num_bytes} == "" ]] && local num_bytes=1
+  od -A n -t d -N ${num_bytes} /dev/urandom | tr -d ' '
+}
+
 function now() {
   date "+%H:%M:%S"
 }
