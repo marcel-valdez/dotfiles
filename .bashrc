@@ -217,9 +217,9 @@ if [ "$(expr substr $(uname) 1 5)" == "Linux" ]; then
   fi
 
   # this will run for every terminal opened and tmux pane
-  log_debug "Verifying packages with cache"
-  verify-packages --use-cache
-  log_debug "Verified packages with cache"
+  # log_debug "Verifying packages with cache"
+  # verify-packages --use-cache
+  # log_debug "Verified packages with cache"
 fi
 
 # This loads nvm
@@ -246,3 +246,4 @@ export ftp_proxy=''
 export socks_proxy=''
 
 [ -f ~/.fzf.bash ] && source ~/.fzf.bash
+[ -s "$NVM_DIR/bash_completion" ] && \. "$NVM_DIR/bash_completion"  # This loads nvm bash_completion
