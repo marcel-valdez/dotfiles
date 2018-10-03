@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 
+EMACS_VERSION="-25.1.91"
 
 # alert function for long running commands.  Use like so:
 #   sleep 10; alert
@@ -66,7 +67,11 @@ function fails() {
 }
 
 function emacs() {
-  /usr/bin/emacs -nw $@
+  local emacs_bin=/usr/bin/emacs
+  if [[ "${EMACS_VERSION}" != "" ]]; then
+    emacs_bin=/usr/local/bin/emacs-25.1.91
+  fi
+  "${emacs_bin}" -nw $@
 }
 
 function nano() {
@@ -169,6 +174,46 @@ npm-lint() {
   npm run lint
 }
 
+# start git functions
+
+diff-lines() {
+  local path=
+  local line=
+  while read; do
+    esc=$'\033'
+    if [[ $REPLY =~ ---\ (a/)?.* ]]; then
+      continue
+    elif [[ $REPLY =~ \+\+\+\ (b/)?([^[:blank:]$esc]+).* ]]; then
+      path=${BASH_REMATCH[2]}
+    elif [[ $REPLY =~ @@\ -[0-9]+(,[0-9]+)?\ \+([0-9]+)(,[0-9]+)?\ @@.* ]]; then
+      line=${BASH_REMATCH[2]}
+    elif [[ $REPLY =~ ^($esc\[[0-9;]+m)*([\ +-]) ]]; then
+      echo "$path:$line:$REPLY"
+      if [[ ${BASH_REMATCH[2]} != - ]]; then
+        ((line++))
+      fi
+    fi
+  done
+}
+
+git-diff-lines() {
+  git diff $1 $2 $3 $4 | diff-lines
+}
+
+g-diff-lines() {
+  git-diff-lines $1 $2 $3 $4
+}
+
+git-branch-out() {
+  new_branch_name=$1
+  treeish=$2
+  git checkout -b $1 $2
+}
+
+g-branch-out() {
+  git-branch-out $1 $2
+}
+
 git-rm-forever() {
   if [ "$1" == "--help" ]; then
     echo Removes a file completely from the repository history
@@ -180,3 +225,17 @@ git-rm-forever() {
       "git rm --cached --ignore-unmatch ${file}" \
       --prune-empty --tag-name-filter cat -- --all
 }
+
+g-rm-forever() {
+  git-rm-forever $1
+}
+
+git-push-marcel() {
+  git push marcel $(git-current-branch):$(git-current-branch)
+}
+
+git-push-f-marcel() {
+  git push -f marcel $(git-current-branch):$(git-current-branch)
+}
+
+# end git functions
