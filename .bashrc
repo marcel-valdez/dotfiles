@@ -187,3 +187,5 @@ export NVM_DIR="/home/marcel/.nvm"
 # This sets up the default node version and loads it
 export NODE_VERSION="9.5.0"
 node-check-use --silent
+
+[ -f ~/.fzf.bash ] && source ~/.fzf.bash
