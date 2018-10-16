@@ -6,9 +6,8 @@ keycode  30 = u U u U
 keycode  31 = i I i I
 keycode  32 = o O o O
 keycode  36 = Return NoSymbol Return
-! Adaptation for the Kinesis Advantage
+! Adaptation for the kinesis advantage
 !keycode  37 = Menu NoSymbol Menu
-! Original value for keycode 37
 keycode  37 = Control_L NoSymbol Control_L
 keycode  38 = a A a A
 keycode  49 = grave asciitilde grave asciitilde
