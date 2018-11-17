@@ -27,6 +27,7 @@
 
 conky.config = {
     alignment = 'bottom_left',
+-- daemonize conky in the background?
     background = false,
     border_width = 1,
     cpu_avg_samples = 2,
@@ -45,12 +46,23 @@ conky.config = {
     minimum_width = 5,
     net_avg_samples = 2,
     no_buffers = true,
+    double_buffer = true,
     out_to_console = false,
     out_to_stderr = false,
     extra_newline = false,
+-- create own window to draw?
     own_window = true,
-    own_window_class = 'Conky',
-    own_window_type = 'override',
+-- sets the WM_CLASS name
+    own_window_class = 'conky-semi',
+-- if own_window is yes, you may specify type normal, desktop, dock, panel or
+-- override (default: normal).
+-- 'desktop' window type creates a sticky windows without a panel entry and not
+-- alt-tabbed.
+    own_window_type = 'desktop',
+-- alternative configuration for window
+-- remove window controls and make it sticky so it looks like wallpaper
+--  own_window_type = 'normal',
+--  own_window_hints = 'undecorated,below,sticky,skip_taskbar,skip_pager',
     stippled_borders = 0,
     uppercase = false,
     use_spacer = 'none',
