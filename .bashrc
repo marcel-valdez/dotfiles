@@ -13,14 +13,17 @@ function log_debug() {
 }
 
 function tmux_attach_initial_session() {
+  local _tmux=tmux
+  type tmx2 &>/dev/null && _tmux=tmx2
+
   if [ "${TMUX_INIT_SESSION}" == "" ]; then
     log_debug "tmux init: attaching to default session"
-    tmux new-session -s "default" >&/dev/null \
-    || tmux attach-session -d -t "default"
+    _tmux new-session -s "default" >&/dev/null \
+    || _tmux attach-session -d -t "default"
   else
     log_debug "tmux init: attaching to ${TMUX_INIT_SESSION}"
-    tmux new-session -s "${TMUX_INIT_SESSION}" >&/dev/null \
-    || tmux attach-session -d -t "${TMUX_INIT_SESSION}"
+    _tmux new-session -s "${TMUX_INIT_SESSION}" >&/dev/null \
+    || _tmux attach-session -d -t "${TMUX_INIT_SESSION}"
   fi
 }
 
@@ -42,7 +45,6 @@ export HISTFILESIZE=200000
 # history -c: clear this session's history list
 # history -r: read the history file's entries and make them the current history list
 export PROMPT_COMMAND="${PROMPT_COMMAND:+$PROMPT_COMMAND$'\n'}history -a"
-
 
 # If set, the pattern "**" used in a pathname expansion context will
 # match all files and zero or more directories and subdirectories.
@@ -73,16 +75,16 @@ fi
 log_debug "Loaded .bash* sources"
 
 log_debug "Loading .google* sources"
-if [ -f "${HOME}/.googlerc" ]; then
-  source "${HOME}/.googlerc"
+if [ -f "${HOME}/.googlerc.d/.googlerc" ]; then
+  source "${HOME}/.googlerc.d/.googlerc"
 fi
 
-if [ -f "${HOME}/.google_aliases" ]; then
-  source "${HOME}/.google_aliases"
+if [ -f "${HOME}/.googlerc.d/.google_aliases" ]; then
+  source "${HOME}/.googlerc.d/.google_aliases"
 fi
 
-if [ -f "${HOME}/.google_functions" ]; then
-  source "${HOME}/.google_functions"
+if [ -f "${HOME}/.googlerc.d/.google_functions" ]; then
+  source "${HOME}/.googlerc.d/.google_functions"
 fi
 log_debug "Loaded .google* sources"
 
@@ -217,9 +219,9 @@ if [ "$(expr substr $(uname) 1 5)" == "Linux" ]; then
   fi
 
   # this will run for every terminal opened and tmux pane
-  # log_debug "Verifying packages with cache"
-  # verify-packages --use-cache
-  # log_debug "Verified packages with cache"
+  log_debug "Verifying packages with cache"
+  verify-packages --use-cache
+  log_debug "Verified packages with cache"
 fi
 
 # This loads nvm
@@ -246,4 +248,3 @@ export ftp_proxy=''
 export socks_proxy=''
 
 [ -f ~/.fzf.bash ] && source ~/.fzf.bash
-[ -s "$NVM_DIR/bash_completion" ] && \. "$NVM_DIR/bash_completion"  # This loads nvm bash_completion
