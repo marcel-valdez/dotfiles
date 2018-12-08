@@ -28,13 +28,14 @@ keycode  75 = F9 F9 F9 F9 F9 F9 XF86Switch_VT_9
 keycode  76 = F10 F10 F10 F10 F10 F10 XF86Switch_VT_10
 keycode  77 = Num_Lock NoSymbol Num_Lock
 ! Ergo configuration, this is normally Scroll lock
-!keycode 78 = Scroll_Lock NoSymbol Scroll_Lock
-keycode  78 = Multi_key NoSymbol Multi_key
+keycode 78 = Scroll_Lock NoSymbol Scroll_Lock
+!keycode  78 = Multi_key NoSymbol Multi_key
 keycode  92 = ISO_Level3_Shift NoSymbol ISO_Level3_Shift
 keycode  95 = F11 F11 F11 F11 F11 F11 XF86Switch_VT_11
 keycode  96 = F12 F12 F12 F12 F12 F12 XF86Switch_VT_12
 keycode 105 = Control_R NoSymbol Control_R
 keycode 107 = Print Sys_Req Print Sys_Req
+# Ergodox EZ -> This is the AltGr keycode
 keycode 108 = Multi_key NoSymbol Multi_key
 keycode 109 = Linefeed NoSymbol Linefeed
 keycode 110 = Home NoSymbol Home
