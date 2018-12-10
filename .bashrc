@@ -18,12 +18,12 @@ function tmux_attach_initial_session() {
 
   if [ "${TMUX_INIT_SESSION}" == "" ]; then
     log_debug "tmux init: attaching to default session"
-    _tmux new-session -s "default" >&/dev/null \
-    || _tmux attach-session -d -t "default"
+    "${_tmux}" new-session -s "default" >&/dev/null \
+    || "${_tmux}" attach-session -d -t "default"
   else
     log_debug "tmux init: attaching to ${TMUX_INIT_SESSION}"
-    _tmux new-session -s "${TMUX_INIT_SESSION}" >&/dev/null \
-    || _tmux attach-session -d -t "${TMUX_INIT_SESSION}"
+    "${_tmux}" new-session -s "${TMUX_INIT_SESSION}" >&/dev/null \
+    || "${_tmux}" attach-session -d -t "${TMUX_INIT_SESSION}"
   fi
 }
 
