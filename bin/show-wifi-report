@@ -1,0 +1,134 @@
+#!/usr/bin/env bash
+
+[ -z "${DEFAULT_INTERFACE}" ] && DEFAULT_INTERFACE="wlp6s0"
+[ -z "${DEFAULT_NETWORK}" ] && DEFAULT_NETWORK="depa_reston"
+
+function ::debug() {
+  [[ ${DEBUG} != "" ]] && echo $1 >&2
+}
+
+function print_network_field() {
+  ::debug "print_network_field(\
+ssid: <$1> \
+network_field: <$2>) \
+interface: <${interface}>"
+  local ssid=$1
+  local network_field=$2
+  iwlist "${interface}" scanning |\
+    grep -B1 -A17 "${ssid}" |\
+    grep -o "${network_field}:[0-9]\.[0-9]*" |\
+    sed "s/${network_field}://g"
+}
+
+function print_network_frequency() {
+  ::debug "print_network_frequency(ssid: <$1> frequency: <$2>)"
+  local ssid=$1
+  local frequency=$2
+  print_network_field "${ssid}" 'Frequency' |\
+    grep "^${frequency}\.[0-9]*"
+}
+
+function print_network_frequency_report() {
+  ::debug "print_network_frequency_report(\
+ssid: <$1> \
+frequency: <$2>) \
+interface: <${interface}>"
+  local ssid=$1
+  local frequency=$2
+  if [[ ${ssid} == "" ]]; then
+    local network_frequency=${frequency}
+  else
+    local network_frequency=$(print_network_frequency "${ssid}" "${frequency}")
+  fi
+  ::debug "network_frequency: <${network_frequency}>"
+  iwlist "${interface}" scanning |\
+    grep 'ESSID\|Frequency\|Quality' |\
+    sed 's/Quality\(.*\)/Quality\1\n/g' |\
+    grep -B1 -A1 "${network_frequency}"
+}
+
+function print_wifi_report() {
+  local ssid=$1
+  local frequency=$2
+cat <<EOF
+  Frequency Report for ${frequency} Ghz network for ${ssid} network
+
+$(print_network_frequency_report "${ssid}" ${frequency})
+
+EOF
+}
+
+function print_help() {
+cat <<EOF
+This function prints a report about the number of networks, frequencies they use
+and the quality of their connections.
+
+show-wifi-report [--ssid <network ssid>] [--frequency|--ghz|--freq <frequency>]
+    [--interface|--wifi-interface <wifi interface to use>] [--help|-h]
+
+ssid: The network's name, if any, by default this is "${DEFAULT_NETWORK}".
+frequency: The regex of the wireless frequency to run the report on.
+interface: The name of the wireless interface to use for the report.
+help: Prints this help message.
+
+In the report you may show:
+
+a) The number of networks sharing the same frequency as another network, for
+example:
+
+  print_wifi_report --ssid depa_reston
+
+b) The number of networks in the same frequency as specified by the frequency
+regex, for example:
+
+  print_wifi_report --frequency 2\.42
+
+c) Print the networks sharing the same frequency as the default network: ${DEFAULT_NETWORK}
+
+  print_wifi_report
+
+EOF
+}
+
+interface=${DEFAULT_INTERFACE}
+network_ssid=${DEFAULT_NETWORK}
+ssid_specified="false"
+frequency_specified="false"
+while [[ $# -gt 0 ]]; do
+  case $1 in
+    --ssid)
+      network_ssid="$2"
+      ssid_specified="true"
+      shift
+      ;;
+    --ghz|--freq|--frequency)
+      frequency=$2
+      frequency_specified="true"
+      shift
+      ;;
+    --interface|--wifi-interface)
+      interface="$2"
+      shift
+      ;;
+    --help|-h)
+      print_help
+      exit 0
+      ;;
+    *)
+      break
+      ;;
+  esac
+  shift
+done
+
+if [[ "${frequency_specified}" == "true" ]]; then
+  if [[ "${ssid_specified}" == "true" ]]; then
+    print_wifi_report "${network_ssid}" "${frequency}"
+  else
+    # This produces a report based on the ESSID
+    print_wifi_report "" "${frequency}"
+  fi
+else
+  print_wifi_report "${network_ssid}" 2
+  print_wifi_report "${network_ssid}" 5
+fi
