@@ -1,18 +1,19 @@
-;; package installer settings
+ ;; package installer settings
 (add-to-list 'load-path (concat (getenv "HOME") "/.emacs.d/lisp/"))
 (add-to-list 'load-path (concat (getenv "HOME") "/.emacs.d/lisp/external/emacs-jedi/"))
 
 (package-initialize)
 (add-to-list 'package-archives
-             '("marmalade" . "http://marmalade-repo.org/packages/"))
-(add-to-list 'package-archives
              '("melpa" . "https://melpa.org/packages/"))
-(add-to-list 'package-archives '("elpa", "https://elpa.org/packages/"))
+(add-to-list 'package-archives
+             '("stable-melpa" . "https://stable.melpa.org/packages/"))
+;;(add-to-list 'package-archives '("elpa-gnu", "http://elpa.gnu.org/packages/"))
 (setq inhibit-startup-screen t)
 
 ;; initialize packages
-(require 'better-defaults)
 (require 'marcel-macros)
+;; (with-library better-defaults)
+
 ;; re-binds certain keys when inside a TMUX session
 (if (display-graphic-p)
     (with-library multi-term
@@ -37,8 +38,11 @@
   (with-library in-tmux))
 
 (with-library multiple-cursors)
-(with-library flycheck)
+(with-library helm-ls-git)
+
 (with-library elpy)
+(with-library flycheck
+  (setq flycheck-checker 'python-pylint))
 
 ;; set whitespace visualization
 (with-library whitespace
@@ -72,18 +76,24 @@
 (with-library undo-tree
   (global-undo-tree-mode))
 ;; always enable auto-complete
-;; (global-auto-complete-mode) ;; auto-compelete interferes with the superior
+(with-library auto-complete)
+;;  (add-hook 'after-init-hook 'global-auto-complete-mode))
 ;; company-mode
-(with-library company
-  (add-hook 'after-init-hook 'global-company-mode))
+(with-library company)
+;;  (add-hook 'after-init-hook (lambda () (global-company-mode -1))))
 
 (with-library jedi
   (defun jedi:python-mode-hook ()
-    (company-mode nil)
-    (auto-complete-mode t)
+    (setq elpy-modules
+          (delq 'elpy-module-company
+                (delq 'elpy-module-flymake elpy-modules)))
+    (add-hook 'elpy-mode-hook 'flycheck-mode)
+    (add-hook 'elpy-mode-hook 'auto-complete-mode)
+    (company-mode -1)
     (elpy-mode t)
     (setq jedi:setup-keys t)
-    (setq jedi:complete-on-dot t))
+    (setq jedi:complete-on-dot t)
+    (setq-local whitespace-line-column 100))
   (add-hook 'python-mode-hook 'jedi:setup)
   (add-hook 'python-mode-hook 'jedi:python-mode-hook))
 ;; always enable identification of JavaStyleWords
@@ -174,7 +184,7 @@
  ;; If there is more than one, they won't work right.
  '(package-selected-packages
    (quote
-    (undo-tree rotate rjsx-mode multiple-cursors multi-term markdownfmt markdown-toc markdown-preview-mode helm-projectile helm-git-grep helm-git gtags gitignore-mode gitconfig-mode flycheck-tip flycheck-package cycle-resize company-quickhelp auto-complete)))
+    (xclip helm git helm-grepint helm-helm-commands helm-ispell helm-ls-git helm-proc helm-pydoc helm-rubygems-org helm-themes helm-wordnet helm-xref hgignore-mode undo-tree rotate rjsx-mode multiple-cursors multi-term markdownfmt markdown-toc markdown-preview-mode helm-git gtags flycheck-tip flycheck-package cycle-resize auto-complete)))
  '(show-paren-mode t))
 (custom-set-faces
  ;; custom-set-faces was added by Custom.
