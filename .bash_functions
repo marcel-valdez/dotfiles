@@ -347,12 +347,11 @@ function emacs() {
   fi
 }
 
-function google-emacs() {
-  if [[ "${TERM}" =~ "eterm" ]]; then
-    /usr/bin/emacsclient &> /tmp/google-emacs-${USER}-${RANDOM}.log
-  else
-    /usr/bin/google-emacs --no-window-system "$@" &> /tmp/google-emacs-${USER}-${RANDOM}.log
-  fi
+function emacs-client() {
+  local editor='emacsclient --create-frame --tty --socket-name=default'
+  EDITOR="${editor}" "${editor}" "$@" || \
+    (emacs --bg-daemon=default && "${editor}" "$@")
+
 }
 
 # force myself to use emacs, not nano
