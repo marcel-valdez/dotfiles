@@ -71,14 +71,19 @@ function emacs() {
   if [[ "${EMACS_VERSION}" != "" ]]; then
     emacs_bin=/usr/local/bin/emacs-25.1.91
   fi
-  "${emacs_bin}" -nw $@
+  "${emacs_bin}" -nw "$@"
+}
+
+function emacs-client() {
+  local editor='emacsclient --create-frame --tty --socket-name=default'
+  EDITOR="${editor}" "${editor}" "$@" || \
+    (emacs --bg-daemon=default && "${editor}" "$@")
 }
 
 function nano() {
   [ "$1" == "-F" ] && shift
-  emacs $@
+  emacs "$@"
 }
-
 
 # shows the shell's keyboard shortcuts
 function bind-show-shortcuts() {
