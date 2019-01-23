@@ -341,7 +341,7 @@ function ps-nice() {
 
 function emacs() {
   if [[ "${TERM}" =~ "eterm" ]]; then
-    /usr/bin/emacsclient &>/tmp/emacs-${USER}-${RANDOM}.log
+    emacs-client "$@"
   else
     /usr/bin/emacs --no-window-system "$@" &>/tmp/emacs-${USER}-${RANDOM}.log
   fi
@@ -358,7 +358,7 @@ function emacs-client() {
 # force myself to use emacs, not nano
 function nano() {
   [ "$1" == "-F" ] && shift
-  emacs "$@"
+  emacs-client "$@"
 }
 
 # shows the shell's keyboard shortcuts
