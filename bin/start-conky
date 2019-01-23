@@ -1,0 +1,3 @@
+#!/usr/bin/env bash
+
+/usr/bin/conky --daemonize --config=${HOME}/.quotes.conkyrc &> ${HOME}/logs/conkyrc.log
