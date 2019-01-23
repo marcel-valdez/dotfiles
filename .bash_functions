@@ -348,9 +348,10 @@ function emacs() {
 }
 
 function emacs-client() {
-  local editor='emacsclient --create-frame --tty --socket-name=default'
-  EDITOR="${editor}" "${editor}" "$@" || \
-    (emacs --bg-daemon=default && "${editor}" "$@")
+  local editor_cmd=(/usr/bin/emacsclient --create-frame --tty --socket-name=default)
+  EDITOR="'""${editor_cmd[@]}""'" "${editor_cmd[@]}" "$@" || \
+    (emacs --bg-daemon=default && \
+       EDITOR="'""${editor_cmd[@]}""'" "${editor_cmd[@]}" "$@")
 
 }
 
