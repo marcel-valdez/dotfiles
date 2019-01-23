@@ -219,14 +219,19 @@ if [ "$(expr substr $(uname) 1 5)" == "Linux" ]; then
   fi
 
   # this will run for every terminal opened and tmux pane
-  log_debug "Verifying packages with cache"
-  verify-packages --use-cache
-  log_debug "Verified packages with cache"
+  if type verify-packages &>/dev/null; then
+    log_debug "Verifying packages with cache"
+    verify-packages --use-cache
+    log_debug "Verified packages with cache"
+  fi
 fi
 
 # This loads nvm
 log_debug "Loading NVM"
 [ -s "$NVM_DIR/nvm.sh" ] && source "$NVM_DIR/nvm.sh"
+# This loads nvm bash_completion
+log_debug "Loading NVM bash completion"
+[ -s "$NVM_DIR/bash_completion" ] && \. "$NVM_DIR/bash_completion"
 log_debug "Loaded NVM"
 
 # Load RVM into a shell session *as a function*
