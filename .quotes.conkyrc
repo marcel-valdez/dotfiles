@@ -28,7 +28,7 @@
 conky.config = {
     alignment = 'bottom_left',
 -- daemonize conky in the background?
-    background = false,
+    background = true,
     border_width = 1,
     cpu_avg_samples = 2,
     default_color = 'white',
