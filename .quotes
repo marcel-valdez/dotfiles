@@ -145,3 +145,18 @@ life but in life itself.
 There are many ways to achieve technical excellence, your way isn't the only way.
 Lead, don't dictate!
     -- So you want to be a TL?
+%
+Every design decision has positive and negative attributes.
+
+  What you will find is that by making it easy to do the right thing (positive
+attribute), you will also be making it harder to do the wrong thing (negative
+attribute).
+
+  This is what we call Good Design.
+
+    -- Marcel Valdez, Lessons Learned
+%
+Anytime it is painful to do the right thing and easy to do the wrong thing, we
+should create infrastructure to alleviate the pain in doing the right thing.
+
+    -- Marcel Valdez, Lessons Learned
