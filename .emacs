@@ -1,12 +1,18 @@
- ;; package installer settings
+;;; .emacs --- Summary
+;;; Commentary:
+;;; This is a sensible configuration for my home computer
+
+;;; Code:
+
+;;; package installer settings
 (add-to-list 'load-path (concat (getenv "HOME") "/.emacs.d/lisp/"))
 (add-to-list 'load-path (concat (getenv "HOME") "/.emacs.d/lisp/external/emacs-jedi/"))
 
 (package-initialize)
 (add-to-list 'package-archives
-             '("melpa" . "https://melpa.org/packages/"))
-(add-to-list 'package-archives
              '("stable-melpa" . "https://stable.melpa.org/packages/"))
+(add-to-list 'package-archives
+             '("melpa" . "https://melpa.org/packages/"))
 ;;(add-to-list 'package-archives '("elpa-gnu", "http://elpa.gnu.org/packages/"))
 (setq inhibit-startup-screen t)
 
@@ -194,3 +200,5 @@
  '(ac-candidate-face ((t (:inherit popup-face)))))
 (put 'downcase-region 'disabled nil)
 (put 'upcase-region 'disabled nil)
+
+;;; .emacs ends here
