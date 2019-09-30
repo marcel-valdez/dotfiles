@@ -20,29 +20,32 @@
 (require 'marcel-macros)
 ;; (with-library better-defaults)
 
-;; re-binds certain keys when inside a TMUX session
+;;; re-binds certain keys when inside a TMUX session
 (if (display-graphic-p)
+    ;; if emacs is run as a GUI window
     (with-library multi-term
-           ;; start an emacs server so editors use an emacs buffer
-           (server-start)
-           ;; start multi-term custom configurations
-           (global-unset-key (kbd "C-t"))
-           (add-to-list 'term-unbind-key-list "C-t")
-           (setq multi-term-program "/bin/bash")
-           ;; start new terminal
-           (global-set-key (kbd "C-t C-n")
-                           (lambda () (interactive) (multi-term)))
-           ;; switch to next terminal within same buffer
-           (global-set-key (kbd "C-t <C-tab>")
-                           (lambda () (interactive) (multi-term-next)))
-           ;; switch to previous terminal within same buffer
-           (global-set-key (kbd "C-t <C-iso-lefttab>")
-                           (lambda () (interactive) (multi-term-prev)))
-           ;; toggle showing/hiding the dedicated terminal window
-           (global-set-key (kbd "C-t C-d")
-                           (lambda () (interactive) (multi-term-dedicated-toggle))))
+      ;; start an emacs server so editors use an emacs buffer
+      (server-start)
+      ;; start multi-term custom configurations
+      (global-unset-key (kbd "C-t"))
+      (add-to-list 'term-unbind-key-list "C-t")
+      (setq multi-term-program "/bin/bash")
+      ;; start new terminal
+      (global-set-key (kbd "C-t C-n")
+                      (lambda () (interactive) (multi-term)))
+      ;; switch to next terminal within same buffer
+      (global-set-key (kbd "C-t <C-tab>")
+                      (lambda () (interactive) (multi-term-next)))
+      ;; switch to previous terminal within same buffer
+      (global-set-key (kbd "C-t <C-iso-lefttab>")
+                      (lambda () (interactive) (multi-term-prev)))
+      ;; toggle showing/hiding the dedicated terminal window
+      (global-set-key (kbd "C-t C-d")
+                      (lambda () (interactive) (multi-term-dedicated-toggle))))
+  ;; if emacs is run as a terminal application
   (with-library in-tmux))
 
+(with-library xclip (xclip-mode))
 (with-library multiple-cursors)
 (with-library helm-ls-git)
 
