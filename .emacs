@@ -141,7 +141,10 @@
   (global-set-key (kbd "C-x C-f") 'helm-find-files)
   (global-set-key (kbd "M-s o") 'helm-occur)
   (global-set-key (kbd "M-x") 'helm-M-x)
-  (global-set-key (kbd "C-x C-b") 'helm-buffers-list))
+  (global-set-key (kbd "C-x C-b") 'helm-buffers-list)
+  (set-face-attribute 'helm-selection nil
+                      :background "black"
+                      :foreground "green"))
 
 ;; configure rotate-window
 (with-library rotate
