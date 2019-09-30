@@ -244,3 +244,28 @@ git-push-f-marcel() {
 }
 
 # end git functions
+
+# java management functions
+set-env-java9() {
+  export JAVA_HOME='/usr/lib/jvm/java-9-openjdk-amd64'
+}
+
+set-env-java8() {
+  export JAVA_HOME='/usr/lib/jvm/java-8-openjdk-amd64'
+}
+
+java() {
+  if [[ ! -z ${JAVA_HOME} ]]; then
+    ${JAVA_HOME}/bin/java $@
+  else
+    /usr/bin/java $@
+  fi
+}
+
+javac() {
+  if [[ ! -z ${JAVA_HOME} ]]; then
+    ${JAVA_HOME}/bin/java $@
+  else
+    /usr/bin/javac $@
+  fi
+}
