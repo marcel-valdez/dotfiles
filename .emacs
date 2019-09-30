@@ -48,10 +48,16 @@
 (with-library xclip (xclip-mode))
 (with-library multiple-cursors)
 (with-library helm-ls-git)
-
 (with-library elpy)
 (with-library flycheck
   (setq flycheck-checker 'python-pylint))
+(with-library flyspell-correct
+  (define-key flyspell-mode-map (kbd "C-;") 'flyspell-correct-wrapper))
+(with-library markdown-mode
+  (defun markdown-enable-flyspell()
+    (flyspell-mode))
+  (add-hook 'markdown-mode-hook 'markdown-enable-flyspell))
+
 
 ;; set whitespace visualization
 (with-library whitespace
