@@ -99,13 +99,14 @@
 
 (with-library jedi
   (defun jedi:python-mode-hook ()
-    (setq elpy-modules
-          (delq 'elpy-module-company
-                (delq 'elpy-module-flymake elpy-modules)))
-    (add-hook 'elpy-mode-hook 'flycheck-mode)
-    (add-hook 'elpy-mode-hook 'auto-complete-mode)
-    (company-mode -1)
-    (elpy-mode t)
+    (with-library elpy
+      (setq elpy-modules
+            (delq 'elpy-module-company
+                  (delq 'elpy-module-flymake elpy-modules)))
+      (add-hook 'elpy-mode-hook 'flycheck-mode)
+      (add-hook 'elpy-mode-hook 'auto-complete-mode)
+      (company-mode -1)
+      (elpy-mode t))
     (setq jedi:setup-keys t)
     (setq jedi:complete-on-dot t)
     (setq-local whitespace-line-column 100))
