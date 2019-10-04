@@ -9,10 +9,10 @@ case $- in
 esac
 
 DEFAULT_TMUX_SESSION="default"
-[ -z ${TMUX_INIT_SESSION} ] && TMUX_INIT_SESSION=${DEFAULT_TMUX_SESSION}
+[ -z "${TMUX_INIT_SESSION}" ] && TMUX_INIT_SESSION=${DEFAULT_TMUX_SESSION}
 
 function log_debug() {
-  [ ! -z ${DEBUG_BASHRC} ] && echo "$(date +%H:%M:%S) $1"
+  [ ! -z "${DEBUG_BASHRC}" ] && echo "$(date +%H:%M:%S) $1"
 }
 
 function tmux_attach_session() {
@@ -73,7 +73,7 @@ if [ -z "${debian_chroot:-}" ] && [ -r /etc/debian_chroot ]; then
 fi
 
 # set a fancy prompt (non-color, unless we know we "want" color)
-case "$TERM" in
+case "${TERM}" in
     xterm-color) color_prompt=yes;;
 esac
 
@@ -82,7 +82,7 @@ esac
 # should be on the output of commands, not on the prompt
 force_color_prompt=yes
 
-if [ -n "$force_color_prompt" ]; then
+if [ -n "${force_color_prompt}" ]; then
     if [ -x /usr/bin/tput ] && tput setaf 1 >&/dev/null; then
 	# We have color support; assume it's compliant with Ecma-48
 	# (ISO/IEC-6429). (Lack of such support is extremely rare, and such
@@ -96,7 +96,7 @@ fi
 # Remove username from prompt but shortened hostname,
 # in order to avoid confusion when SSHing
 short_hostname=$(echo ${HOSTNAME} | grep -oE '^[a-Z]{5}')
-if [ "$color_prompt" = yes ]; then
+if [ "${color_prompt}" = yes ]; then
   log_debug "Using color_prompt PS1"
   PS1='${debian_chroot:+($debian_chroot)}\[\033[01;32m\]@'"${short_hostname}"'\[\033[00m\]:\[\033[01;34m\]\w\[\033[00m\]'
 else
@@ -104,9 +104,9 @@ else
   PS1='${debian_chroot:+($debian_chroot)}@'"${short_hostname}"':\w'
 fi
 
-PS1="$PS1"'$(__git_ps1)'
-PS1="$PS1"'\n'
-PS1="$PS1"'\$ '
+PS1="${PS1}"'$(__git_ps1)'
+PS1="${PS1}"'\n'
+PS1="${PS1}"'\$ '
 
 unset color_prompt force_color_prompt
 
@@ -155,13 +155,13 @@ fi
 
 if [[ "$(uname)" =~ "Linux" ]]; then
   export GIT_EDITOR="emacs -nw"
-  export EDITOR=${GIT_EDITOR}
+  export EDITOR="${GIT_EDITOR}"
   if [[ "${TERM}" =~ "eterm" ]]; then
       export GIT_EDITOR="emacsclient"
-      export EDITOR=${GIT_EDITOR}
+      export EDITOR="${GIT_EDITOR}"
   fi
   # if we are not in a tmux session
-  if [ -z ${TMUX} ] && [[ ! "${TERM}" =~ "eterm" ]]; then
+  if [ -z "${TMUX}" ] && [[ ! "${TERM}" =~ "eterm" ]]; then
     # initialize environment if running for the first time
     [ is_first_time_starting_tmux ] && initialize_environment
     # this will make the terminal attach to an existing tmux session or create one
@@ -173,19 +173,20 @@ if [[ "$(uname)" =~ "Linux" ]]; then
   fi
 fi
 
-export PATH="$PATH:$HOME/bin" # add local bin folder to path
-export PATH="$PATH:$HOME/.rvm/bin" # Add RVM to PATH for scripting
+export PATH="${PATH}:${HOME}/bin" # add local bin folder to path
+export PATH="${PATH}:${HOME}/.rvm/bin" # Add RVM to PATH for scripting
+export PATH="${PATH}:${HOME}/modules/buck/bin" # Add buck to the PATH
 
 if [ -z ${MONO_PATH} ]; then
   export MONO_PATH="/usr/bin/continuoustests"
 else
-  export MONO_PATH="$MONO_PATH:/usr/bin/continuoustests"
+  export MONO_PATH="${MONO_PATH}:/usr/bin/continuoustests"
 fi
 
-export NVM_DIR="/home/marcel/.nvm"
-[ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"  # This loads nvm
+export NVM_DIR="${HOME}/.nvm"
+[ -s "${NVM_DIR}/nvm.sh" ] && . "${NVM_DIR}/nvm.sh"  # This loads nvm
 # This sets up the default node version and loads it
 export NODE_VERSION="9.5.0"
 node-check-use --silent
 
-[ -f ~/.fzf.bash ] && source ~/.fzf.bash
+[ -f "${HOME}/.fzf.bash" ] && source "${HOME}/.fzf.bash"
