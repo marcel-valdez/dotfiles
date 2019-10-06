@@ -1,3 +1,0 @@
-export WINEARCH=win64 wineboot
-unlink ~/.wine
-ln -s ~/.wine64 ~/.wine
