@@ -2,6 +2,9 @@
 # see /usr/share/doc/bash/examples/startup-files (in the package bash-doc)
 # for examples
 
+if [[ ${USERNAME} == "" ]] && [[ ${USER} != "" ]]; then
+  export USERNAME=${USER}
+fi
 # If not running interactively, don't do anything
 case $- in
     *i*) ;;
@@ -95,13 +98,13 @@ fi
 
 # Remove username from prompt but shortened hostname,
 # in order to avoid confusion when SSHing
-short_hostname=$(echo ${HOSTNAME} | grep -oE '^[a-Z]{5}')
+short_hostname=$(echo ${HOSTNAME} | egrep '^.{0,20}' | head -1)
 if [ "$color_prompt" = yes ]; then
   log_debug "Using color_prompt PS1"
-  PS1='${debian_chroot:+($debian_chroot)}\[\033[01;32m\]@'"${short_hostname}"'\[\033[00m\]:\[\033[01;34m\]\w\[\033[00m\]'
+  PS1="[Exit: \[\033[1;31m\]\${PIPESTATUS[@]/#0/\[\033[0m\]\[\033[1;32m\]0\[\033[1;31m\]}\[\033[0m\]]"
 else
   log_debug "Using non-color prompt PS1"
-  PS1='${debian_chroot:+($debian_chroot)}@'"${short_hostname}"':\w'
+  export PS1="[Exit: \${PIPESTATUS[@]/#0/0}]"
 fi
 
 PS1="$PS1"'$(__git_ps1)'
@@ -153,7 +156,7 @@ if ! shopt -oq posix; then
   fi
 fi
 
-if [[ "$(uname)" =~ "Linux" ]]; then
+if [[ "$(uname)" =~ "Darwin" ]]; then
   export GIT_EDITOR="emacs -nw"
   export EDITOR=${GIT_EDITOR}
   if [[ "${TERM}" =~ "eterm" ]]; then
@@ -173,17 +176,20 @@ if [[ "$(uname)" =~ "Linux" ]]; then
   fi
 fi
 
-export PATH="$PATH:$HOME/bin" # add local bin folder to path
-export PATH="$PATH:$HOME/.rvm/bin" # Add RVM to PATH for scripting
+export PATH="$PATH:${HOME}/bin" # add local bin folder to path
+export PATH="$PATH:${HOME}/.rvm/bin" # Add RVM to PATH for scripting
 
 if [ -z ${MONO_PATH} ]; then
   export MONO_PATH="/usr/bin/continuoustests"
 else
-  export MONO_PATH="$MONO_PATH:/usr/bin/continuoustests"
+  export MONO_PATH="${MONO_PATH}:/usr/bin/continuoustests"
 fi
 
-export NVM_DIR="/home/marcel/.nvm"
-[ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"  # This loads nvm
+export NVM_DIR="${HOME}/.nvm"
+# This loads nvm
+[ -s "/usr/local/opt/nvm/nvm.sh" ] && source "/usr/local/opt/nvm/nvm.sh"
+# This loads bash completion
+[ -s "/usr/local/opt/nvm/etc/bash_completion" ] && source "/usr/local/opt/nvm/etc/bash_completion"
 # This sets up the default node version and loads it
 export NODE_VERSION="9.5.0"
 node-check-use --silent
