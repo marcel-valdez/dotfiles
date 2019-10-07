@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
-format="-o pid -o tty -o start -o args"
-sort="--sort=-comm"
+format="-o pid -o tty -o start -o args -o rss"
+sort="-m"
 config="axw"
 
 # default configuration
@@ -33,7 +33,7 @@ if [ "${full_command}" == "true" ]; then
   config="${config}w"
 fi
 
-ps ${format}\
+ps ${config}\
    ${sort}\
-   ${config}\
+   ${format}\
    $@
