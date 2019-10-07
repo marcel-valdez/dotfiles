@@ -1,24 +1,30 @@
 #!/usr/bin/env bash
 
 ::debug() {
-  [[ ${DEBUG} != "" ]] && echo $1
+  [[ ${DEBUG} != "" ]] && echo $1 >&2
 }
 
 function process-ps-lines() {
-  lines="$(cat)"
-  byte_limit="$(numfmt --to=none --from=si $1 2>/dev/null)"
+  local byte_limit="$(numfmt --to=none --from=si $1 2>/dev/null)"
   ::debug "process-ps-lines: byte_limit=${byte_limit}"
-  readarray -t lines_array <<<"${lines}"
-  for line in "${lines_array[@]}"
+
+  local lines=()
+  while IFS="" read line; do
+    lines+=("${line}")
+  done
+
+  for line in "${lines[@]}"
   do
-    elements=(${line//:/ })
-    kb_size="${elements[0]}"
+    ::debug "line: ${line[@]}"
+    local elements=(${line//:/ })
+    ::debug "elements: ${elements[@]}"
+    local kb_size="${elements[0]}"
     if [[ "${kb_size}" == "SIZE"  ]]; then
       echo "${line}"
     else
-      byte_size=$(echo "${kb_size} * 1024" | bc)
-      elements=("${elements[@]/$kb_size}")
-      human_size="$(numfmt --to=si ${byte_size})"
+      local byte_size=$(echo "${kb_size} * 1024" | bc)
+      local elements=("${elements[@]/$kb_size}")
+      local human_size="$(numfmt --to=si ${byte_size})"
       if [[ "${byte_size}" -gt "${byte_limit}"  ]] || [[ -z "${byte_limit}" ]]; then
         echo "${human_size} ${elements[@]}"
       fi
@@ -27,21 +33,26 @@ function process-ps-lines() {
 }
 
 procs=25
+limit=1024
 command_format=comm
 while [[ $# -gt 0 ]]; do
   case $1 in
     -n|--number)
+      # sets how many entries to show
       procs=$2
       shift
       ;;
     -f|--full-command)
+      # shows the full command that invoked the process
       command_format="args"
       shift
       ;;
     -s|--short-command)
+      # shows only the binary for the command, without the arguments
       # this is the default
       ;;
     -l|--limit-size)
+      # filters out processes using less memory than this limit
       limit=$2
       shift
       ;;
@@ -55,6 +66,8 @@ done
 ::debug "procs=${procs}"
 ::debug "limit=${limit}"
 
-ps -A -o size -o pid -o "${command_format}" --sort=-size \
-  | process-ps-lines "${limit}" | head "-${procs}"
-
+echo "SIZE  PID  COMMANDS"
+echo "----  ---  -------"
+ps -A -o rss= -o pid= -o "${command_format}=" -m \
+  | head "-${procs}" \
+  | process-ps-lines "${limit}"
