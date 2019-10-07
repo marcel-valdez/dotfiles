@@ -194,4 +194,6 @@ export NVM_DIR="${HOME}/.nvm"
 export NODE_VERSION="9.5.0"
 node-check-use --silent
 
-[ -f ~/.fzf.bash ] && source ~/.fzf.bash
+[ -f "${HOME}"/.fzf.bash ] && source "${HOME}"/.fzf.bash
+[[ -r "/usr/local/etc/profile.d/bash_completion.sh" ]] && \
+  source "/usr/local/etc/profile.d/bash_completion.sh"
