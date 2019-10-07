@@ -76,7 +76,8 @@
   (setq-local js-indent-level 2)
   (setq-local cperl-indent-level 2)
   (setq-local sh-basic-offset 2)
-  (setq-local sh-indentation 2)
+;; Produces the error "Don't know how to make a localized variable an alias"
+;;  (setq-local sh-indentation 2)
   (setq-local smie-indent-basic 2)
   (setq-local c-basic-offset 2)
   (setq-local indent-tabs-mode nil)
