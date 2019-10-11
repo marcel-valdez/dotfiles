@@ -16,6 +16,7 @@
 ;;(add-to-list 'package-archives '("elpa-gnu", "http://elpa.gnu.org/packages/"))
 (setq inhibit-startup-screen t)
 (menu-bar-mode -1)
+
 ;; initialize packages
 (require 'marcel-macros)
 ;; (with-library better-defaults)
@@ -121,6 +122,12 @@
 (global-auto-revert-mode)
 
 ;;;; custom bindings
+;; fixes for macos, should not affect other OSes
+(global-set-key (kbd "<home>")
+                     (lambda () (interactive) (move-beginning-of-line 1)))
+(global-set-key (kbd "<end>")
+                     (lambda () (interactive) (move-end-of-line 1)))
+
 ;; move a line up-down easily
 (global-set-key (kbd "M-<up>") 'move-text-up)
 (global-set-key (kbd "M-<down>") 'move-text-down)
@@ -206,7 +213,7 @@
  ;; If there is more than one, they won't work right.
  '(package-selected-packages
    (quote
-    (xclip helm git helm-grepint helm-helm-commands helm-ispell helm-ls-git helm-proc helm-pydoc helm-rubygems-org helm-themes helm-wordnet helm-xref hgignore-mode undo-tree rotate rjsx-mode multiple-cursors multi-term markdownfmt markdown-toc markdown-preview-mode helm-git gtags flycheck-tip flycheck-package cycle-resize auto-complete)))
+    (bash-completion company flycheck flyspell-correct flyspell-correct-helm markdown-mode helm-git-grep xclip helm git helm-grepint helm-helm-commands helm-ispell helm-ls-git helm-proc helm-pydoc helm-rubygems-org helm-themes helm-wordnet helm-xref hgignore-mode undo-tree rotate rjsx-mode multiple-cursors multi-term markdownfmt markdown-toc markdown-preview-mode helm-git gtags flycheck-tip flycheck-package cycle-resize auto-complete)))
  '(show-paren-mode t))
 (custom-set-faces
  ;; custom-set-faces was added by Custom.
