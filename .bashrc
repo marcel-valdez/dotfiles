@@ -9,7 +9,7 @@ case $- in
 esac
 
 DEFAULT_TMUX_SESSION="default"
-[ -z "${TMUX_INIT_SESSION}" ] && TMUX_INIT_SESSION=${DEFAULT_TMUX_SESSION}
+[ -z "${TMUX_INIT_SESSION}" ] && TMUX_INIT_SESSION="${DEFAULT_TMUX_SESSION}"
 
 function log_debug() {
   [ ! -z "${DEBUG_BASHRC}" ] && echo "$(date +%H:%M:%S) $1"
@@ -17,12 +17,12 @@ function log_debug() {
 
 function tmux_attach_session() {
   log_debug "tmux init: attaching to <${TMUX_INIT_SESSION}>"
-  tmux new-session -s ${TMUX_INIT_SESSION} >&/dev/null \
-  || tmux attach-session -t ${TMUX_INIT_SESSION}
+  tmux new-session -s "${TMUX_INIT_SESSION}" >&/dev/null \
+  || tmux attach-session -t "${TMUX_INIT_SESSION}"
 }
 
 function is_first_time_starting_tmux() {
-  tmux has-session -t ${DEFAULT_TMUX_SESSION}
+  tmux has-session -t "${DEFAULT_TMUX_SESSION}"
 }
 
 function initialize_environment() {
