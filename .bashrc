@@ -243,8 +243,9 @@ log_debug "Loaded node.js"
 
 # Reads the pending log buffer
 log-buffer --read
-export http_proxy=''
-export https_proxy=''
+# devserver-specific
+export http_proxy=http://fwdproxy:8080
+export https_proxy=http://fwdproxy:8080
 export ftp_proxy=''
 export socks_proxy=''
 
