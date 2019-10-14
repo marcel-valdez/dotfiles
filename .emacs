@@ -160,11 +160,11 @@
 (with-library undo-tree
   ;; remap undo-redo using undo-tree
   (global-undo-tree-mode)
-  (global-unset-key (kbd "M-z"))
-  (global-set-key (kbd "M-z")
+  (global-unset-key (kbd "C-."))
+  (global-set-key (kbd "C-.")
                   (lambda () (interactive) (undo-tree-undo)))
-  (global-unset-key (kbd "M-Z"))
-  (global-set-key (kbd "M-Z")
+  (global-unset-key (kbd "C-,"))
+  (global-set-key (kbd "C-,")
                   (lambda () (interactive) (undo-tree-redo))))
 
 (with-library multiple-cursors
