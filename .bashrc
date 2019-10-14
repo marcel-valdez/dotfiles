@@ -113,24 +113,20 @@ fi
 color_prompt=yes
 
 log_debug "Setting PS1 (prompt)"
-g4_functions_exist=$(type g4-client-name >&/dev/null && echo "yes")
-if [ "${g4_functions_exist}" == "yes" ]; then
-  PS1_SUFFIX='$(g4-client-ps1)\n$ '
-  WORKDIR='$(g4-workdir-ps1)'
-else
-  PS1_SUFFIX='\n\$ '
-  WORKDIR='\w'
-fi
+source "${HOME}/lib/git-prompt.sh"
 
-[ -z ${PS1_HOST} ] && PS1_HOST=$(hostname) && PS1_HOST=${PS1_HOST/.mtv.*/}
-
+short_hostname=$(echo ${HOSTNAME} | egrep '^.{0,20}' | head -1)
 if [ "${color_prompt}" = yes ]; then
-  PS1='${debian_chroot:+($debian_chroot)}\[\033[01;32m\]@${PS1_HOST}\[\033[00m\]:\[\033[01;34m\]'${WORKDIR}'\[\033[00m\]'${PS1_SUFFIX}
+  log_debug "Using color_prompt PS1"
+  PS1="[Exit: \[\033[1;31m\]\${PIPESTATUS[@]/#0/\[\033[0m\]\[\033[1;32m\]0\[\033[1;31m\]}\[\033[0m\]]"
 else
-  PS1='${debian_chroot:+($debian_chroot)}@${PS1_HOST}:\w'${PS1_SUFFIX}
+  log_debug "Using non-color prompt PS1"
+  export PS1="[Exit: \${PIPESTATUS[@]/#0/0}]"
 fi
 
-unset color_prompt force_color_prompt
+PS1="$PS1"'$(__git_ps1)'
+PS1="$PS1"'\n'
+PS1="$PS1"'\$ '
 
 # If this is an xterm set the title to user@host:dir
 case "$TERM" in
