@@ -31,18 +31,18 @@ function initialize_environment() {
 
   # WINE settings
   # set to use wine simulating Windows 64-bit by default
-  source ~/bin/wine-use-win64
+  source "${HOME}/bin/wine-use-win64"
   # uncomment to use wine simulating Windows 32-bit
-  # . ~/bin/wine-use-win32
+  # source "${HOME}/bin/wine-use-win32"
 
   # SSH agent environment, only load it whenever we start
   # the environment for the first time
-  source ~/.bash_ssh
+  source "${HOME}/.bash_ssh"
 }
 
-source ~/bin/functions
-source ~/bin/reinstall_modules
-source ~/lib/git-prompt
+source "${HOME}/bin/functions"
+source "${HOME}/bin/reinstall_modules"
+source "${HOME}/lib/git-prompt"
 
 
 # don't put duplicate lines or lines starting with space in the history.
@@ -62,7 +62,7 @@ shopt -s checkwinsize
 
 # If set, the pattern "**" used in a pathname expansion context will
 # match all files and zero or more directories and subdirectories.
-#shopt -s globstar
+# shopt -s globstar
 
 # make less more friendly for non-text input files, see lesspipe(1)
 [ -x /usr/bin/lesspipe ] && eval "$(SHELL=/bin/sh lesspipe)"
@@ -84,18 +84,18 @@ force_color_prompt=yes
 
 if [ -n "${force_color_prompt}" ]; then
     if [ -x /usr/bin/tput ] && tput setaf 1 >&/dev/null; then
-	# We have color support; assume it's compliant with Ecma-48
-	# (ISO/IEC-6429). (Lack of such support is extremely rare, and such
-	# a case would tend to support setf rather than setaf.)
-	color_prompt=yes
+      # We have color support; assume it's compliant with Ecma-48
+      # (ISO/IEC-6429). (Lack of such support is extremely rare, and such
+      # a case would tend to support setf rather than setaf.)
+      color_prompt=yes
     else
-	color_prompt=
+      color_prompt=
     fi
 fi
 
 # Remove username from prompt but shortened hostname,
 # in order to avoid confusion when SSHing
-short_hostname=$(echo ${HOSTNAME} | grep -oE '^[a-Z]{5}')
+short_hostname=$(echo "${HOSTNAME}" | grep -oE '^[a-Z]{5}')
 if [ "${color_prompt}" = yes ]; then
   log_debug "Using color_prompt PS1"
   PS1='${debian_chroot:+($debian_chroot)}\[\033[01;32m\]@'"${short_hostname}"'\[\033[00m\]:\[\033[01;34m\]\w\[\033[00m\]'
@@ -110,14 +110,12 @@ PS1="${PS1}"'\$ '
 
 unset color_prompt force_color_prompt
 
-# If this is an xterm set the title to user@host:dir
-
 # enable color support of ls and also add handy aliases
 if [ -x /usr/bin/dircolors ]; then
-    test -r ~/.dircolors && eval "$(dircolors -b ~/.dircolors)" || eval "$(dircolors -b)"
+    test -r "${HOME}/.dircolors" && eval "$(dircolors -b ~/.dircolors)" || eval "$(dircolors -b)"
     alias ls='ls --color=auto'
-    #alias dir='dir --color=auto'
-    #alias vdir='vdir --color=auto'
+    # alias dir='dir --color=auto'
+    # alias vdir='vdir --color=auto'
 
     alias grep='grep --color=auto'
     alias fgrep='fgrep --color=auto'
@@ -134,12 +132,12 @@ alias l='ls -CF'
 # ~/.bash_aliases, instead of adding them here directly.
 # See /usr/share/doc/bash-doc/examples in the bash-doc package.
 
-if [ -f ~/.bash_aliases ]; then
-    source ~/.bash_aliases
+if [ -f "${HOME}/.bash_aliases" ]; then
+    source "${HOME}/.bash_aliases"
 fi
 
-if [ -f ~/.bash_functions ]; then
-  source ~/.bash_functions
+if [ -f "${HOME}/.bash_functions" ]; then
+  source "${HOME}/.bash_functions"
 fi
 
 # enable programmable completion features (you don't need to enable
@@ -147,9 +145,9 @@ fi
 # sources /etc/bash.bashrc).
 if ! shopt -oq posix; then
   if [ -f /usr/share/bash-completion/bash_completion ]; then
-    . /usr/share/bash-completion/bash_completion
+    source /usr/share/bash-completion/bash_completion
   elif [ -f /etc/bash_completion ]; then
-    . /etc/bash_completion
+    source /etc/bash_completion
   fi
 fi
 
@@ -184,7 +182,7 @@ else
 fi
 
 export NVM_DIR="${HOME}/.nvm"
-[ -s "${NVM_DIR}/nvm.sh" ] && . "${NVM_DIR}/nvm.sh"  # This loads nvm
+[ -s "${NVM_DIR}/nvm.sh" ] && source "${NVM_DIR}/nvm.sh"  # This loads nvm
 # This sets up the default node version and loads it
 export NODE_VERSION="9.5.0"
 node-check-use --silent
