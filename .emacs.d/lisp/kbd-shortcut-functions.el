@@ -1,5 +1,7 @@
 
 ;;; Code:
+(setq lexical-binding t)
+
 (defun rotate-windows (arg)
   "Rotate your windows; use the prefix argument to rotate the other direction.
 ARG number of lines to move."
@@ -55,6 +57,32 @@ ARG number of lines to move the text"
 ARG number of lines to move the text"
    (interactive "*p")
    (move-text-internal (- arg)))
+
+(setq exec-temp-bind:temp-fn nil)
+(setq exec-temp-bind:kbd-mapping nil)
+(setq exec-temp-bind:repeat-fn nil)
+
+(defun exec-temp-bind (repeat-fn kbd-mapping)
+  "Execute REPEAT-FN and temporarily map KBD-MAPPING to REPEAT-FN."
+  (interactive)
+  (funcall repeat-fn)
+
+  (setq exec-temp-bind:repeat-fn repeat-fn)
+  (setq exec-temp-bind:kbd-mapping kbd-mapping)
+  (setq exec-temp-bind:temp-fn
+        (lambda () (interactive)
+;;          (display-message-or-buffer
+;;           (concat "lambda exec-temp-bind:kbd-mapping => " exec-temp-bind:kbd-mapping))
+          (exec-temp-bind exec-temp-bind:repeat-fn exec-temp-bind:kbd-mapping)))
+
+;;  (display-message-or-buffer
+;;   (concat "exec-temp-bind:kbd-mapping " exec-temp-bind:kbd-mapping))
+
+  (set-transient-map
+   (let ((map (make-sparse-keymap)))
+     (define-key map (kbd kbd-mapping)
+       (lambda () (interactive) (funcall exec-temp-bind:temp-fn)))
+     map)))
 
 (provide 'kbd-shortcut-functions)
 ;;; kbd-shortcut-functions.el ends here
