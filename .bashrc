@@ -107,9 +107,7 @@ else
   export PS1="[Exit: \${PIPESTATUS[@]/#0/0}]"
 fi
 
-PS1="$PS1"'$(__git_ps1)'
-PS1="$PS1"'\n'
-PS1="$PS1"'\$ '
+PS1="$PS1"'$(__git_ps1) \w\n\$ '
 
 unset color_prompt force_color_prompt
 
