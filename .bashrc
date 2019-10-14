@@ -74,19 +74,19 @@ if [ -f "${HOME}/.bash_functions" ]; then
 fi
 log_debug "Loaded .bash* sources"
 
-log_debug "Loading .google* sources"
-if [ -f "${HOME}/.googlerc.d/.googlerc" ]; then
-  source "${HOME}/.googlerc.d/.googlerc"
+log_debug "Loading .fb* sources"
+if [ -f "${HOME}/.fbrc.d/.fbrc" ]; then
+  source "${HOME}/.fbrc.d/.fbrc"
 fi
 
-if [ -f "${HOME}/.googlerc.d/.google_aliases" ]; then
-  source "${HOME}/.googlerc.d/.google_aliases"
+if [ -f "${HOME}/.fbrc.d/.fb_aliases" ]; then
+  source "${HOME}/.fbrc.d/.fb_aliases"
 fi
 
-if [ -f "${HOME}/.googlerc.d/.google_functions" ]; then
-  source "${HOME}/.googlerc.d/.google_functions"
+if [ -f "${HOME}/.fbrc.d/.fb_functions" ]; then
+  source "${HOME}/.fbrc.d/.fb_functions"
 fi
-log_debug "Loaded .google* sources"
+log_debug "Loaded .fb* sources"
 
 # set a fancy prompt (non-color, unless we know we "want" color)
 case "${TERM}" in
@@ -231,7 +231,7 @@ log_debug "Loading NVM"
 [ -s "$NVM_DIR/nvm.sh" ] && source "$NVM_DIR/nvm.sh"
 # This loads nvm bash_completion
 log_debug "Loading NVM bash completion"
-[ -s "$NVM_DIR/bash_completion" ] && \. "$NVM_DIR/bash_completion"
+[ -s "$NVM_DIR/bash_completion" ] && source "$NVM_DIR/bash_completion"
 log_debug "Loaded NVM"
 
 # Load RVM into a shell session *as a function*
@@ -252,4 +252,4 @@ export https_proxy=''
 export ftp_proxy=''
 export socks_proxy=''
 
-[ -f ~/.fzf.bash ] && source ~/.fzf.bash
+[ -f "${HOME}/.fzf.bash" ] && source "${HOME}/.fzf.bash"
