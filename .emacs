@@ -136,12 +136,27 @@
 (global-set-key (kbd "C-M-k") (lambda () (interactive) (other-frame -1)))
 
 ;; split windows with sensible keys
-(global-unset-key (kbd "C-x |"))
-(global-set-key (kbd "C-x |") (lambda () (interactive) (split-window-horizontally)))
-(global-unset-key (kbd "C-x _"))
-(global-set-key (kbd "C-x _") (lambda () (interactive) (split-window-vertically)))
+(global-unset-key (kbd "C-x \\"))
+(global-set-key (kbd "C-x \\") (lambda () (interactive) (split-window-horizontally)))
+(global-unset-key (kbd "C-x -"))
+(global-set-key (kbd "C-x -") (lambda () (interactive) (split-window-vertically)))
+;; resize windows with sensible keys
+(with-library cycle-resize
+  (global-unset-key (kbd "C-x M--"))
+  (global-set-key (kbd "C-x M--")
+                  (lambda () (interactive) (exec-temp-bind
+                                            'cycle-resize-window-vertically
+                                            "M--")))
+  (global-unset-key (kbd "C-x M-\\"))
+  (global-set-key (kbd "C-x M-\\")
+                  (lambda () (interactive) (exec-temp-bind
+                                            'cycle-resize-window-horizontally
+                                            "M-\\")))
+  ;; You also can configure the dimensions (in %) the package will cycle through
+  ;; By default, it is: 80% -> 50% -> 20% -> 50%, and so on...
+  (setq cycle-resize-steps '(75 50 25 50)))
 
-;;(with-library auto-complete (global-auto-complete-mode))
+;; (with-library auto-complete (global-auto-complete-mode))
 (with-library undo-tree
   ;; remap undo-redo using undo-tree
   (global-undo-tree-mode)
