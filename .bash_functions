@@ -66,6 +66,11 @@ function fails() {
   $@ >&/dev/null
 }
 
+function get-arg-or-stdin() {
+  # if there are no arguments, then echo from stdin, otherwise echo arguments
+  ([ $# -eq 0 ] && cat) || echo "$@"
+}
+
 function emacs() {
   local emacs_bin=/usr/bin/emacs
   [[ -x /usr/local/bin/emacs ]] && emacs_bin=/usr/local/bin/emacs
@@ -269,4 +274,16 @@ javac() {
   else
     /usr/bin/javac $@
   fi
+}
+
+function copy-to-tmux() {
+  tmux set-buffer "$(get-arg-or-stdin $@)"
+}
+
+function tmux-to-clip() {
+  tmux show-buffer | copy-to-clip
+}
+
+function copy-to-clip() {
+  get-arg-or-stdin "$@" | perl -pe 'chomp if eof' | pbcopy
 }
