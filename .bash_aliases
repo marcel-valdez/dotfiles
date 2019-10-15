@@ -15,8 +15,7 @@ alias less-lineno='less -N'
 alias nano-crypto=crypto-file
 
 # start git commands
-
-alias g='git'
+# note: g is a function in .bash_functions
 alias g-add='git add'
 alias g-fetch='git fetch'
 alias g-clean-dfx='git-clean-dfx'

@@ -40,6 +40,10 @@ function diff-lines() {
 
 # start git functions
 
+function g() {
+  git "$@"
+}
+
 function git-diff-lines() {
   git diff "$@" | diff-lines
 }
@@ -345,14 +349,6 @@ function emacs() {
   else
     /usr/bin/emacs --no-window-system "$@" &>/tmp/emacs-${USER}-${RANDOM}.log
   fi
-}
-
-function emacs-client() {
-  local editor_cmd=(/usr/bin/emacsclient --create-frame --tty --socket-name=default)
-  EDITOR="'""${editor_cmd[@]}""'" "${editor_cmd[@]}" "$@" || \
-    (emacs --bg-daemon=default && \
-       EDITOR="'""${editor_cmd[@]}""'" "${editor_cmd[@]}" "$@")
-
 }
 
 # force myself to use emacs, not nano

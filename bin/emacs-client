@@ -1,0 +1,5 @@
+#!/usr/bin/env bash
+
+# editor_cmd=(/usr/bin/emacsclient --create-frame --tty --socket-name=default)
+# EDITOR="'""${editor_cmd[@]}""'" "${editor_cmd[@]}" "$@"
+/usr/bin/emacsclient --socket-name=default "$@"
