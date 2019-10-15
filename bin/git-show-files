@@ -7,6 +7,7 @@ if [ "$1" = "--help" ]; then
   echo "--staged: Shows files currently staged."
   echo "commit: Shows files in a given commit."
   echo "default: Shows files in the previous commit."
+  exit 0
 fi
 
 if [ "$1" = "--cached" ]; then

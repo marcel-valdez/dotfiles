@@ -22,6 +22,9 @@ ARGV.each_with_index do |option, index|
   if option == '--only-fixup'
     only_fixups = true
     ARGV.delete_at(index)
+  else if option == '-help' or option == '--help'
+    usage
+    exit
   end
 end
 
