@@ -124,18 +124,7 @@ else
   export PS1="[Exit: \${PIPESTATUS[@]/#0/0}]"
 fi
 
-PS1="$PS1"'$(__git_ps1)'
-PS1="$PS1"'\n'
-PS1="$PS1"'\$ '
-
-# If this is an xterm set the title to user@host:dir
-case "$TERM" in
-xterm*|rxvt*)
-  PS1="\[\e]0;${debian_chroot:+($debian_chroot)}@${PS1_HOST}: \w\a\]$PS1"
-  ;;
-*)
-  ;;
-esac
+PS1="$PS1"'$(__git_ps1) \w\n\$ '
 log_debug "Done setting PS1 (prompt)"
 
 # enable color support of ls and also add handy aliases
@@ -227,12 +216,12 @@ log_debug "Loading NVM"
 [ -s "$NVM_DIR/nvm.sh" ] && source "$NVM_DIR/nvm.sh"
 # This loads nvm bash_completion
 log_debug "Loading NVM bash completion"
-[ -s "$NVM_DIR/bash_completion" ] && source "$NVM_DIR/bash_completion"
+[ -s "$NVM_DIR/bash_completion" ] && source "${NVM_DIR}/bash_completion"
 log_debug "Loaded NVM"
 
 # Load RVM into a shell session *as a function*
 log_debug "Loading RVM"
-[[ -s "$HOME/.rvm/scripts/rvm" ]] && source "$HOME/.rvm/scripts/rvm"
+[[ -s "${HOME}/.rvm/scripts/rvm" ]] && source "${HOME}/.rvm/scripts/rvm"
 log_debug "Loaded RVM"
 export PATH="$PATH:$HOME/.rvm/bin" # Add RVM to PATH for scripting
 
