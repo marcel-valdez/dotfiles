@@ -47,24 +47,13 @@
     (with-library multi-term
       ;; start an emacs server so editors use an emacs buffer
       (setq-local server-name (concatenate 'string "server" (getenv "DISPLAY")))
-      (server-start)
-      ;; start multi-term custom configurations
-      (global-unset-key (kbd "C-t"))
-      (add-to-list 'term-unbind-key-list "C-t")
-      (setq multi-term-program "/bin/bash")
-      ;; start new terminal
-      (global-set-key (kbd "C-t C-n")
-                      (lambda () (interactive) (multi-term)))
-      ;; switch to next terminal within same buffer
-      (global-set-key (kbd "C-t <C-tab>")
-                      (lambda () (interactive) (multi-term-next)))
-      ;; switch to previous terminal within same buffer
-      (global-set-key (kbd "C-t <C-iso-lefttab>")
-                      (lambda () (interactive) (multi-term-prev)))
-      ;; toggle showing/hiding the dedicated terminal window
-      (global-set-key (kbd "C-t C-d")
-                      (lambda () (interactive) (multi-term-dedicated-toggle))))
-  (with-library in-tmux))
+      (server-start))
+  (progn
+    (with-library multi-term
+      ;; start an emacs server so editors use an emacs buffer
+      (setq-local server-name "default")
+      (server-start))
+    (with-library in-tmux)))
 
 (setq browse-url-browser-function 'browse-url-generic)
 (setq browse-url-generic-program "~/modules/chrome-remote-scripts/open-cantata-url")
@@ -100,6 +89,25 @@
       kept-new-versions 20   ; how many of the newest versions to keep
       kept-old-versions 5    ; and how many of the old
       )
+
+(with-library multi-term
+  ;; start multi-term custom configurations
+  (setq server-window 'pop-to-buffer)
+  (global-unset-key (kbd "C-t"))
+  (add-to-list 'term-unbind-key-list "C-t")
+  (setq multi-term-program "/bin/bash")
+  ;; start new terminal
+  (global-set-key (kbd "C-t C-n")
+                  (lambda () (interactive) (multi-term)))
+  ;; switch to next terminal within same buffer
+  (global-set-key (kbd "C-t <C-tab>")
+                  (lambda () (interactive) (multi-term-next)))
+  ;; switch to previous terminal within same buffer
+  (global-set-key (kbd "C-t <C-iso-lefttab>")
+                  (lambda () (interactive) (multi-term-prev)))
+  ;; toggle showing/hiding the dedicated terminal window
+  (global-set-key (kbd "C-t C-d")
+                  (lambda () (interactive) (multi-term-dedicated-toggle))))
 
 
 ;; always enable identifications of JavaStyleWords
@@ -229,7 +237,9 @@
     ("6068d911f0ad3f9e6834d4849038ef3a317510f23683ff9656da7d49a5ab3ed5" "d4890c4d8d262c61decb7c0e43b1dc5c92b378e9acada6c04d9e94f00cc70ead" "4badd47b5ba16df46b849137903f2210d344f3c7021e979ff8ed68b8c3827d84" default)))
  '(graphviz-dot-indent-width 2 t)
  '(line-number-mode t)
- '(package-selected-packages (quote (windresize async xclip undo-tree)))
+ '(package-selected-packages
+   (quote
+    (helm-mt multi-term hl-anything helm helm-xref windresize async xclip undo-tree)))
  '(show-paren-mode t)
  '(tool-bar-mode nil))
 (custom-set-faces
