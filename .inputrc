@@ -26,6 +26,9 @@ set bind-tty-special-chars off
 # set bell-style none
 # set bell-style visible
 
+set colored-stats on
+set colored-completion-prefix on
+
 # some defaults / modifications for the emacs mode
 $if mode=emacs
 
