@@ -118,13 +118,19 @@ source "${HOME}/lib/git-prompt.sh"
 short_hostname=$(echo ${HOSTNAME} | egrep '^.{0,20}' | head -1)
 if [ "${color_prompt}" = yes ]; then
   log_debug "Using color_prompt PS1"
-  PS1="[Exit: \[\033[1;31m\]\${PIPESTATUS[@]/#0/\[\033[0m\]\[\033[1;32m\]0\[\033[1;31m\]}\[\033[0m\]]"
+  export PS1="[Exit: \[\033[1;31m\]\${PIPESTATUS[@]/#0/\[\033[0m\]\[\033[1;32m\]0\[\033[1;31m\]}\[\033[0m\]]"
 else
   log_debug "Using non-color prompt PS1"
   export PS1="[Exit: \${PIPESTATUS[@]/#0/0}]"
 fi
 
-PS1="$PS1"'$(__git_ps1) \w\n\$ '
+export PS1="$PS1"'$(__git_ps1)'
+if [[ "$TERM" =~ "eterm" ]]; then
+  export PS1=" $PS1"'\n$ '
+else
+  export PS1="$PS1"' \w\n\$ '
+fi
+
 log_debug "Done setting PS1 (prompt)"
 
 # enable color support of ls and also add handy aliases
