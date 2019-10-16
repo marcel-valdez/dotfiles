@@ -10,7 +10,7 @@ alias search='find -iregex'
 alias search-history='history | grep -v history | grep '
 alias vdir='ls --color=auto --format=long'
 alias webserver='python -m SimpleHTTPServer'
-alias wget_page='wget -q -O -'
+alias wget-page='wget -q -O -'
 alias less-lineno='less -N'
 alias nano-crypto=crypto-file
 
@@ -66,4 +66,3 @@ alias g-receive-pack='git-receive-pack'
 alias g-upload-pack='git-load-pack'
 
 # end git commands
-alias bisect='/google/data/ro/teams/tetralight/bin/bisect'
