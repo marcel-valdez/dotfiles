@@ -1,8 +1,9 @@
 #!/bin/env bash
 
-alias run-commits-script='make-commits-script > ~/tmp/commits.sh && nano ~/tmp/commits.sh && ~/tmp/commits.sh'
+alias run-commits-script='make-commits-script > ~/tmp/commits.sh \
+&& $EDITOR ~/tmp/commits.sh && ~/tmp/commits.sh'
 alias cls='clear'
-alias edit-bashrc='edit_bashrc_func'
+alias edit-bashrc='$EDITOR .bashrc'
 alias load-bashrc='source $HOME/.bashrc'
 alias nano='nano -F'
 alias rm-merge-files='rm -f `find | grep ".*\.\(REMOTE\|LOCAL\|BASE\).*\.java"`'
