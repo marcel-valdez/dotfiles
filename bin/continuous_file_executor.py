@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 from cStringIO import StringIO
-from thread import *
+from thread import start_new_thread
 import os
 import sys
 import time

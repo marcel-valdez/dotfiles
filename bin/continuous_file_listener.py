@@ -1,14 +1,14 @@
 #!/usr/bin/env python
 
-import os
 import sys
 import time
-from subprocess import call
-from continuous_file_executor import *
+
+from os import popen3
+from continuous_file_executor import watch
 
 def execute_command(command, exec_state, output):
   try:
-    (cmd_stdin, cmd_stdout, cmd_stderror) = os.popen3(command)
+    (_, cmd_stdout, cmd_stderror) = popen3(command)
     last_char = cmd_stdout.read(1)
     while last_char != '':
       output.write(last_char)
@@ -22,33 +22,33 @@ def execute_command(command, exec_state, output):
   except Exception, e:
     print "Error while executing command: " + ' '.join(map(str, command))
     print "Details: " + str(e)
-  except SystemExit, exit:
-    print "-- Exit Status: " + str(exit)
+  except SystemExit, se:
+    print "-- Exit Status: " + str(se)
 
   print "-- Done."
   time.sleep(0.1)
   exec_state['done'] = True
 
-def main(filename, command):
-  watch(filename, execute_command, command)
+def main(_filename, _command):
+  watch(_filename, execute_command, _command)
 
-def quoteWhenSpaced(arg):
+def quote_when_spaced(arg):
   if ' ' in arg:
     return '"' + arg + '"'
-  else:
-    return arg
 
-def notEmpty(arg):
+  return arg
+
+def not_empty(arg):
   return arg != ''
 
 if __name__ == '__main__':
-  script_name = sys.argv[0]
+  SCRIPT_NAME = sys.argv[0]
   if len(sys.argv) < 3:
     print "Usage: " + sys.argv[0] + " <filename> <command> <arg1> <arg2> ... <argN>"
     exit(1)
 
-  filename = sys.argv[1]
-  command_args = sys.argv[2:len(sys.argv)]
-  command = ' '.join(map(quoteWhenSpaced, filter(notEmpty, command_args)))
+  FILENAME = sys.argv[1]
+  COMMAND_ARGS = sys.argv[2:len(sys.argv)]
+  COMMAND = ' '.join(map(quote_when_spaced, filter(not_empty, COMMAND_ARGS)))
 
-  main(filename, command)
+  main(FILENAME, COMMAND)
