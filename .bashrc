@@ -27,6 +27,12 @@ function tmux_attach_initial_session() {
   fi
 }
 
+# load the facebook rc first, so we can override some values
+if [ -f "${HOME}/.fbrc.d/.fbrc" ]; then
+  source "${HOME}/.fbrc.d/.fbrc"
+fi
+
+
 # don't put duplicate lines or lines starting with space in the history.
 # See bash(1) for more options
 export HISTCONTROL=ignoreboth:erasedups
@@ -44,7 +50,7 @@ export HISTFILESIZE=200000
 # history -a: append this session's new history elements to the history file
 # history -c: clear this session's history list
 # history -r: read the history file's entries and make them the current history list
-export PROMPT_COMMAND="${PROMPT_COMMAND:+$PROMPT_COMMAND$'\n'}history -a"
+export PROMPT_COMMAND="history -a"
 
 # If set, the pattern "**" used in a pathname expansion context will
 # match all files and zero or more directories and subdirectories.
@@ -71,11 +77,6 @@ fi
 
 if [ -f "${HOME}/.bash_functions" ]; then
   source "${HOME}/.bash_functions"
-fi
-
-log_debug "Loading .fb* sources"
-if [ -f "${HOME}/.fbrc.d/.fbrc" ]; then
-  source "${HOME}/.fbrc.d/.fbrc"
 fi
 ::util::log_debug "Loaded .bash* sources"
 
@@ -125,12 +126,8 @@ else
   export PS1="[Exit: \${PIPESTATUS[@]/#0/0}]"
 fi
 
-export PS1="$PS1"'$(__git_ps1)'
-if [[ "$TERM" =~ "eterm" ]]; then
-  export PS1=" $PS1"'\n$ '
-else
-  export PS1="$PS1"' \w\n\$ '
-fi
+export PS1="$PS1"'$(__git_ps1) \w\n\$ '
+
 
 ::util::log_debug "Done setting PS1 (prompt)"
 
@@ -240,8 +237,8 @@ node-check-use --silent
 # Reads the pending log buffer
 log-buffer --read
 # devserver-specific
-export http_proxy=http://fwdproxy:8080
-export https_proxy=http://fwdproxy:8080
+export http_proxy='http://fwdproxy:8080'
+export https_proxy='http://fwdproxy:8080'
 export ftp_proxy=''
 export socks_proxy=''
 
