@@ -8,7 +8,7 @@ case $- in
     *) return;;
 esac
 
-function log_debug() {
+function ::util::log_debug() {
   [ "${DEBUG_BASHRC}" != "" ] && echo "$(date +%H:%M:%S) $1"
 }
 
@@ -17,11 +17,11 @@ function tmux_attach_initial_session() {
   type tmx2 &>/dev/null && _tmux=tmx2
 
   if [ "${TMUX_INIT_SESSION}" == "" ]; then
-    log_debug "tmux init: attaching to default session"
+    ::util::log_debug "tmux init: attaching to default session"
     "${_tmux}" new-session -s "default" >&/dev/null \
     || "${_tmux}" attach-session -d -t "default"
   else
-    log_debug "tmux init: attaching to ${TMUX_INIT_SESSION}"
+    ::util::log_debug "tmux init: attaching to ${TMUX_INIT_SESSION}"
     "${_tmux}" new-session -s "${TMUX_INIT_SESSION}" >&/dev/null \
     || "${_tmux}" attach-session -d -t "${TMUX_INIT_SESSION}"
   fi
@@ -64,7 +64,7 @@ fi
 # ~/.bash_aliases, instead of adding them here directly.
 # See /usr/share/doc/bash-doc/examples in the bash-doc package.
 
-log_debug "Loading .bash* sources"
+::util::log_debug "Loading .bash* sources"
 if [ -f "${HOME}/.bash_aliases" ]; then
   source "${HOME}/.bash_aliases"
 fi
@@ -72,13 +72,14 @@ fi
 if [ -f "${HOME}/.bash_functions" ]; then
   source "${HOME}/.bash_functions"
 fi
-log_debug "Loaded .bash* sources"
 
 log_debug "Loading .fb* sources"
 if [ -f "${HOME}/.fbrc.d/.fbrc" ]; then
   source "${HOME}/.fbrc.d/.fbrc"
 fi
+::util::log_debug "Loaded .bash* sources"
 
+::util::log_debug "Loading .fb* sources"
 if [ -f "${HOME}/.fbrc.d/.fb_aliases" ]; then
   source "${HOME}/.fbrc.d/.fb_aliases"
 fi
@@ -86,7 +87,7 @@ fi
 if [ -f "${HOME}/.fbrc.d/.fb_functions" ]; then
   source "${HOME}/.fbrc.d/.fb_functions"
 fi
-log_debug "Loaded .fb* sources"
+::util::log_debug "Loaded .fb* sources"
 
 # set a fancy prompt (non-color, unless we know we "want" color)
 case "${TERM}" in
@@ -112,15 +113,15 @@ fi
 # custom: It is 2017, colored prompt is ALWAYS available
 color_prompt=yes
 
-log_debug "Setting PS1 (prompt)"
+::util::log_debug "Setting PS1 (prompt)"
 source "${HOME}/lib/git-prompt.sh"
 
 short_hostname=$(echo ${HOSTNAME} | egrep '^.{0,20}' | head -1)
 if [ "${color_prompt}" = yes ]; then
-  log_debug "Using color_prompt PS1"
+  ::util::log_debug "Using color_prompt PS1"
   export PS1="[Exit: \[\033[1;31m\]\${PIPESTATUS[@]/#0/\[\033[0m\]\[\033[1;32m\]0\[\033[1;31m\]}\[\033[0m\]]"
 else
-  log_debug "Using non-color prompt PS1"
+  ::util::log_debug "Using non-color prompt PS1"
   export PS1="[Exit: \${PIPESTATUS[@]/#0/0}]"
 fi
 
@@ -131,7 +132,7 @@ else
   export PS1="$PS1"' \w\n\$ '
 fi
 
-log_debug "Done setting PS1 (prompt)"
+::util::log_debug "Done setting PS1 (prompt)"
 
 # enable color support of ls and also add handy aliases
 if [ -x /usr/bin/dircolors ]; then
@@ -154,7 +155,7 @@ alias l='ls -CF'
 #   sleep 10; alert
 # alias alert='notify-send --urgency=low -i "$([ $? = 0 ] && echo terminal || echo error)" "$(history|tail -n1|sed -e '\''s/^\s*[0-9]\+\s*//;s/[;&|]\s*alert$//'\'')"'
 
-log_debug "Loading bash_completion"
+::util::log_debug "Loading bash_completion"
 # enable programmable completion features (you don't need to enable
 # this, if it's already enabled in /etc/bash.bashrc and /etc/profile
 # sources /etc/bash.bashrc).
@@ -166,7 +167,7 @@ if ! shopt -oq posix; then
   fi
 fi
 
-log_debug "Loaded bash_completion"
+::util::log_debug "Loaded bash_completion"
 
 # Path additions
 if [ -d "${HOME}/bin" ]; then
@@ -196,9 +197,9 @@ if [ "$(expr substr $(uname) 1 5)" == "Linux" ]; then
   # if the terminal has not been initialized yet
   if [ -z "${TERMINAL_SESSION_INITIALIZED}" ]; then
     # This is slow, so we do not want to do it for every TMUX pane
-    log_debug "Loading SSH session"
+    ::util::log_debug "Loading SSH session"
     source "${HOME}/lib/ssh-persist-session.sh"
-    log_debug "Loaded SSH session"
+    ::util::log_debug "Loaded SSH session"
     export TERMINAL_SESSION_INITIALIZED="true"
   fi
 
@@ -211,30 +212,30 @@ if [ "$(expr substr $(uname) 1 5)" == "Linux" ]; then
 
   # this will run for every terminal opened and tmux pane
   if type verify-packages &>/dev/null; then
-    log_debug "Verifying packages with cache"
+    ::util::log_debug "Verifying packages with cache"
     verify-packages --use-cache
-    log_debug "Verified packages with cache"
+    ::util::log_debug "Verified packages with cache"
   fi
 fi
 
 # This loads nvm
-log_debug "Loading NVM"
+::util::log_debug "Loading NVM"
 [ -s "$NVM_DIR/nvm.sh" ] && source "$NVM_DIR/nvm.sh"
 # This loads nvm bash_completion
-log_debug "Loading NVM bash completion"
+::util::log_debug "Loading NVM bash completion"
 [ -s "$NVM_DIR/bash_completion" ] && source "${NVM_DIR}/bash_completion"
-log_debug "Loaded NVM"
+::util::log_debug "Loaded NVM"
 
 # Load RVM into a shell session *as a function*
-log_debug "Loading RVM"
+::util::log_debug "Loading RVM"
 [[ -s "${HOME}/.rvm/scripts/rvm" ]] && source "${HOME}/.rvm/scripts/rvm"
 [[ -d "${PATH}:${HOME}/.rvm/bin" ]] && export PATH="${PATH}:${HOME}/.rvm/bin" # Add RVM to PATH for scripting
-log_debug "Loaded RVM"
+::util::log_debug "Loaded RVM"
 
 # This sets up the default node version and loads it
-log_debug "Loading node.js"
+::util::log_debug "Loading node.js"
 node-check-use --silent
-log_debug "Loaded node.js"
+::util::log_debug "Loaded node.js"
 
 # Reads the pending log buffer
 log-buffer --read
