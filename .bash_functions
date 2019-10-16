@@ -21,7 +21,7 @@ function now() {
 function diff-lines() {
   local path=
   local line=
-  while read; do
+  while read -r; do
     esc=$'\033'
     if [[ "${REPLY}" =~ ---\ (a/)?.* ]]; then
       continue
@@ -53,9 +53,9 @@ function g-diff-lines() {
 }
 
 function git-branch-out() {
-  new_branch_name=$1
-  treeish=$2
-  git checkout -b ${new_branch_name} ${treeish}
+  local new_branch_name=$1
+  local treeish=$2
+  git checkout -b "${new_branch_name}" "${treeish}"
 }
 
 function g-branch-out() {
@@ -67,9 +67,10 @@ function g-branch-out() {
 # start npm functions
 
 function node-check-use() {
-  node_version=$(node --version 2>/dev/null)
+  local node_version= && node_version=$(node --version 2>/dev/null)
   if [ "${node_version}" != "v${NODE_VERSION}" ]; then
-    node_version_installed=$(nvm ls 2>/dev/null | grep "${NODE_VERSION}")
+    local node_version_installed= && \
+      node_version_installed=$(nvm ls 2>/dev/null | grep "${NODE_VERSION}")
     if [ "${node_version_installed}" == "" ]; then
       echo "Node v${NODE_VERSION} is not installed, installing now."
       nvm install "v${NODE_VERSION}"
@@ -84,7 +85,7 @@ function node-check-use() {
         ;;
     esac
     # put the path to the node executable
-    which node > ~/.node_exec
+    command -v node > ~/.node_exec
   fi
 }
 
@@ -115,10 +116,10 @@ npm-lint() {
 
 
 npm-run-all() {
-  time=$(date +%H:%M)
+  local time= && time=$(date +%H:%M)
   lemonbar-show --fg "#FFFF00" "(${time}) Running npm-run-all"
   run-step "npm install" "1/5"
-  if [ ! ${__result} -eq 0 ]; then
+  if [ ! "${__step_result}" -eq 0 ]; then
     exit 1
   fi
 
@@ -131,7 +132,7 @@ npm-run-all() {
 # end npm functions
 
 mlocate-here() {
-  directory=$2
+  local directory=$2
   if [ -z "${directory}" ]; then
     directory="$(pwd)/"
   fi
@@ -140,9 +141,9 @@ mlocate-here() {
 
 run-step() {
   eval "$1"
-  __result=$?
-  time=$(date +%H:%M)
-  if [ "${__result}" == "0" ]; then
+  __step_result=$?
+  local time= && time=$(date +%H:%M)
+  if [ "${__step_result}" == "0" ]; then
     lemonbar-show --fg "#99FF99" "(${time}) <$1> done ($2)"
   else
     lemonbar-show --fg "#C45454" "(${time}) <$1> failed ($2)"
@@ -155,7 +156,7 @@ function top-n() {
   | cut -d']' -f2- \
   | awk '{ count[$0]++ } END { for (i in count) print count[i], i }' \
   | sort -rn \
-  | head -$1
+  | head "-$1"
 }
 
 function top-ten() {
@@ -199,15 +200,12 @@ function tmux-session-name() {
   tmux display-message -p '#S'
 }
 
-function tmux-goto-session-client() {
-  g4d $(tmux-session-name)
-}
-
 function tmux-window-set-name() {
+  local short_name=
   if [[ "$2" == "-n" ]]; then
-    local short_name="$1"
+    short_name="$1"
   else
-    local short_name=$(echo "$1" | cut -c 1-30)
+    short_name=$(echo "$1" | cut -c 1-30)
   fi
   tmux rename-window "${short_name}"
 }
@@ -227,32 +225,36 @@ function is-ssh-session() {
 }
 
 function get-ssh-relay-ip() {
-  connection_string=$(([ -n "${SSH_CLIENT}" ] && echo "${SSH_CLIENT}")|| echo "${SSH_CONNECTION}")
+  local connection_string=
+  connection_string=$( ([ -n "${SSH_CLIENT}" ] && echo "${SSH_CLIENT}") \
+                         || echo "${SSH_CONNECTION}")
   echo "${connection_string}" | cut -d' ' -f1
 }
 
 function get-ssh-relay-hostname() {
-  relay_ip=$(get-ssh-relay-ip)
+  local relay_ip=$(get-ssh-relay-ip)
   if [ -n "${relay_ip}" ]; then
     nslookup "${relay_ip}" | grep -o 'name =.*'  | cut -d'=' -f2 | sed 's/ //g' | sed 's/\.$//'
   fi
 }
 
 function __process-ps-lines() {
+  local lines=
   lines="$(cat)"
+  local byte_limit=
   byte_limit="$(numfmt --to=none --from=si $1 2>/dev/null)"
   __debug "__process-ps-lines: byte_limit=${byte_limit}"
   readarray -t lines_array <<<"${lines}"
   for line in "${lines_array[@]}"
   do
-    elements=(${line//:/ })
-    kb_size="${elements[0]}"
+    local elements=(${line//:/ })
+    local kb_size="${elements[0]}"
     if [[ "${kb_size}" == "SIZE"  ]]; then
       echo "${line}"
     else
-      byte_size=$(echo "${kb_size} * 1024" | bc)
+      local byte_size= && byte_size=$(echo "${kb_size} * 1024" | bc)
       elements=("${elements[@]/$kb_size}")
-      human_size="$(numfmt --to=si ${byte_size})"
+      local human_size= && human_size="$(numfmt --to=si ${byte_size})"
       if [[ "${byte_size}" -gt "${byte_limit}"  ]] || [[ -z "${byte_limit}" ]]; then
         echo "${human_size} ${elements[@]}"
       fi
@@ -261,8 +263,8 @@ function __process-ps-lines() {
 }
 
 function ps-show-memory-hogs() {
-  procs=25
-  command_format=comm
+  local procs=25
+  local command_format=comm
   while [[ $# -gt 0 ]]; do
     case $1 in
       -n|--number)
@@ -295,13 +297,14 @@ function ps-show-memory-hogs() {
 
 function ps-nice() {
   # TODO: move to its own script file
-  format="-o pid -o tty -o start -o args"
-  sort="--sort=-comm"
-  config="axw"
+  local format="-o pid -o tty -o start -o args"
+  local sort="--sort=-comm"
+  local config="axw"
 
   # default configuration
-  use_headers="false"
-  full_command="false"
+  local use_headers="false"
+  local full_command="false"
+  local size=
 
   while [[ $# -gt 0 ]]; do
     case $1 in
@@ -337,9 +340,9 @@ function ps-nice() {
     format="-o pid -o size -o tty -o start -o args"
   fi
 
-  ps ${format}\
-    ${sort}\
-    ${config}\
+  ps "${format}"\
+    "${sort}"\
+    "${config}"\
     "$@"
 }
 
@@ -347,7 +350,7 @@ function emacs() {
   if [[ "${TERM}" =~ "eterm" ]]; then
     emacs-client "$@"
   else
-    /usr/bin/emacs --no-window-system "$@" &>/tmp/emacs-${USER}-${RANDOM}.log
+    /usr/bin/emacs --no-window-system "$@" &>"/tmp/emacs-${USER}-${RANDOM}.log"
   fi
 }
 
@@ -390,8 +393,8 @@ function wait-for-process() {
     # skip pid if process does not exist
     [ -z "$(pgrep "${pid}")"  ] && continue
 
-    wait ${pid} &>/dev/null ||\
-      tail --pid=${pid} -f &>/dev/null ||\
+    wait "${pid}" &>/dev/null ||\
+      tail "--pid=${pid}" -f &>/dev/null ||\
       echo "Failed to wait for process ${pid}" 1>&2
   done
 }
