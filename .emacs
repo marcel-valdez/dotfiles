@@ -48,14 +48,16 @@
 (if (display-graphic-p)
     (with-library multi-term
       ;; start an emacs server so editors use an emacs buffer
-      (setq-local server-name (concatenate 'string "server" (getenv "DISPLAY")))
-      (server-start))
+      (setq-local server-name (concatenate 'string "server" (getenv "DISPLAY"))))
   (progn
     (with-library multi-term
       ;; start an emacs server so editors use an emacs buffer
       (setq-local server-name "default")
-      (server-start))
-    (with-library in-tmux)))
+      (with-library in-tmux))))
+
+(with-library server
+  (unless (server-running-p server-name)
+    (server-start)))
 
 (setq browse-url-browser-function 'browse-url-generic)
 (setq browse-url-generic-program "~/modules/chrome-remote-scripts/open-cantata-url")
