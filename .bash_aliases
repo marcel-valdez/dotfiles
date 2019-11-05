@@ -60,6 +60,10 @@ alias g-current-branch='git-current-branch'
 alias git-pull-rebase='git pull --rebase'
 alias g-pull-rebase='git-pull-rebase'
 
+alias g-to-h='git-to-hg'
+alias gtoh='git-to-hg'
+alias gittohg='git-to-hg'
+
 # aliases to things not created by me
 alias g-shell='git-shell'
 alias g-upload-archive='git-upload-archive'
