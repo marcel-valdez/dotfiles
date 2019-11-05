@@ -1,9 +1,7 @@
 #!/usr/bin/env bash
 
-function __debug() {
-  if [[ ! -z ${DEBUG} ]]; then
-    echo "$@"
-  fi
+function ::util::log_debug() {
+  [ "${DEBUG_BASHRC}" != "" ] && echo "$(date +%H:%M:%S) $1"
 }
 
 # Gets a random decimal number made up of 0-N bytes specified by the user.
@@ -243,7 +241,7 @@ function __process-ps-lines() {
   lines="$(cat)"
   local byte_limit=
   byte_limit="$(numfmt --to=none --from=si $1 2>/dev/null)"
-  __debug "__process-ps-lines: byte_limit=${byte_limit}"
+  ::util::log_debug "__process-ps-lines: byte_limit=${byte_limit}"
   readarray -t lines_array <<<"${lines}"
   for line in "${lines_array[@]}"
   do
@@ -288,8 +286,8 @@ function ps-show-memory-hogs() {
     esac
     shift
   done
-  __debug "procs=${procs}"
-  __debug "limit=${limit}"
+  ::util::log_debug "procs=${procs}"
+  ::util::log_debug "limit=${limit}"
 
   ps -A -o size -o pid -o "${command_format}" --sort=-size \
     | __process-ps-lines "${limit}" | head "-${procs}"
