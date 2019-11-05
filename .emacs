@@ -260,15 +260,18 @@
  '(line-number-mode t)
  '(package-selected-packages
    (quote
-    (helm-mt multi-term hl-anything helm helm-xref windresize async xclip undo-tree)))
+    (use-package mc-extras multiple-cursors linear-undo helm-mt multi-term hl-anything helm helm-xref windresize async xclip)))
  '(show-paren-mode t)
- '(tool-bar-mode nil))
+ '(tool-bar-mode nil)
+ '(winner-mode t))
 (custom-set-faces
  ;; custom-set-faces was added by Custom.
  ;; If you edit it by hand, you could mess it up, so be careful.
  ;; Your init file should contain only one such instance.
  ;; If there is more than one, they won't work right.
- '(clang-include-fixer-highlight ((t (:background "white")))))
+ '(clang-include-fixer-highlight ((t (:background "white"))))
+ '(helm-selection ((t (:background "magenta" :foreground "white"))))
+ '(helm-visible-mark ((t (:inverse-video t)))))
 (put 'upcase-region 'disabled nil)
 (put 'downcase-region 'disabled nil)
 (load-theme 'company-dark)
