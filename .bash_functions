@@ -65,6 +65,24 @@ function g-branch-out() {
 # start npm functions
 
 function node-check-use() {
+  local is_silent="no"
+  case "$1" in
+    -s|--silent)
+      is_silent="yes"
+      ;;
+    *)
+      ;;
+  esac
+
+  if ! type nvm &>/dev/null; then
+      local error_msg="node-check-use: nvm is not available." >&2
+      ::util::log_debug "${error_msg}"
+      if [[ "${is_silent}" == "no" ]]; then
+          echo "${error_msg}" >&2
+      fi
+      return 1
+  fi
+
   local node_version= && node_version=$(node --version 2>/dev/null)
   if [ "${node_version}" != "v${NODE_VERSION}" ]; then
     local node_version_installed= && \
