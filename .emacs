@@ -102,18 +102,22 @@
   (add-to-list 'term-unbind-key-list "C-t")
   (setq multi-term-program "/bin/bash")
   ;; start new terminal
-  (global-set-key (kbd "C-t C-n")
-                  (lambda () (interactive) (multi-term)))
+  (global-set-key (kbd "C-t C-n") 'multi-term)
   ;; switch to next terminal within same buffer
-  (global-set-key (kbd "C-t <C-tab>")
-                  (lambda () (interactive) (multi-term-next)))
+  (global-set-key (kbd "C-t TAB")
+                  (lambda () (interactive) (exec-temp-bind
+                                            'multi-term-next
+                                            "TAB")))
   ;; switch to previous terminal within same buffer
-  (global-set-key (kbd "C-t <C-iso-lefttab>")
-                  (lambda () (interactive) (multi-term-prev)))
-  ;; toggle showing/hiding the dedicated terminal window
+  (global-set-key (kbd "C-t S-TAB")
+                  (lambda () (interactive) (exec-temp-bind
+                                            'multi-term-prev
+                                            "S-TAB")))
+  ;; toggle showing/hiding the dedica
   (global-set-key (kbd "C-t C-d")
-                  (lambda () (interactive) (multi-term-dedicated-toggle))))
-
+                  (lambda () (interactive) (exec-temp-bind
+                                            'multi-term-dedicated-toggle
+                                            "C-d"))))
 
 ;; always enable identifications of JavaStyleWords
 (global-subword-mode)
@@ -143,10 +147,18 @@
   (global-set-key (kbd "M-<down>") 'move-text-down))
 
 ;; switch between frames quickly
-(global-unset-key (kbd "C-M-j"))
-(global-set-key (kbd "C-M-j") (lambda () (interactive) (other-frame 1)))
-(global-unset-key (kbd "C-M-k"))
-(global-set-key (kbd "C-M-k") (lambda () (interactive) (other-frame -1)))
+(defun init:next-frame ()
+  "Move focus to the next frame."
+  (interactive)
+  (other-frame 1))
+(defun init:prev-frame ()
+  "Move focus to the previous frame."
+  (interactive)
+  (other-frame -1))
+(global-unset-key (kbd "M-C-j"))
+(global-set-key (kbd "M-C-j") 'init:next-frame)
+(global-unset-key (kbd "M-C-k"))
+(global-set-key (kbd "M-C-k") 'init:prev-frame)
 
 ;; split windows with sensible keys
 (global-unset-key (kbd "C-x \\"))
@@ -155,30 +167,29 @@
 (global-set-key (kbd "C-x -") (lambda () (interactive) (split-window-vertically)))
 ;; resize windows with sensible keys
 (with-library cycle-resize
-  (global-unset-key (kbd "C-x M--"))
-  (global-set-key (kbd "C-x M--")
+  (global-unset-key (kbd "C-x C-_"))
+  (global-set-key (kbd "C-x C-_")
                   (lambda () (interactive) (exec-temp-bind
                                             'cycle-resize-window-vertically
-                                            "M--")))
-  (global-unset-key (kbd "C-x M-\\"))
-  (global-set-key (kbd "C-x M-\\")
+                                            "C-_")))
+  (global-unset-key (kbd "C-x C-\\"))
+  (global-set-key (kbd "C-x C-\\")
                   (lambda () (interactive) (exec-temp-bind
                                             'cycle-resize-window-horizontally
-                                            "M-\\")))
+                                            "C-\\")))
   ;; You also can configure the dimensions (in %) the package will cycle through
   ;; By default, it is: 80% -> 50% -> 20% -> 50%, and so on...
   (setq cycle-resize-steps '(75 50 25 50)))
 
 ;; (with-library auto-complete (global-auto-complete-mode))
-(with-library undo-tree
-  ;; remap undo-redo using undo-tree
-  (global-undo-tree-mode)
-  (global-unset-key (kbd "C-."))
-  (global-set-key (kbd "C-.")
-                  (lambda () (interactive) (undo-tree-undo)))
-  (global-unset-key (kbd "C-,"))
-  (global-set-key (kbd "C-,")
-                  (lambda () (interactive) (undo-tree-redo))))
+(with-library linear-undo
+  (linear-undo-mode t)
+  (global-unset-key (kbd "C-_"))
+  (global-set-key (kbd "C-_")
+                  (lambda () (interactive) (linear-undo/undo-1)))
+  (global-unset-key (kbd "M--"))
+  (global-set-key (kbd "M--")
+                  (lambda () (interactive) (linear-undo/redo-1))))
 
 (with-library multiple-cursors
   ;; extended mode to mark instances, multiple M-3 simply add forward
