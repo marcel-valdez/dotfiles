@@ -1,0 +1,17 @@
+#!/usr/bin/env bash
+
+
+# Gets the commit frequency to a file by user.
+# Tested: Linux
+
+file=$1
+
+if [[ "${file}" = "--help" ]]; then
+  echo "Gets the commit frequency to a file by user."
+  echo "Usage: "
+  echo "  hg-blame-frequency [--help] <file>"
+  echo "    file: The file for which to show the commit frequency."
+  echo "    --help: Shows this help message."
+fi
+
+hg annotate --user --number "${file}" | sed -r 's/^[ ]+//' | sed -r 's/[ ]+/ /' | cut -d' ' -f1,2 | sort | uniq | cut -d' ' -f1 | uniq -c | sort -nr

@@ -1,0 +1,17 @@
+#!/usr/bin/env bash
+
+
+# Gets the number of lines owned per user.
+# Tested: Linux
+
+file=$1
+
+if [[ "${file}" = "--help" ]]; then
+  echo "Gets the number of lines owned per user."
+  echo "Usage: "
+  echo "  hg-blame-ownership [--help] <file>"
+  echo "    file: The file for which to show the line ownership."
+  echo "    --help: Shows this help message."
+fi
+
+hg annotate --user --number "${file}" | sed -r 's/^[ ]+//' | sed -r 's/[ ]+/ /' | cut -d' ' -f1 | sort | uniq -c | sort -nr

@@ -1,0 +1,13 @@
+#!/usr/bin/env bash
+
+if [[ "$1" == "--help" ]]; then
+  echo "Produces the mercurial version of a git command."
+  echo "Usage: "
+  echo "git-to-hg <git command>"
+  echo "Example: "
+  echo "git-to-hg rebase -i"
+  echo "hg rebase --interactive"
+  exit 0
+fi
+
+hg githelp -- git "$@"
