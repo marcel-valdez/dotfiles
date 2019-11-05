@@ -1,5 +1,14 @@
 #!/usr/bin/env bash
 
+emacs_binary=$(type -p emacsclient) 2>/dev/null
+
+
+if ! [[ $? -eq 0 ]]; then
+  echo "There is no emacsclient binary in PATH." >&2
+  exit 1
+fi
+
 # editor_cmd=(/usr/bin/emacsclient --create-frame --tty --socket-name=default)
 # EDITOR="'""${editor_cmd[@]}""'" "${editor_cmd[@]}" "$@"
-/usr/bin/emacsclient --socket-name=default "$@"
+
+${emacs_binary} --socket-name=server "$@"
