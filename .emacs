@@ -29,6 +29,8 @@
 ;; interfere
 ;; core macros used for basic functionality
 (require 'marcel-core-macros)
+;; core package required by many other packages
+(with-library cl)
 ;; loads packages only available at the office
 ;; uses the 'google package by default.
 (with-library at-office)
