@@ -28,10 +28,9 @@ function tmux_attach_initial_session() {
 }
 
 # load the facebook rc first, so we can override some values
-if [ -f "${HOME}/.fbrc.d/.fbrc" ]; then
-  source "${HOME}/.fbrc.d/.fbrc"
+if [ -f "${HOME}/.fb.d/.fbrc" ]; then
+  source "${HOME}/.fb.d/.fbrc"
 fi
-
 
 # don't put duplicate lines or lines starting with space in the history.
 # See bash(1) for more options
@@ -115,7 +114,7 @@ fi
 color_prompt=yes
 
 ::util::log_debug "Setting PS1 (prompt)"
-source "${HOME}/lib/git-prompt.sh"
+[[ -f "${HOME}/lib/git-prompt.sh" ]] && source "${HOME}/lib/git-prompt.sh"
 
 short_hostname=$(echo ${HOSTNAME} | egrep '^.{0,20}' | head -1)
 if [ "${color_prompt}" = yes ]; then
@@ -126,7 +125,13 @@ else
   export PS1="[Exit: \${PIPESTATUS[@]/#0/0}]"
 fi
 
-export PS1="$PS1"'$(__git_ps1) \w\n\$ '
+# Show the current bookmark or branch
+if type _scm_prompt &>/dev/null; then
+  ::util::log_debug "Using _scm_prompt"
+  export PS1="$PS1"'$(_scm_prompt) \w\n\$ '
+elif type __git_ps1 &>/dev/null; then
+  export PS1="$PS1"'$(__git_ps1) \w\n\$ '
+fi
 
 
 ::util::log_debug "Done setting PS1 (prompt)"
