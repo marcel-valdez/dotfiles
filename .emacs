@@ -21,7 +21,7 @@
 
 (package-initialize)
 (add-to-list 'package-archives '("marmalade" . "http://marmalade-repo.org/packages/"))
-(add-to-list 'package-archives '("melpa" . "http://melpa.org/packages/"))
+(add-to-list 'package-archives '("melpa" . "https://melpa.org/packages/"))
 (add-to-list 'package-archives '("elpa" . "http://elpa.org/packages/"))
 
 
@@ -245,7 +245,7 @@
  ;; If you edit it by hand, you could mess it up, so be careful.
  ;; Your init file should contain only one such instance.
  ;; If there is more than one, they won't work right.
- '(c-basic-offset 2)
+ '(c-basic-offset 2 t)
  '(column-number-mode t)
  '(company-backends
    (quote
@@ -260,7 +260,7 @@
  '(line-number-mode t)
  '(package-selected-packages
    (quote
-    (use-package mc-extras multiple-cursors linear-undo helm-mt multi-term hl-anything helm helm-xref windresize async xclip)))
+    (company use-package mc-extras multiple-cursors linear-undo helm-mt multi-term hl-anything helm helm-xref windresize async xclip)))
  '(show-paren-mode t)
  '(tool-bar-mode nil)
  '(winner-mode t))
