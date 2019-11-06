@@ -11,4 +11,11 @@ fi
 # editor_cmd=(/usr/bin/emacsclient --create-frame --tty --socket-name=default)
 # EDITOR="'""${editor_cmd[@]}""'" "${editor_cmd[@]}" "$@"
 
-${emacs_binary} --socket-name=server "$@"
+options=()
+if ! [[ "${TERM}" =~ "eterm" ]]; then
+    # we want a new frame on this tty if we're not within emacs
+    # already.
+    options+=(--tty)
+fi
+
+${emacs_binary} --socket-name=default "${options[@]}" "$@"
