@@ -97,7 +97,8 @@
 
 (with-library multi-term
   ;; start multi-term custom configurations
-  (setq server-window 'pop-to-buffer)
+  ;; (setq server-window 'pop-to-buffer)
+  (setq server-window 'display-buffer-other-frame)
   (global-unset-key (kbd "C-t"))
   (add-to-list 'term-unbind-key-list "C-t")
   (setq multi-term-program "/bin/bash")
