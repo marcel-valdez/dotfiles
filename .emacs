@@ -15,8 +15,10 @@
              '("melpa" . "https://melpa.org/packages/"))
 ;;(add-to-list 'package-archives '("elpa-gnu", "http://elpa.gnu.org/packages/"))
 (setq inhibit-startup-screen t)
+(menu-bar-mode -1)
 
 ;; initialize packages
+(require 'cl)
 (require 'marcel-macros)
 ;; initialize use-package
 (unless (package-installed-p 'use-package)
