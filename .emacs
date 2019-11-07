@@ -92,6 +92,14 @@
   (setq-local css-indent-offset 2))
 (add-hook 'prog-mode-hook 'set-custom-indent)
 
+;; setup telephone-line
+
+(use-package telephone-line
+  :ensure t
+  :config
+  (require 'telephone-line)
+  (require 'telephone-line-config)
+  (telephone-line-mode t))
 
 ;;;; global editing settings and overrides
 ;; use undo-tree instead of built-in undo
