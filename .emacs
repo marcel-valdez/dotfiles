@@ -18,7 +18,14 @@
 
 ;; initialize packages
 (require 'marcel-macros)
+;; initialize use-package
+(unless (package-installed-p 'use-package)
+  (package-refresh-contents)
+  (package-install 'use-package))
+
 ;; (with-library better-defaults)
+(with-library use-package)
+(with-library use-package-ensure)
 
 ;;; re-binds certain keys when inside a TMUX session
 (if (display-graphic-p)
