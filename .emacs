@@ -32,8 +32,16 @@
 ;; core package required by many other packages
 (with-library cl)
 ;; loads packages only available at the office
-;; uses the 'google package by default.
 (with-library at-office)
+;; initialize use-package
+(unless (package-installed-p 'use-package)
+  (package-refresh-contents)
+  (package-install 'use-package))
+
+;; (with-library better-defaults)
+(with-library use-package)
+(with-library use-package-ensure)
+
 (with-library helm-xref)
 (with-library flycheck
   (global-flycheck-mode))
@@ -129,6 +137,13 @@
 (setq whitespace-line-column 80)
 ;; only highlight tab chars and trailing whitespace
 (setq whitespace-style '(tab-mark trailing lines-tail face))
+;; configure the status bar using telephone-line
+(use-package telephone-line
+             :ensure t
+             :config
+             (require 'telephone-line)
+             (require 'telephone-line-config)
+               (telephone-line-mode t))
 
 ;; switch between windows quickly
 (global-unset-key (kbd "M-j"))
@@ -251,7 +266,7 @@
  '(company-backends
    (quote
     (company-tasks company-reviewers company-bbdb company-nxml company-css company-capf
-                   (company-dabbrev-code company-keywords))))
+		   (company-dabbrev-code company-keywords))))
  '(company-minimum-prefix-length 1)
  '(custom-enabled-themes (quote (tango-dark)))
  '(custom-safe-themes
