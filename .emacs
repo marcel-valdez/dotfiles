@@ -160,7 +160,7 @@
   (global-set-key (kbd "M-x") 'helm-M-x)
   (global-set-key (kbd "C-x C-b") 'helm-buffers-list)
   (set-face-attribute 'helm-selection nil
-                      :background "black"
+                      :background "brightblack"
                       :foreground "green"))
 
 ;; configure rotate-window
@@ -229,7 +229,16 @@
  ;; If you edit it by hand, you could mess it up, so be careful.
  ;; Your init file should contain only one such instance.
  ;; If there is more than one, they won't work right.
- '(ac-candidate-face ((t (:inherit popup-face)))))
+ '(ac-candidate-face ((t (:inherit popup-face))))
+ '(company-preview-common ((t (:inherit (company-tooltip-selection company-tooltip)))))
+ '(company-scrollbar-bg ((t (:background "cyan"))))
+ '(company-scrollbar-fg ((t (:background "brightcyan"))))
+ '(company-tooltip ((t (:background "black" :foreground "color-244"))))
+ '(company-tooltip-common ((t (:foreground "brightwhite" :weight extra-bold))))
+ '(company-tooltip-selection ((t (:background "brightblack"))))
+ '(helm-selection ((t (:background "brightblack" :foreground "green"))))
+ '(region ((t (:background "color-235"))))
+ '(whitespace-line ((t (:background "color-237" :foreground "color-250")))))
 (put 'downcase-region 'disabled nil)
 (put 'upcase-region 'disabled nil)
 
