@@ -1,0 +1,24 @@
+#!/usr/bin/env bash
+
+parameters=()
+file_parameters=()
+
+reading_params="true"
+for arg in "$@"; do
+  case ${arg} in
+    --wsl-files)
+      reading_params="false"
+      shift
+      ;;
+    *)
+      if [[ "${reading_params}" == "true" ]]; then
+        parameters+=("${arg}")
+      else
+        file_parameters+=($(wslpath "${arg}"))
+      fi
+      shift
+      ;;
+  esac
+done
+
+"${parameters[@]}" "${file_parameters[@]}"
