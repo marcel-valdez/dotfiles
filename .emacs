@@ -261,12 +261,12 @@
  ;; If you edit it by hand, you could mess it up, so be careful.
  ;; Your init file should contain only one such instance.
  ;; If there is more than one, they won't work right.
- '(c-basic-offset 2 t)
+ '(c-basic-offset 2)
  '(column-number-mode t)
  '(company-backends
    (quote
     (company-tasks company-reviewers company-bbdb company-nxml company-css company-capf
-		   (company-dabbrev-code company-keywords))))
+                   (company-dabbrev-code company-keywords))))
  '(company-minimum-prefix-length 1)
  '(custom-enabled-themes (quote (tango-dark)))
  '(custom-safe-themes
