@@ -116,7 +116,6 @@ color_prompt=yes
 ::util::log_debug "Setting PS1 (prompt)"
 [[ -f "${HOME}/lib/git-prompt.sh" ]] && source "${HOME}/lib/git-prompt.sh"
 
-short_hostname=$(echo ${HOSTNAME} | egrep '^.{0,20}' | head -1)
 if [ "${color_prompt}" = yes ]; then
   ::util::log_debug "Using color_prompt PS1"
   export PS1="[Exit: \[\033[1;31m\]\${PIPESTATUS[@]/#0/\[\033[0m\]\[\033[1;32m\]0\[\033[1;31m\]}\[\033[0m\]]"
@@ -128,10 +127,13 @@ fi
 # Show the current bookmark or branch
 if type _scm_prompt &>/dev/null; then
   ::util::log_debug "Using _scm_prompt"
-  export PS1="$PS1"'$(_scm_prompt) \w\n\$ '
+  export PS1="${PS1}"'$(_scm_prompt) \w\n'
 elif type __git_ps1 &>/dev/null; then
-  export PS1="$PS1"'$(__git_ps1) \w\n\$ '
+  export PS1="${PS1}"'$(__git_ps1) \w\n'
 fi
+
+short_hostname=$(echo ${HOSTNAME} | egrep '^.{0,20}' | head -1)
+export PS1="${PS1}\e[0;34m@${short_hostname}\e[m \$ "
 
 
 ::util::log_debug "Done setting PS1 (prompt)"
