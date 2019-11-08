@@ -222,14 +222,16 @@ fi
 
 # This loads nvm
 ::util::log_debug "Loading NVM"
-[ -s "$NVM_DIR/nvm.sh" ] && source "$NVM_DIR/nvm.sh"
+[ -s "${NVM_DIR}/nvm.sh" ] && source "${NVM_DIR}/nvm.sh"
 # This loads nvm bash_completion
 ::util::log_debug "Loading NVM bash completion"
-[ -s "$NVM_DIR/bash_completion" ] && source "${NVM_DIR}/bash_completion"
+[ -s "${NVM_DIR}/bash_completion" ] && source "${NVM_DIR}/bash_completion"
 ::util::log_debug "Loaded NVM"
 
 # Load RVM into a shell session *as a function*
 ::util::log_debug "Loading RVM"
+[[ -d "/usr/share/rvm/scripts/" ]] && source "/usr/share/rvm/scripts/rvm"
+[[ -d "/usr/share/rvm/bin" ]] && export PATH="${PATH}:/usr/share/rvm/bin"
 [[ -s "${HOME}/.rvm/scripts/rvm" ]] && source "${HOME}/.rvm/scripts/rvm"
 [[ -d "${PATH}:${HOME}/.rvm/bin" ]] && export PATH="${PATH}:${HOME}/.rvm/bin" # Add RVM to PATH for scripting
 ::util::log_debug "Loaded RVM"
