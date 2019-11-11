@@ -26,4 +26,13 @@ fi
 cmd="$1"
 shift
 
-python "$script_dir/continuous_file_listener.py" "${file}" "${cmd}" "$@"
+python=python
+if ! type python &>/dev/null; then
+  if type python3 &>/dev/null; then
+    python=python3
+  elif type python2.7 &>/dev/null; then
+    python=python2.7
+  fi
+fi
+
+"${python}" "$script_dir/continuous_file_listener.py" "${file}" "${cmd}" "$@"
