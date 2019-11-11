@@ -133,9 +133,9 @@ elif type __git_ps1 &>/dev/null; then
 fi
 
 if [[ "${color_prompt}" = yes ]]; then
-  export PS1="${PS1}"'\[\033[0;34m\]@'${short_hostname}'\[\033[0;0m\] \$ '
+  export PS1="${PS1}"'\[\033[0;34m\]@'"${short_hostname}"'\[\033[0;0m\] \$ '
 else
-  export PS1="${PS1}"'@'${short_hostname}' \$ '
+  export PS1="${PS1}"'@'"${short_hostname}"' \$ '
 fi
 
 short_hostname=$(echo ${HOSTNAME} | egrep '^.{0,20}' | head -1)
