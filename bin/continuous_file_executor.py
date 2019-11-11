@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
-from cStringIO import StringIO
-from thread import *
+from io import StringIO
+from _thread import *
 import os
 import sys
 import time
@@ -12,10 +12,10 @@ PAD_ROWS = 1000
 
 def validate_file(filename):
   if not os.path.isfile(filename):
-    print "The file " + filename + " does not exist."
+    print("The file " + filename + " does not exist.")
     sys.exit(1)
   if not os.access(filename, os.R_OK):
-    print "The file " + filename + " is not accessible."
+    print("The file " + filename + " is not accessible.")
     sys.exit(1)
 
 def get_modification_time(filename):
@@ -23,6 +23,7 @@ def get_modification_time(filename):
 
 def init_curses():
   curses.initscr()
+  curses.start_color()
   win = curses.newpad(PAD_LINES, PAD_ROWS)
   win.idlok(1)
   win.scrollok(True)
@@ -68,19 +69,19 @@ def replace_stdout(new_stdout):
 def execute_file(filename, exec_state, output):
   try:
     execfile(filename, { '__name__' : '__main__' })
-  except Exception, ex:
-    print "Error occurred while executing " + filename
-    print str(ex)
-  except SystemExit, exit:
-    print "-- Exit status: " + str(exit)
+  except Exception as ex:
+    print("Error occurred while executing " + filename)
+    print(str(ex))
+  except SystemExit as exit:
+    print("-- Exit status: " + str(exit))
 
-  print "-- Done."
-  time.sleep(0.1) # give print_output time to print remaining contents
+  print("-- Done.")
+  time.sleep(0.1) # give print_output time to print(remaining contents)
   exec_state['done'] = True
 
 def print_mod_message(filename, modtime):
   modtime_msg = time.strftime("%I:%M:%S %p", time.localtime(modtime))
-  print "-- [" + modtime_msg + "] Change detected."
+  print("-- [" + modtime_msg + "] Change detected.")
 
 def handle_scroll(win):
   key = win.getch()
@@ -112,11 +113,11 @@ def watch(filename, method, parameter):
   try:
     while True:
       modtime = get_modification_time(filename)
-      if last_modification_time != modtime
+      if last_modification_time != modtime:
         handle_modification(win, filename, modtime, parameter)
         last_modification_time = modtime
       else:
-        handle_scroll(win, proc_stdout)
+        handle_scroll(win)
 
       time.sleep(0.1)
   finally:
@@ -127,7 +128,7 @@ def main(filename):
 
 if __name__ == '__main__':
   if len(sys.argv) < 2:
-    print "Usage: " + sys.argv[0] + " <filename> "
+    print("Usage: " + sys.argv[0] + " <filename> ")
     sys.exit(1)
 
   main(sys.argv[1])

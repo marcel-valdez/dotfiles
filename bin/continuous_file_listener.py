@@ -3,8 +3,8 @@
 import os
 import sys
 import time
+from continuous_file_executor import watch
 from subprocess import call
-from continuous_file_executor import *
 
 def execute_command(command, exec_state, output):
   try:
@@ -19,13 +19,13 @@ def execute_command(command, exec_state, output):
       output.write(last_char)
       last_char = cmd_stderror.read(1)
 
-  except Exception, e:
-    print "Error while executing command: " + ' '.join(map(str, command))
-    print "Details: " + str(e)
-  except SystemExit, exit:
-    print "-- Exit Status: " + str(exit)
+  except Exception as e:
+    print("Error while executing command: ").join(map(str, command))
+    print("Details: " + str(e))
+  except SystemExit as exit:
+    print("-- Exit Status: " + str(exit))
 
-  print "-- Done."
+  print("-- Done.")
   time.sleep(0.1)
   exec_state['done'] = True
 
@@ -44,7 +44,7 @@ def notEmpty(arg):
 if __name__ == '__main__':
   script_name = sys.argv[0]
   if len(sys.argv) < 3:
-    print "Usage: " + sys.argv[0] + " <filename> <command> <arg1> <arg2> ... <argN>"
+    print("Usage: " + sys.argv[0] + " <filename> <command> <arg1> <arg2> ... <argN>")
     sys.exit(1)
 
   filename = sys.argv[1]
