@@ -1,0 +1,102 @@
+#!/usr/bin/env bash
+
+SCRIPT="$(basename $0)"
+
+
+function ::debug() {
+  ! [ -z DEBUG ] && echo "${SCRIPT}: $@"
+}
+
+function print_error() {
+  echo -e "\e[31m\nERROR: $1 \e[0m\n"
+}
+
+function usage() {
+  cat <<EOF
+${SCRIPT} [--help|-h] [<--directory|-d <dir>>] <--file|-f <file>|--regx|-r <regx>> <command arg1 arg2 ... >
+
+--help: Shows this help message and exits.
+--directory: The directory on which to listen to any file changes. (e.g. /tmp/foo)
+    Note: Defaults to the current directory.
+--file: When this file changes, the command will be called.
+--regx: A regular expression that when a modified file's name matches, triggers the command.
+    Note: Overrides --file.
+
+command arg1 arg2...: The command to execute when a file or file regx matches. You can use the
+special name __file__ to replace it with the filename of the file that triggered the command.
+EOF
+}
+
+
+directory="$(pwd)"
+file=
+regx=
+command=
+while [ $# -gt 0 ]; do
+  arg="$1"
+  case "${arg}" in
+    --directory|-d)
+      directory="$2"
+      shift
+      ;;
+    --file|-f)
+      file="$2"
+      shift
+      ;;
+    --regx|-r)
+      regx="$2"
+      shift
+      ;;
+    --help)
+      usage
+      exit 0
+      ;;
+    *)
+      command="$@"
+      break
+      ;;
+  esac
+  shift
+done
+
+::debug "directory=${directory}"
+::debug "file=${file}"
+::debug "regx=${regx}"
+::debug "command=${command}"
+
+
+if [ -z "${file}" ] && [ -z "${regx}" ]; then
+    print_error "Either --file or --regx parameters must be given."
+    usage
+    exit 1
+fi
+
+if [ -z "${command}" ]; then
+    print_error "No command was provided."
+    usage
+    exit 1
+fi
+
+
+::debug "Watching directory: ${directory}"
+inotifywait -e close_write,moved_to,create,modify -m "${directory}" |
+    while read -r directory events filename; do
+      ::debug "Events triggered: ${events}"
+      # TODO: Set a minimum time treshold to trigger the event. At the moment a
+      # single file save from emacs triggers two rapid-fire MODIFY events.
+      if ! [ -z ${regx} ]; then
+          if [[ "${filename}" =~ ${regx} ]]; then
+              ::debug "Matched regx: ${filename}"
+              effective_command=$(echo ${command} | sed s/__file__/"${filename}"/g)
+              ::debug "${effective_command}"
+              ${effective_command}
+          fi
+      elif [ "${filename}" = "${file}" ]; then
+          ::debug "Matched filename: ${filename}"
+          effective_command=$(echo ${command} | sed s/__file__/"${filename}"/g)
+          ::debug "${effective_command}"
+          ${effective_command}
+      else
+        ::debug "Ignored filename: ${filename}"
+      fi
+    done
