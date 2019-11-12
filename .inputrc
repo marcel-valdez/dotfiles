@@ -28,6 +28,9 @@ set bind-tty-special-chars off
 
 set colored-stats on
 set colored-completion-prefix on
+set completion-ignore-case on
+set blink-matching-paren on
+set enable-bracketed-paste on
 
 # some defaults / modifications for the emacs mode
 $if mode=emacs
