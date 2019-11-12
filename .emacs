@@ -276,7 +276,7 @@
  '(line-number-mode t)
  '(package-selected-packages
    (quote
-    (company use-package mc-extras multiple-cursors linear-undo helm-mt multi-term hl-anything helm helm-xref windresize async xclip)))
+    (graphviz-dot-mode cycle-resize company use-package mc-extras multiple-cursors linear-undo helm-mt multi-term hl-anything helm helm-xref windresize async xclip)))
  '(show-paren-mode t)
  '(tool-bar-mode nil)
  '(winner-mode t))
