@@ -28,7 +28,8 @@ function tmux_attach_initial_session() {
 }
 
 # load the facebook rc first, so we can override some values
-if [ -f "${HOME}/.fb.d/.fbrc" ]; then
+if [[ -f "${HOME}/.fb.d/.fbrc" ]]; then
+  ::util::log_debug "Loading .fbrc"
   source "${HOME}/.fb.d/.fbrc"
 fi
 
@@ -80,12 +81,12 @@ fi
 ::util::log_debug "Loaded .bash* sources"
 
 ::util::log_debug "Loading .fb* sources"
-if [ -f "${HOME}/.fbrc.d/.fb_aliases" ]; then
-  source "${HOME}/.fbrc.d/.fb_aliases"
+if [ -f "${HOME}/.fb.d/.fb_aliases" ]; then
+  source "${HOME}/.fb.d/.fb_aliases"
 fi
 
-if [ -f "${HOME}/.fbrc.d/.fb_functions" ]; then
-  source "${HOME}/.fbrc.d/.fb_functions"
+if [ -f "${HOME}/.fb.d/.fb_functions" ]; then
+  source "${HOME}/.fb.d/.fb_functions"
 fi
 ::util::log_debug "Loaded .fb* sources"
 
