@@ -71,3 +71,6 @@ alias g-receive-pack='git-receive-pack'
 alias g-upload-pack='git-load-pack'
 
 # end git commands
+
+alias tag-all='rm TAGS; find . -name "*.php" -o -name "*.phpt" -o -name "*.c" -o -name "*.cpp" -o -name "*.c++"  -o -name "*.h" -o -name "*.hpp" -o -name "*.py" -o -name "*.pl" -o -name "*.pm" -o -name "*.java" -o -name "*.thrift" | ctags -L -'
+alias tag-cpp='rm TAGS; find . -name "*.c" -o -name "*.cpp" -o -name "*.h" -o -name "*.hpp" | ctags -L -'
