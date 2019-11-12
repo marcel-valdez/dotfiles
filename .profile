@@ -9,10 +9,10 @@
 #umask 022
 
 # if running bash
-if [ -n "$BASH_VERSION" ]; then
+if [ -n "${BASH_VERSION}" ]; then
   # include .bashrc if it exists
-  if [ -f "$HOME/.bashrc" ]; then
-    source "$HOME/.bashrc"
+  if [ -f "${HOME}/.bashrc" ]; then
+    source "${HOME}/.bashrc"
   fi
 else
   # As a general thing, try not to put anything here and always use
@@ -22,13 +22,14 @@ else
   # command line, and therefore don't need to execute .bashrc
 
   # Instructions required even when not in bash shell
-  if [ -d "$HOME/bin" ]; then
-    export PATH=$PATH:"$HOME/bin"
+  if [ -d "${HOME}/bin" ]; then
+    export PATH=$PATH:"${HOME}/bin"
   fi
 
   # NOTE: I am uncertain if NVM can be run like this in a non-interactive
   # shell session.
-  [ -s "$NVM_DIR/nvm.sh" ] && source "$NVM_DIR/nvm.sh"
-  [[ -s "$HOME/.rvm/scripts/rvm" ]] && source "$HOME/.rvm/scripts/rvm"
-  export PATH="$PATH:$HOME/.rvm/bin" # Add RVM to PATH for scripting
+  [ -s "${NVM_DIR}/nvm.sh" ] && source "${NVM_DIR}/nvm.sh"
+  [ -s "${HOME}/.rvm/scripts/rvm" ] && source "${HOME}/.rvm/scripts/rvm"
+  # Add RVM to PATH for scripting
+  [ -e "${HOME}/.rvm/bin/" ] && export PATH="${PATH}:${HOME}/.rvm/bin"
 fi
