@@ -28,9 +28,10 @@ function tmux_attach_initial_session() {
 }
 
 # load the facebook rc first, so we can override some values
-if [[ -f "${HOME}/.fb.d/.fbrc" ]]; then
+if [ -e "${HOME}/.fb.d/.fbrc" ]; then
   ::util::log_debug "Loading .fbrc"
   source "${HOME}/.fb.d/.fbrc"
+  ::util::log_debug "Loaded .fbrc"
 fi
 
 # don't put duplicate lines or lines starting with space in the history.
