@@ -217,7 +217,9 @@ if [ "$(expr substr $(uname) 1 5)" == "Linux" ]; then
 
   # if we are not within tmux and not within an emacs ansi-term
   # start or join a tmux session
-  if [ "$TMUX" == "" ] && [[ ! "$TERM" =~ "eterm" ]] ; then
+  if [ "${TMUX}" == "" ] &&\
+     [[ ! "${TERM}" =~ "eterm" ]] &&\
+     [[ "${TERM_PROGRAM}" != "nuclide" ]] ; then
     # this will run once per non-eterm terminal opened
     tmux_attach_initial_session
   fi
