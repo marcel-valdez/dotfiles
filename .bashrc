@@ -251,15 +251,10 @@ node-check-use --silent
 
 # Reads the pending log buffer
 log-buffer --read
-# devserver-specific
-if [[ "${HOSTNAME}" =~ .*facebook.com.* ]]; then
-  export http_proxy='http://fwdproxy:8080'
-  export https_proxy='http://fwdproxy:8080'
-else
-  export http_proxy=''
-  export https_proxy=''
-fi
 
+# Proxies setup
+export http_proxy=''
+export https_proxy=''
 export ftp_proxy=''
 export socks_proxy=''
 
