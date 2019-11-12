@@ -15,6 +15,9 @@ function usage() {
   cat <<EOF
 ${SCRIPT} [--help|-h] [<--directory|-d <dir>>] <--file|-f <file>|--regx|-r <regx>> <command arg1 arg2 ... >
 
+Note that this script triggers on the following inotify filesystem events:
+  close_write,moved_to,modify
+
 --help: Shows this help message and exits.
 --directory: The directory on which to listen to any file changes. (e.g. /tmp/foo)
     Note: Defaults to the current directory.
@@ -79,24 +82,25 @@ fi
 
 
 ::debug "Watching directory: ${directory}"
-inotifywait -e close_write,moved_to,create,modify -m "${directory}" |
+inotifywait -e close_write,moved_to,modify -m "${directory}" |
     while read -r directory events filename; do
       ::debug "Events triggered: ${events}"
       # TODO: Set a minimum time treshold to trigger the event. At the moment a
       # single file save from emacs triggers two rapid-fire MODIFY events.
       if ! [ -z ${regx} ]; then
-          if [[ "${filename}" =~ ${regx} ]]; then
+           if [[ "${filename}" =~ ${regx} ]]; then
               ::debug "Matched regx: ${filename}"
               effective_command=$(echo ${command} | sed s/__file__/"${filename}"/g)
               ::debug "${effective_command}"
               ${effective_command}
+              continue
           fi
       elif [ "${filename}" = "${file}" ]; then
           ::debug "Matched filename: ${filename}"
           effective_command=$(echo ${command} | sed s/__file__/"${filename}"/g)
           ::debug "${effective_command}"
           ${effective_command}
-      else
-        ::debug "Ignored filename: ${filename}"
+          continue
       fi
+      ::debug "Ignored filename: ${filename}"
     done
