@@ -52,14 +52,23 @@
       (global-set-key (kbd "C-t C-d")
                       (lambda () (interactive) (multi-term-dedicated-toggle))))
   ;; if emacs is run as a terminal application
-  (with-library in-tmux))
+  (with-library in-tmux
+    (with-library helm-dash
+      (setq helm-dash-browser-func 'eww)))
+
+(with-library zeal-at-point
+  (global-set-key "\C-cd" 'zeal-at-point)
+  (setq zeal-at-point-zeal-version "0.6.1")
+  (add-to-list 'zeal-at-point-mode-alist '(ruby-mode . ("ruby2" "ruby"))))
 
 (with-library xclip (xclip-mode))
 (with-library multiple-cursors)
 (with-library helm-ls-git)
 (with-library elpy)
-(with-library flycheck
-  (setq flycheck-checker 'python-pylint))
+(with-library flycheck)
+;;  (defun flycheck-set-pylint ()
+;;    (setq flycheck-checker 'python-pylint))
+;;  (add-hook 'python-mode-hook 'flycheck-set-pylint))
 (with-library flyspell-correct
   (define-key flyspell-mode-map (kbd "C-;") 'flyspell-correct-wrapper))
 (with-library markdown-mode
@@ -95,7 +104,6 @@
 (add-hook 'prog-mode-hook 'set-custom-indent)
 
 ;; setup telephone-line
-
 (use-package telephone-line
   :ensure t
   :config
@@ -214,6 +222,21 @@
               (global-set-key (kbd "C-x M-l") 'mc/edit-lines))
 
 (with-library erc-status-sidebar)
+
+(with-library flycheck-checkbashisms
+  ;; Check 'echo -n' usage
+  (setq flycheck-checkbashisms-newline t)
+  ;; Check non-POSIX issues but required to be supported  by Debian Policy 10.4
+  ;; Setting this variable to non nil made flycheck-checkbashisms-newline effects
+  ;; regardless of its value
+  (setq flycheck-checkbashisms-posix t)
+
+  (eval-after-load 'flycheck
+    '(add-hook 'flycheck-mode-hook #'flycheck-checkbashisms-setup))
+
+  (defun set-flycheck-checkbashisms ()
+    (setq flycheck-checker 'sh-checkbashisms))
+  (add-hook 'sh-mode 'set-flycheck-checkbashisms))
 
 (custom-set-variables
  ;; custom-set-variables was added by Custom.
