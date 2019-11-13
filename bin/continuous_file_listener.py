@@ -1,14 +1,14 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
 import sys
 import time
+import subprocess
 
-from os import popen3
 from continuous_file_executor import watch
 
 def execute_command(command, exec_state, output):
   try:
-    (_, cmd_stdout, cmd_stderror) = popen3(command)
+    (_, cmd_stdout, cmd_stderror) = subprocess.Popen(command)
     last_char = cmd_stdout.read(1)
     while last_char != '':
       output.write(last_char)
@@ -19,13 +19,13 @@ def execute_command(command, exec_state, output):
       output.write(last_char)
       last_char = cmd_stderror.read(1)
 
-  except Exception, e:
-    print "Error while executing command: " + ' '.join(map(str, command))
-    print "Details: " + str(e)
-  except SystemExit, se:
-    print "-- Exit Status: " + str(se)
+  except Exception as e:
+    print("Error while executing command: ".join(map(str, command)))
+    print("Details: " + str(e))
+  except SystemExit as se:
+    print("-- Exit Status: " + str(se))
 
-  print "-- Done."
+  print("-- Done.")
   time.sleep(0.1)
   exec_state['done'] = True
 
@@ -44,7 +44,7 @@ def not_empty(arg):
 if __name__ == '__main__':
   SCRIPT_NAME = sys.argv[0]
   if len(sys.argv) < 3:
-    print "Usage: " + sys.argv[0] + " <filename> <command> <arg1> <arg2> ... <argN>"
+    print("Usage: " + sys.argv[0] + " <filename> <command> <arg1> <arg2> ... <argN>")
     exit(1)
 
   FILENAME = sys.argv[1]
