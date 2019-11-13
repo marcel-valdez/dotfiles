@@ -22,12 +22,12 @@ function open-bg() {
 function compress-pdf() {
 
   if [ "$1" == "--help" ]; then
-   echo "This command compresses a pdf to enough quality for documents with images (like passports)"
-   echo "Usage:"
-   echo "compress-pdf <input-file> [output-file]"
-   echo "input-file: The PDF file to compress"
-   echo "output-file: The name of the output file to compress, if no output-file is given"
-   echo "             then a file called compressed-<input-file> is created."
+    echo "This command compresses a pdf to enough quality for documents with images (like passports)"
+    echo "Usage:"
+    echo "compress-pdf <input-file> [output-file]"
+    echo "input-file: The PDF file to compress"
+    echo "output-file: The name of the output file to compress, if no output-file is given"
+    echo "             then a file called compressed-<input-file> is created."
   fi
 
   input_file=$1
@@ -117,11 +117,12 @@ function show-shell-capabilities() {
 # wireless network interface.
 # NOTE: if this solution does not work well enough, you can alternatively
 # switch from NetworkManager to wicd (manual configuration).
+
 function wifi-pause-background-scan() {
   sudo killall -STOP NetworkManager &>/dev/null ||\
     sudo killall -STOP wicd &>/dev/null
   if [[ "$?" != "0" ]]; then
-        echo "Neither a NetworkManager nor a wicd process found to STOP." >&2
+    echo "Neither a NetworkManager nor a wicd process found to STOP." >&2
   fi
   echo "Disabled background wi-fi network scan by pausing the NetworkManager/wicd process"
 }
@@ -137,10 +138,10 @@ function wifi-enable-background-scan() {
 
 
 # start npm functions
-node-check-use() {
-  node_version=$(node --version 2>/dev/null)
+function node-check-use() {
+  local node_version=$(node --version 2>/dev/null)
   if [ "${node_version}" != "v${NODE_VERSION}" ]; then
-    node_version_installed=$(nvm ls 2>/dev/null | grep ${NODE_VERSION})
+    local node_version_installed=$(nvm ls 2>/dev/null | grep ${NODE_VERSION})
     if [ "${node_version_installed}" == "" ]; then
       echo Node v$NODE_VERSION is not installed, installing now.
       nvm install "v${NODE_VERSION}"
@@ -154,34 +155,34 @@ node-check-use() {
   fi
 }
 
-npm-tdd() {
+function npm-tdd() {
   node-check-use
   npm run test:watch
 }
 
-npm-install() {
+function npm-install() {
   node-check-use
   npm install
 }
 
-npm-test() {
+function npm-test() {
   node-check-use
   npm run test
 }
 
-npm-start() {
+function npm-start() {
   node-check-use
   npm start
 }
 
-npm-lint() {
+function npm-lint() {
   node-check-use
   npm run lint
 }
 
 # start git functions
 
-diff-lines() {
+function diff-lines() {
   local path=
   local line=
   while read; do
@@ -201,25 +202,25 @@ diff-lines() {
   done
 }
 
-git-diff-lines() {
+function git-diff-lines() {
   git diff $1 $2 $3 $4 | diff-lines
 }
 
-g-diff-lines() {
+function g-diff-lines() {
   git-diff-lines $1 $2 $3 $4
 }
 
-git-branch-out() {
+function git-branch-out() {
   new_branch_name=$1
   treeish=$2
   git checkout -b $1 $2
 }
 
-g-branch-out() {
+function g-branch-out() {
   git-branch-out $1 $2
 }
 
-git-rm-forever() {
+function git-rm-forever() {
   if [ "$1" == "--help" ]; then
     echo Removes a file completely from the repository history
     exit 1
@@ -231,30 +232,30 @@ git-rm-forever() {
       --prune-empty --tag-name-filter cat -- --all
 }
 
-g-rm-forever() {
+function g-rm-forever() {
   git-rm-forever $1
 }
 
-git-push-marcel() {
+function git-push-marcel() {
   git push marcel $(git-current-branch):$(git-current-branch)
 }
 
-git-push-f-marcel() {
+function git-push-f-marcel() {
   git push -f marcel $(git-current-branch):$(git-current-branch)
 }
 
 # end git functions
 
 # java management functions
-set-env-java9() {
+function set-env-java9() {
   export JAVA_HOME='/usr/lib/jvm/java-9-openjdk-amd64'
 }
 
-set-env-java8() {
+function set-env-java8() {
   export JAVA_HOME='/usr/lib/jvm/java-8-openjdk-amd64'
 }
 
-java() {
+function java() {
   if [[ ! -z ${JAVA_HOME} ]]; then
     ${JAVA_HOME}/bin/java $@
   else
@@ -262,9 +263,9 @@ java() {
   fi
 }
 
-javac() {
+function javac() {
   if [[ ! -z ${JAVA_HOME} ]]; then
-    ${JAVA_HOME}/bin/java $@
+    "${JAVA_HOME}/bin/java" $@
   else
     /usr/bin/javac $@
   fi
