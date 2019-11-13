@@ -270,3 +270,9 @@ function javac() {
     /usr/bin/javac $@
   fi
 }
+
+function generate-dotfiles-tags() {
+  type etags &>/dev/null && etags ~/.bashrc ~/.bash_functions ~/.bash_aliases\
+                                  ~/.bash_ssh ~/.bash_profile ~/.bash_logout\
+                                  ~/.profile ~/.xinitrc ~/.xinputrc ~/.xsession
+}
