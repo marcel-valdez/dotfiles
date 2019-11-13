@@ -18,7 +18,7 @@ function log_debug() {
 function tmux_attach_session() {
   log_debug "tmux init: attaching to <${TMUX_INIT_SESSION}>"
   tmux new-session -s "${TMUX_INIT_SESSION}" >&/dev/null \
-  || tmux attach-session -t "${TMUX_INIT_SESSION}"
+    || tmux attach-session -t "${TMUX_INIT_SESSION}"
 }
 
 function is_first_time_starting_tmux() {
@@ -69,12 +69,12 @@ shopt -s checkwinsize
 
 # set variable identifying the chroot you work in (used in the prompt below)
 if [ -z "${debian_chroot:-}" ] && [ -r /etc/debian_chroot ]; then
-    debian_chroot=$(cat /etc/debian_chroot)
+  debian_chroot=$(cat /etc/debian_chroot)
 fi
 
 # set a fancy prompt (non-color, unless we know we "want" color)
 case "${TERM}" in
-    xterm-color) color_prompt=yes;;
+  xterm-color) color_prompt=yes;;
 esac
 
 # uncomment for a colored prompt, if the terminal has the capability; turned
@@ -83,14 +83,14 @@ esac
 force_color_prompt=yes
 
 if [ -n "${force_color_prompt}" ]; then
-    if [ -x /usr/bin/tput ] && tput setaf 1 >&/dev/null; then
-      # We have color support; assume it's compliant with Ecma-48
-      # (ISO/IEC-6429). (Lack of such support is extremely rare, and such
-      # a case would tend to support setf rather than setaf.)
-      color_prompt=yes
-    else
-      color_prompt=
-    fi
+  if [ -x /usr/bin/tput ] && tput setaf 1 >&/dev/null; then
+    # We have color support; assume it's compliant with Ecma-48
+    # (ISO/IEC-6429). (Lack of such support is extremely rare, and such
+    # a case would tend to support setf rather than setaf.)
+    color_prompt=yes
+  else
+    color_prompt=
+  fi
 fi
 
 # Remove username from prompt but shortened hostname,
@@ -98,28 +98,28 @@ fi
 short_hostname=$(echo "${HOSTNAME}" | grep -oE '^[a-Z]{5}')
 if [ "${color_prompt}" = yes ]; then
   log_debug "Using color_prompt PS1"
-  PS1='${debian_chroot:+($debian_chroot)}\[\033[01;32m\]@'"${short_hostname}"'\[\033[00m\]:\[\033[01;34m\]\w\[\033[00m\]'
+  export PS1='${debian_chroot:+($debian_chroot)}\[\033[01;32m\]@'"${short_hostname}"'\[\033[00m\]:\[\033[01;34m\]\w\[\033[00m\]'
 else
   log_debug "Using non-color prompt PS1"
-  PS1='${debian_chroot:+($debian_chroot)}@'"${short_hostname}"':\w'
+  export PS1='${debian_chroot:+($debian_chroot)}@'"${short_hostname}"':\w'
 fi
 
-PS1="${PS1}"'$(__git_ps1)'
-PS1="${PS1}"'\n'
-PS1="${PS1}"'\$ '
+export PS1="${PS1}"'$(__git_ps1)\n'
+export PS1="${PS1}"'\$ '
 
 unset color_prompt force_color_prompt
 
 # enable color support of ls and also add handy aliases
 if [ -x /usr/bin/dircolors ]; then
-    test -r "${HOME}/.dircolors" && eval "$(dircolors -b ~/.dircolors)" || eval "$(dircolors -b)"
-    alias ls='ls --color=auto'
-    # alias dir='dir --color=auto'
-    # alias vdir='vdir --color=auto'
+  test -r "${HOME}/.dircolors" && eval "$(dircolors -b ~/.dircolors)"\
+      || eval "$(dircolors -b)"
+  alias ls='ls --color=auto'
+  # alias dir='dir --color=auto'
+  # alias vdir='vdir --color=auto'
 
-    alias grep='grep --color=auto'
-    alias fgrep='fgrep --color=auto'
-    alias egrep='egrep --color=auto'
+  alias grep='grep --color=auto'
+  alias fgrep='fgrep --color=auto'
+  alias egrep='egrep --color=auto'
 fi
 
 # some more ls aliases
@@ -133,7 +133,7 @@ alias l='ls -CF'
 # See /usr/share/doc/bash-doc/examples in the bash-doc package.
 
 if [ -f "${HOME}/.bash_aliases" ]; then
-    source "${HOME}/.bash_aliases"
+  source "${HOME}/.bash_aliases"
 fi
 
 if [ -f "${HOME}/.bash_functions" ]; then
@@ -155,8 +155,8 @@ if [[ "$(uname)" =~ "Linux" ]]; then
   export GIT_EDITOR="emacs -nw"
   export EDITOR="${GIT_EDITOR}"
   if [[ "${TERM}" =~ "eterm" ]]; then
-      export GIT_EDITOR="emacsclient"
-      export EDITOR="${GIT_EDITOR}"
+    export GIT_EDITOR="emacsclient"
+    export EDITOR="${GIT_EDITOR}"
   fi
   # if we are not in a tmux session
   if [ -z "${TMUX}" ] && [[ ! "${TERM}" =~ "eterm" ]]; then
