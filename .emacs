@@ -292,7 +292,7 @@ At the moment it configures indentation and paren highlighting"
  ;; If you edit it by hand, you could mess it up, so be careful.
  ;; Your init file should contain only one such instance.
  ;; If there is more than one, they won't work right.
- '(c-basic-offset 2 t)
+ '(c-basic-offset 2)
  '(column-number-mode t)
  '(company-backends
    (quote
@@ -307,7 +307,7 @@ At the moment it configures indentation and paren highlighting"
  '(line-number-mode t)
  '(package-selected-packages
    (quote
-    (graphviz-dot-mode cycle-resize company use-package mc-extras multiple-cursors linear-undo helm-mt multi-term hl-anything helm helm-xref windresize async xclip)))
+    (omnisharp graphviz-dot-mode cycle-resize company use-package mc-extras multiple-cursors linear-undo helm-mt multi-term hl-anything helm helm-xref windresize async xclip)))
  '(show-paren-mode t)
  '(tool-bar-mode nil)
  '(winner-mode t))
