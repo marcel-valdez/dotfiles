@@ -278,7 +278,7 @@
 (defun configure-general-programming ()
   "Configures settings that apply to any programming language.
 At the moment it configures indentation and paren highlighting"
-  (with-library show-paren-mode
+  (with-library paren
     (show-paren-mode t))
   ;; set indentation configuration
   (setq-local standard-indent 2)
