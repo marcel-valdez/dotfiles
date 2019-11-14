@@ -24,9 +24,6 @@
 (add-to-list 'package-archives '("melpa" . "https://melpa.org/packages/"))
 (add-to-list 'package-archives '("elpa" . "http://elpa.org/packages/"))
 
-
-;; TODO: cancel auto-complete mode when company-mode is enabled, as they
-;; interfere
 ;; core macros used for basic functionality
 (require 'marcel-core-macros)
 ;; core package required by many other packages
@@ -197,7 +194,15 @@
   ;; By default, it is: 80% -> 50% -> 20% -> 50%, and so on...
   (setq cycle-resize-steps '(75 50 25 50)))
 
-;; (with-library auto-complete (global-auto-complete-mode))
+;;; Enable auto-complete by default, but if company-mode is enabled, then
+;;; disable auto-complete mode.
+(with-library auto-complete
+  (global-auto-complete-mode)
+  (with-library company
+    (defun disable-auto-complete()
+      (auto-complete-mode -1))
+    (add-hook 'company-mode-hook 'disable-auto-complete)))
+
 (with-library linear-undo
   (linear-undo-mode t)
   (global-unset-key (kbd "C-_"))
