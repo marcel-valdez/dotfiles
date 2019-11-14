@@ -198,13 +198,21 @@
   ;; By default, it is: 80% -> 50% -> 20% -> 50%, and so on...
   (setq cycle-resize-steps '(75 50 25 50)))
 
+;;; Configure company
+;;; It should be disabled when auto-complete mode is activated.
+(with-library company
+  (with-library auto-complete
+    (defun disable-company () (company-mode -1))
+
+    (add-hook 'auto-complete-mode 'disable-company)))
+
 ;;; Enable auto-complete by default, but if company-mode is enabled, then
 ;;; disable auto-complete mode.
 (with-library auto-complete
   (global-auto-complete-mode)
   (with-library company
-    (defun disable-auto-complete()
-      (auto-complete-mode -1))
+    (defun disable-auto-complete () (auto-complete-mode -1))
+
     (add-hook 'company-mode-hook 'disable-auto-complete)))
 
 (with-library linear-undo
@@ -257,6 +265,8 @@
       '(add-to-list 'company-backends 'company-omnisharp)))
 
   (defun marcel-csharp-mode-setup ()
+    ;; disable auto-complete mode and enable company-mode
+    (with-library auto-complete (auto-complete-mode nil))
     (with-library company (company-mode t))
     (with-library flycheck (flycheck-mode t))
     (omnisharp-mode t)
