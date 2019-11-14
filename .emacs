@@ -227,6 +227,7 @@
   (global-set-key (kbd "C-x M-l") 'mc/edit-lines))
 
 (defun custom-java-mode-hook ()
+  "Set options that only apply to 'java-mode'."
   ;; TODO: Make this only work for .java files, but not for other
   ;;       types of files opened after entering java-mode
   (setq whitespace-line-column 100)
@@ -248,8 +249,28 @@
 
 (add-hook 'java-mode-hook 'custom-java-mode-hook)
 
-;; set indentation configuration
-(defun set-custom-indent ()
+;; Start server with: omnisharp-start-omnisharp-server
+(with-library omnisharp
+  (with-library company
+    (eval-after-load
+        'company
+      '(add-to-list 'company-backends 'company-omnisharp)))
+
+  (defun marcel-csharp-mode-setup ()
+    (with-library company (company-mode t))
+    (with-library flycheck (flycheck-mode t))
+    (omnisharp-mode t)
+    (local-set-key (kbd "C-c r r") 'omnisharp-run-code-action-refactoring)
+    (local-set-key (kbd "C-c C-c") 'recompile))
+
+  (add-hook 'csharp-mode-hook 'marcel-csharp-mode-setup))
+
+(defun configure-general-programming ()
+  "Configures settings that apply to any programming language.
+At the moment it configures indentation and paren highlighting"
+  (with-library show-paren-mode
+    (show-paren-mode t))
+  ;; set indentation configuration
   (setq-local standard-indent 2)
   (setq-local tab-width 2)
   (setq-local indent-tabs-mode nil)
@@ -260,7 +281,8 @@
   (setq-local js2-bounce-indent-p t)
   (setq-local js-indent-level 2)
   (setq-local graphviz-dot-indent-width 2))
-(add-hook 'prog-mode-hook 'set-custom-indent)
+
+(add-hook 'prog-mode-hook 'configure-general-programming)
 
 ;;; .emacs ends here
 
