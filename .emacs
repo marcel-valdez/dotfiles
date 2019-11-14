@@ -80,6 +80,10 @@
 (desktop-save-mode 0)
 ;; end: desktop package configuration
 
+;; configure ispell
+(with-library ispell
+  (setq ispell-program-name "/usr/bin/aspell"))
+
 (with-library helm-config
   (helm-mode 1)
   (global-set-key (kbd "C-x C-f") 'helm-find-files)
