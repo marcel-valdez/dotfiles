@@ -238,6 +238,27 @@
     (setq flycheck-checker 'sh-checkbashisms))
   (add-hook 'sh-mode 'set-flycheck-checkbashisms))
 
+(with-library csharp-mode
+  (with-library company
+    (add-hook 'csharp-mode #'company-mode))
+  (with-library omnisharp
+    (add-hook 'csharp-mode #'omnisharp-mode))
+  (with-library flycheck
+    (add-hook 'csharp-mode #'flycheck-mode)))
+
+;; omnisharp configuration
+;; Start the omnisharp server with the following command:
+;; (omnisharp-start-omnisharp-server)
+(with-library omnisharp
+  (with-library company
+    (eval-after-load 'company '(add-to-list 'company-backend #'company-omnisharp)))
+  (defun marcel-omnisharp-keys  ()
+      (local-set-key (kbd "C-c r r") 'omnisharp-run-code-action-refactoring)
+      (local-set-key (kbd "C-c C-c") 'recompile))
+  (with-library csharp-mode
+    (add-hook 'csharp-mode 'marcel-omnisharp-keys t)))
+
+
 (custom-set-variables
  ;; custom-set-variables was added by Custom.
  ;; If you edit it by hand, you could mess it up, so be careful.
