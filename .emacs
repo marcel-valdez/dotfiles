@@ -313,7 +313,7 @@ At the moment it configures indentation and paren highlighting"
  '(custom-safe-themes
    (quote
     ("6068d911f0ad3f9e6834d4849038ef3a317510f23683ff9656da7d49a5ab3ed5" "d4890c4d8d262c61decb7c0e43b1dc5c92b378e9acada6c04d9e94f00cc70ead" "4badd47b5ba16df46b849137903f2210d344f3c7021e979ff8ed68b8c3827d84" default)))
- '(graphviz-dot-indent-width 2 t)
+ '(graphviz-dot-indent-width 2)
  '(line-number-mode t)
  '(package-selected-packages
    (quote
