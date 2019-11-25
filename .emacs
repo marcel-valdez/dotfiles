@@ -25,6 +25,7 @@
   (package-refresh-contents)
   (package-install 'use-package))
 
+(with-library cl-generic)
 ;; (with-library better-defaults)
 (with-library use-package)
 (with-library use-package-ensure)
@@ -54,7 +55,7 @@
   ;; if emacs is run as a terminal application
   (with-library in-tmux
     (with-library helm-dash
-      (setq helm-dash-browser-func 'eww)))
+      (setq helm-dash-browser-func 'eww))))
 
 (with-library zeal-at-point
   (global-set-key "\C-cd" 'zeal-at-point)
@@ -89,6 +90,7 @@
 
 ;; set indentation configuration
 (defun set-custom-indent ()
+  "Set custom indentation settings (two spaces) in all modes."
   (setq-local js2-basic-offset 2)
   (setq-local js2-bounce-indent-p t)
   (setq-local js-indent-level 2)
@@ -116,11 +118,15 @@
 (with-library undo-tree
   (global-undo-tree-mode))
 ;; always enable auto-complete
-(with-library auto-complete)
-;;  (add-hook 'after-init-hook 'global-auto-complete-mode))
+(with-library auto-complete
+  (add-hook 'after-init-hook 'global-auto-complete-mode)
+  (with-library company
+    (add-hook 'company-mode (lambda () (auto-complete-mode -1)))))
 ;; company-mode
-(with-library company)
-;;  (add-hook 'after-init-hook (lambda () (global-company-mode -1))))
+(with-library company
+  (add-hook 'after-init-hook (lambda () (global-company-mode -1)))
+  (with-library auto-complete
+    (add-hook 'auto-complete-mode (lambda () (company-mode -1)))))
 
 (with-library jedi
   (defun jedi:python-mode-hook ()
@@ -190,12 +196,12 @@
 
 ;; remap undo-redo using undo-tree
 (with-library undo-tree
-              (global-unset-key (kbd "C-/"))
-              (global-set-key (kbd "C-/")
-                              (lambda () (interactive) (undo-tree-undo)))
-              (global-unset-key (kbd "C-."))
-              (global-set-key (kbd "C-.")
-                              (lambda () (interactive) (undo-tree-redo))))
+  (global-unset-key (kbd "C-/"))
+  (global-set-key (kbd "C-/")
+                  (lambda () (interactive) (undo-tree-undo)))
+  (global-unset-key (kbd "C-."))
+  (global-set-key (kbd "C-.")
+                  (lambda () (interactive) (undo-tree-redo))))
 
 ;; puts all backup files in .emacs.d/backup directory rather than on
 ;; the same folder as the file being edited
@@ -209,17 +215,17 @@
 
 ;; mark instances forward of whatever is marked in the region
 (with-library multiple-cursors
-              (global-unset-key (kbd "M-3"))
-              (global-set-key (kbd "M-3") 'mc/mark-more-like-this-extended)
-              ;; mark instances backwards of whatever is marked in the region
-              (global-unset-key (kbd "M-#"))
-              (global-set-key (kbd "M-#") 'mc/mark-previous-like-this)
-              ;; mark all instances of whatever is marked in the region
-              (global-unset-key (kbd "C-x M-3"))
-              (global-set-key (kbd "C-x M-3") 'mc/mark-all-dwim)
-              ;; create a separate caret for every line under the cursor
-              (global-unset-key (kbd "C-x M-l"))
-              (global-set-key (kbd "C-x M-l") 'mc/edit-lines))
+  (global-unset-key (kbd "M-3"))
+  (global-set-key (kbd "M-3") 'mc/mark-more-like-this-extended)
+  ;; mark instances backwards of whatever is marked in the region
+  (global-unset-key (kbd "M-#"))
+  (global-set-key (kbd "M-#") 'mc/mark-previous-like-this)
+  ;; mark all instances of whatever is marked in the region
+  (global-unset-key (kbd "C-x M-3"))
+  (global-set-key (kbd "C-x M-3") 'mc/mark-all-dwim)
+  ;; create a separate caret for every line under the cursor
+  (global-unset-key (kbd "C-x M-l"))
+  (global-set-key (kbd "C-x M-l") 'mc/edit-lines))
 
 (with-library erc-status-sidebar)
 
@@ -253,8 +259,8 @@
   (with-library company
     (eval-after-load 'company '(add-to-list 'company-backend #'company-omnisharp)))
   (defun marcel-omnisharp-keys  ()
-      (local-set-key (kbd "C-c r r") 'omnisharp-run-code-action-refactoring)
-      (local-set-key (kbd "C-c C-c") 'recompile))
+    (local-set-key (kbd "C-c r r") 'omnisharp-run-code-action-refactoring)
+    (local-set-key (kbd "C-c C-c") 'recompile))
   (with-library csharp-mode
     (add-hook 'csharp-mode 'marcel-omnisharp-keys t)))
 
