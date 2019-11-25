@@ -1,6 +1,17 @@
+;;; package --- Summary
+;;; Core macros with custom functions for unique emacs behavior.
+
+;;; Commentary:
+;;; Some functions here are provided because available functions in
+;;; Emacs packages don't behave as I'd like to.
+
+
+;;; Code:
 (provide 'marcel-macros)
 
 (defmacro with-library (symbol &rest body)
+ "Function used to safely load a SYMBOL package with a custom function BODY.
+The BODY only executes if the symbol is available in the system."
   `(when
        (condition-case err
            (progn (require ',symbol) t)
@@ -13,6 +24,7 @@
 (put 'with-library 'lisp-indent-function 1)
 
 (defun move-text-internal (arg)
+ "Move a text region ARG lines."
    (cond
     ((and mark-active transient-mark-mode)
      (if (> (point) (mark))
@@ -34,13 +46,15 @@
        (forward-line -1)))))
 
 (defun move-text-down (arg)
-   "Move region (transient-mark-mode active) or current line
-  arg lines down."
+   "Move region or current line ARG lines down."
    (interactive "*p")
    (move-text-internal arg))
 
 (defun move-text-up (arg)
-   "Move region (transient-mark-mode active) or current line
-  arg lines up."
+   "Move region or current line ARG lines up."
    (interactive "*p")
    (move-text-internal (- arg)))
+
+(provide 'marcel-macros)
+
+;;; marcel-macros.el ends here
