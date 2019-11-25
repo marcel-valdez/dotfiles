@@ -2,9 +2,16 @@
 
 SCRIPT="$(basename $0)"
 
+function ::now() {
+  date "+%m/%d %H:%M:%S"
+}
+
+function ::log() {
+  echo "[$(::now)] ${SCRIPT}: $@"
+}
 
 function ::debug() {
-  ! [ -z DEBUG ] && echo "${SCRIPT}: $@"
+  ! [ -z "${DEBUG}" ] && ::log "$@"
 }
 
 function print_error() {
@@ -81,7 +88,7 @@ if [ -z "${command}" ]; then
 fi
 
 
-::debug "Watching directory: ${directory}"
+::log "Watching directory: ${directory}"
 inotifywait -e close_write,moved_to,modify -m "${directory}" |
     while read -r directory events filename; do
       ::debug "Events triggered: ${events}"
@@ -89,16 +96,16 @@ inotifywait -e close_write,moved_to,modify -m "${directory}" |
       # single file save from emacs triggers two rapid-fire MODIFY events.
       if ! [ -z ${regx} ]; then
            if [[ "${filename}" =~ ${regx} ]]; then
-              ::debug "Matched regx: ${filename}"
+              ::log "Matched regx: ${filename}"
               effective_command=$(echo ${command} | sed s/__file__/"${filename}"/g)
-              ::debug "${effective_command}"
+              ::log "${effective_command}"
               ${effective_command}
               continue
           fi
       elif [ "${filename}" = "${file}" ]; then
-          ::debug "Matched filename: ${filename}"
+          ::log "Matched filename: ${filename}"
           effective_command=$(echo ${command} | sed s/__file__/"${filename}"/g)
-          ::debug "${effective_command}"
+          ::log "${effective_command}"
           ${effective_command}
           continue
       fi
