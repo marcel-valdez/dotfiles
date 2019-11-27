@@ -21,5 +21,24 @@ If the BODY fails during execution, the error is allowed to bubble up, it is not
 
 (put 'with-library 'lisp-indent-function 1)
 
+(defvar run-on-save-cmd "")
+
+(defun run-on-save ()
+  "Execute the file in the current buffer.
+If variable run-on-save-cmd is set for the current buffer, then it runs that
+command and psses the saved buffer filename as the sole parameter."
+  (when (bound-and-true-p run-on-save-mode)
+    (display-message-or-buffer
+     (if (string= run-on-save-cmd "")
+         (shell-command-to-string buffer-file-name)
+       (shell-command-to-string concat(run-on-save-cmd buffer-file-name))))))
+
+(define-minor-mode run-on-save-mode
+  "Execute a script every time a file is saved."
+  :lighter "run-on-save"
+  (make-local-variable 'run-on-save-cmd))
+
+(add-hook 'after-save-hook #'run-on-save)
+
 (provide 'marcel-core-macros)
 ;;; marcel-core-macros.el ends here
