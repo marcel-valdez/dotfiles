@@ -1,0 +1,5 @@
+#!/usr/bin/env bash
+
+[[ -z ${DISPLAY} ]] && DISPLAY=:0.0
+
+DISPLAY="${DISPLAY}" "$@"
