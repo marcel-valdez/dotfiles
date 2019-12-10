@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-EMACS_VERSION="-25.1.91"
+EMACS_VERSION="25.1.91"
 
 # alert function for long running commands.  Use like so:
 #   sleep 10; alert
@@ -67,9 +67,10 @@ function fails() {
 }
 
 function emacs() {
-  local emacs_bin=/usr/bin/emacs
-  if [[ "${EMACS_VERSION}" != "" ]]; then
-    emacs_bin=/usr/local/bin/emacs-25.1.91
+  local emacs_bin="$(which emacs)"
+  if [[ "${EMACS_VERSION}" != "" ]] && [[ -e "/usr/local/bin/emacs-${EMACS_VERSION}" ]]; then
+    emacs_bin="/usr/local/bin/emacs-${EMACS_VERSION}"
+    echo "Emacs binary /usr/local/bin/emacs-${EMACS_VERSION} not found. Using ${emacs_bin} instead." >&2
   fi
   "${emacs_bin}" -nw "$@"
 }
