@@ -95,13 +95,25 @@ fi
 
 # Remove username from prompt but shortened hostname,
 # in order to avoid confusion when SSHing
+short_hostname=$(echo ${HOSTNAME} | egrep '^.{0,20}' | head -1)
+if [ "${color_prompt}" = "yes" ]; then
+  log_debug "Using color_prompt PS1"
+  PS1="[Exit: \[\033[1;31m\]\${PIPESTATUS[@]/#0/\[\033[0m\]\[\033[1;32m\]0\[\033[1;31m\]}\[\033[0m\]] "
+else
+  log_debug "Using non-color prompt PS1"
+  export PS1="[Exit: \${PIPESTATUS[@]/#0/0}] "
+fi
+
+
+# Remove username from prompt but shortened hostname,
+# in order to avoid confusion when SSHing
 short_hostname=$(echo "${HOSTNAME}" | grep -oE '^[a-Z]{5}')
 if [ "${color_prompt}" = yes ]; then
   log_debug "Using color_prompt PS1"
-  export PS1='${debian_chroot:+($debian_chroot)}\[\033[01;32m\]@'"${short_hostname}"'\[\033[00m\]:\[\033[01;34m\]\w\[\033[00m\]'
+  PS1="${PS1}"'${debian_chroot:+($debian_chroot)}\[\033[01;32m\]@'"${short_hostname}"'\[\033[00m\]:\[\033[01;34m\]\w\[\033[00m\]'
 else
   log_debug "Using non-color prompt PS1"
-  export PS1='${debian_chroot:+($debian_chroot)}@'"${short_hostname}"':\w'
+  PS1="${PS1}"'${debian_chroot:+($debian_chroot)}@'"${short_hostname}"':\w'
 fi
 
 export PS1="${PS1}"'$(__git_ps1)\n'
