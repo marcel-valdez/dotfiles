@@ -9,10 +9,10 @@ case $- in
 esac
 
 DEFAULT_TMUX_SESSION="default"
-[ -z "${TMUX_INIT_SESSION}" ] && TMUX_INIT_SESSION="${DEFAULT_TMUX_SESSION}"
+[[ -z "${TMUX_INIT_SESSION}" ]] && TMUX_INIT_SESSION="${DEFAULT_TMUX_SESSION}"
 
 function log_debug() {
-  [ ! -z "${DEBUG_BASHRC}" ] && echo "$(date +%H:%M:%S) $1"
+  [[ ! -z "${DEBUG_BASHRC}" ]] && echo "$(date +%H:%M:%S) $1"
 }
 
 function tmux_attach_session() {
@@ -31,19 +31,18 @@ function initialize_environment() {
 
   # WINE settings
   # set to use wine simulating Windows 64-bit by default
-  source "${HOME}/bin/wine-use-win64"
+  [[ -f "${HOME}/bin/wine-use-win64" ]] && source "${HOME}/bin/wine-use-win64"
   # uncomment to use wine simulating Windows 32-bit
   # source "${HOME}/bin/wine-use-win32"
 
   # SSH agent environment, only load it whenever we start
   # the environment for the first time
-  source "${HOME}/.bash_ssh"
+  [[ -f "${HOME}/.bash_ssh" ]] && source "${HOME}/.bash_ssh"
 }
 
-source "${HOME}/bin/functions"
-source "${HOME}/bin/reinstall_modules"
-source "${HOME}/lib/git-prompt"
-
+[[ -f "${HOME}/bin/functions" ]] && source "${HOME}/bin/functions"
+[[ -f "${HOME}/bin/reinstall_modules" ]] && source "${HOME}/bin/reinstall_modules"
+[[ -f "${HOME}/lib/git-prompt" ]] && source "${HOME}/lib/git-prompt"
 
 # don't put duplicate lines or lines starting with space in the history.
 # See bash(1) for more options
@@ -65,10 +64,10 @@ shopt -s checkwinsize
 # shopt -s globstar
 
 # make less more friendly for non-text input files, see lesspipe(1)
-[ -x /usr/bin/lesspipe ] && eval "$(SHELL=/bin/sh lesspipe)"
+[[ -x /usr/bin/lesspipe ]] && eval "$(SHELL=/bin/sh lesspipe)"
 
 # set variable identifying the chroot you work in (used in the prompt below)
-if [ -z "${debian_chroot:-}" ] && [ -r /etc/debian_chroot ]; then
+if [[ -z "${debian_chroot:-}" ]] && [[ -r /etc/debian_chroot ]]; then
   debian_chroot=$(cat /etc/debian_chroot)
 fi
 
@@ -82,8 +81,8 @@ esac
 # should be on the output of commands, not on the prompt
 force_color_prompt=yes
 
-if [ -n "${force_color_prompt}" ]; then
-  if [ -x /usr/bin/tput ] && tput setaf 1 >&/dev/null; then
+if [[ -n "${force_color_prompt}" ]]; then
+  if [[ -x /usr/bin/tput ]] && tput setaf 1 >&/dev/null; then
     # We have color support; assume it's compliant with Ecma-48
     # (ISO/IEC-6429). (Lack of such support is extremely rare, and such
     # a case would tend to support setf rather than setaf.)
@@ -96,19 +95,18 @@ fi
 # Remove username from prompt but shortened hostname,
 # in order to avoid confusion when SSHing
 short_hostname=$(echo ${HOSTNAME} | egrep '^.{0,20}' | head -1)
-if [ "${color_prompt}" = "yes" ]; then
+if [[ "${color_prompt}" = "yes" ]]; then
   log_debug "Using color_prompt PS1"
   PS1="[Exit: \[\033[1;31m\]\${PIPESTATUS[@]/#0/\[\033[0m\]\[\033[1;32m\]0\[\033[1;31m\]}\[\033[0m\]] "
 else
   log_debug "Using non-color prompt PS1"
-  export PS1="[Exit: \${PIPESTATUS[@]/#0/0}] "
+  PS1="[Exit: \${PIPESTATUS[@]/#0/0}] "
 fi
-
 
 # Remove username from prompt but shortened hostname,
 # in order to avoid confusion when SSHing
 short_hostname=$(echo "${HOSTNAME}" | grep -oE '^[a-Z]{5}')
-if [ "${color_prompt}" = yes ]; then
+if [[ "${color_prompt}" = yes ]]; then
   log_debug "Using color_prompt PS1"
   PS1="${PS1}"'${debian_chroot:+($debian_chroot)}\[\033[01;32m\]@'"${short_hostname}"'\[\033[00m\]:\[\033[01;34m\]\w\[\033[00m\]'
 else
@@ -122,7 +120,7 @@ export PS1="${PS1}"'\$ '
 unset color_prompt force_color_prompt
 
 # enable color support of ls and also add handy aliases
-if [ -x /usr/bin/dircolors ]; then
+if [[ -x /usr/bin/dircolors ]]; then
   test -r "${HOME}/.dircolors" && eval "$(dircolors -b ~/.dircolors)"\
       || eval "$(dircolors -b)"
   alias ls='ls --color=auto'
@@ -144,21 +142,16 @@ alias l='ls -CF'
 # ~/.bash_aliases, instead of adding them here directly.
 # See /usr/share/doc/bash-doc/examples in the bash-doc package.
 
-if [ -f "${HOME}/.bash_aliases" ]; then
-  source "${HOME}/.bash_aliases"
-fi
-
-if [ -f "${HOME}/.bash_functions" ]; then
-  source "${HOME}/.bash_functions"
-fi
+[[ -f "${HOME}/.bash_aliases" ]] && source "${HOME}/.bash_aliases"
+[[ -f "${HOME}/.bash_functions" ]] && source "${HOME}/.bash_functions"
 
 # enable programmable completion features (you don't need to enable
 # this, if it's already enabled in /etc/bash.bashrc and /etc/profile
 # sources /etc/bash.bashrc).
 if ! shopt -oq posix; then
-  if [ -f /usr/share/bash-completion/bash_completion ]; then
+  if [[ -f /usr/share/bash-completion/bash_completion ]]; then
     source /usr/share/bash-completion/bash_completion
-  elif [ -f /etc/bash_completion ]; then
+  elif [[ -f /etc/bash_completion ]]; then
     source /etc/bash_completion
   fi
 fi
@@ -171,7 +164,7 @@ if [[ "$(uname)" =~ "Linux" ]]; then
     export EDITOR="${GIT_EDITOR}"
   fi
   # if we are not in a tmux session
-  if [ -z "${TMUX}" ] && [[ ! "${TERM}" =~ "eterm" ]]; then
+  if [[ -z "${TMUX}" ]] && [[ ! "${TERM}" =~ "eterm" ]]; then
     # initialize environment if running for the first time
     [ is_first_time_starting_tmux ] && initialize_environment
     # this will make the terminal attach to an existing tmux session or create one
@@ -187,16 +180,16 @@ export PATH="${PATH}:${HOME}/bin" # add local bin folder to path
 export PATH="${PATH}:${HOME}/.rvm/bin" # Add RVM to PATH for scripting
 export PATH="${PATH}:${HOME}/modules/buck/bin" # Add buck to the PATH
 
-if [ -z ${MONO_PATH} ]; then
+if [[ -z "${MONO_PATH}" ]]; then
   export MONO_PATH="/usr/bin/continuoustests"
 else
   export MONO_PATH="${MONO_PATH}:/usr/bin/continuoustests"
 fi
 
 export NVM_DIR="${HOME}/.nvm"
-[ -s "${NVM_DIR}/nvm.sh" ] && source "${NVM_DIR}/nvm.sh"  # This loads nvm
+[[ -s "${NVM_DIR}/nvm.sh" ]] && source "${NVM_DIR}/nvm.sh"  # This loads nvm
 # This sets up the default node version and loads it
 export NODE_VERSION="9.5.0"
 node-check-use --silent
 
-[ -f "${HOME}/.fzf.bash" ] && source "${HOME}/.fzf.bash"
+[[ -f "${HOME}/.fzf.bash" ]] && source "${HOME}/.fzf.bash"
