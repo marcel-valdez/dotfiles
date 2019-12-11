@@ -39,26 +39,38 @@
 (with-library use-package)
 (with-library use-package-ensure)
 
-(with-library helm-xref)
-(with-library flycheck
-  (global-flycheck-mode))
+(use-package helm-xref :ensure t)
+(use-package flycheck
+  :ensure t
+  :config
+  (with-library flycheck
+    (global-flycheck-mode)))
 
 ;; Remove the menu bar (get one extra line of real estate
 (menu-bar-mode -1)
 ;; If we are in TMUX within an X environment
 (if (and (getenv "TMUX") (getenv "DISPLAY"))
     ;; use xclip for copy-pasting
-    (with-library xclip (xclip-mode 1)))
+    (use-package xclip
+      :ensure t
+      :config
+      (with-library xclip (xclip-mode 1))))
 ;; if running in a separate X window
 (if (display-graphic-p)
-    (with-library multi-term
-      ;; start an emacs server so editors use an emacs buffer
-      (setq-local server-name (concatenate 'string "server" (getenv "DISPLAY"))))
+    (use-package multi-term
+      :ensure t
+      :config
+      (with-library multi-term
+        ;; start an emacs server so editors use an emacs buffer
+        (setq-local server-name (concatenate 'string "server" (getenv "DISPLAY")))))
   (progn
-    (with-library multi-term
-      ;; start an emacs server so editors use an emacs buffer
-      (setq-local server-name "default")
-      (with-library in-tmux))))
+    (use-package multi-term
+      :ensure t
+      :config
+      (with-library multi-term
+        ;; start an emacs server so editors use an emacs buffer
+        (setq-local server-name "default")
+        (with-library in-tmux)))))
 
 (with-library server
   (unless (server-running-p server-name)
@@ -81,18 +93,24 @@
 ;; end: desktop package configuration
 
 ;; configure ispell
-(with-library ispell
-  (setq ispell-program-name "/usr/bin/aspell"))
+(use-package ispell
+  :ensure t
+  :config
+  (with-library ispell
+    (setq ispell-program-name "/usr/bin/aspell")))
 
-(with-library helm-config
-  (helm-mode 1)
-  (global-set-key (kbd "C-x C-f") 'helm-find-files)
-  (global-set-key (kbd "M-s o") 'helm-occur)
-  (global-set-key (kbd "M-x") 'helm-M-x)
-  (global-set-key (kbd "C-x C-b") 'helm-buffers-list)
-  (set-face-attribute 'helm-selection nil
-                      :background "purple"
-                      :foreground "white"))
+(use-package helm
+  :ensure t
+  :config
+  (with-library helm
+    (helm-mode 1)
+    (global-set-key (kbd "C-x C-f") 'helm-find-files)
+    (global-set-key (kbd "M-s o") 'helm-occur)
+    (global-set-key (kbd "M-x") 'helm-M-x)
+    (global-set-key (kbd "C-x C-b") 'helm-buffers-list)
+    (set-face-attribute 'helm-selection nil
+                        :background "purple"
+                        :foreground "white")))
 
 ;; puts all backup files in the .emacs.d/backup directory, rather than on the
 ;; same folder as the file being edited
@@ -104,30 +122,33 @@
       kept-old-versions 5    ; and how many of the old
       )
 
-(with-library multi-term
-  ;; start multi-term custom configurations
-  ;; (setq server-window 'pop-to-buffer)
-  (setq server-window 'display-buffer-other-frame)
-  (global-unset-key (kbd "C-t"))
-  (add-to-list 'term-unbind-key-list "C-t")
-  (setq multi-term-program "/bin/bash")
-  ;; start new terminal
-  (global-set-key (kbd "C-t C-n") 'multi-term)
-  ;; switch to next terminal within same buffer
-  (global-set-key (kbd "C-t TAB")
-                  (lambda () (interactive) (exec-temp-bind
-                                            'multi-term-next
-                                            "TAB")))
-  ;; switch to previous terminal within same buffer
-  (global-set-key (kbd "C-t S-TAB")
-                  (lambda () (interactive) (exec-temp-bind
-                                            'multi-term-prev
-                                            "S-TAB")))
-  ;; toggle showing/hiding the dedica
-  (global-set-key (kbd "C-t C-d")
-                  (lambda () (interactive) (exec-temp-bind
-                                            'multi-term-dedicated-toggle
-                                            "C-d"))))
+(use-package multi-term
+  :ensure t
+  :config
+  (with-library multi-term
+    ;; start multi-term custom configurations
+    ;; (setq server-window 'pop-to-buffer)
+    (setq server-window 'display-buffer-other-frame)
+    (global-unset-key (kbd "C-t"))
+    (add-to-list 'term-unbind-key-list "C-t")
+    (setq multi-term-program "/bin/bash")
+    ;; start new terminal
+    (global-set-key (kbd "C-t C-n") 'multi-term)
+    ;; switch to next terminal within same buffer
+    (global-set-key (kbd "C-t TAB")
+                    (lambda () (interactive) (exec-temp-bind
+                                              'multi-term-next
+                                              "TAB")))
+    ;; switch to previous terminal within same buffer
+    (global-set-key (kbd "C-t S-TAB")
+                    (lambda () (interactive) (exec-temp-bind
+                                              'multi-term-prev
+                                              "S-TAB")))
+    ;; toggle showing/hiding the dedica
+    (global-set-key (kbd "C-t C-d")
+                    (lambda () (interactive) (exec-temp-bind
+                                              'multi-term-dedicated-toggle
+                                              "C-d")))))
 
 ;; always enable identifications of JavaStyleWords
 (global-subword-mode)
@@ -183,56 +204,70 @@
 (global-unset-key (kbd "C-x -"))
 (global-set-key (kbd "C-x -") (lambda () (interactive) (split-window-vertically)))
 ;; resize windows with sensible keys
-(with-library cycle-resize
-  (global-unset-key (kbd "C-x C-_"))
-  (global-set-key (kbd "C-x C-_")
-                  (lambda () (interactive) (exec-temp-bind
-                                            'cycle-resize-window-vertically
-                                            "C-_")))
-  (global-unset-key (kbd "C-x C-\\"))
-  (global-set-key (kbd "C-x C-\\")
-                  (lambda () (interactive) (exec-temp-bind
-                                            'cycle-resize-window-horizontally
-                                            "C-\\")))
-  ;; You also can configure the dimensions (in %) the package will cycle through
-  ;; By default, it is: 80% -> 50% -> 20% -> 50%, and so on...
-  (setq cycle-resize-steps '(75 50 25 50)))
+(use-package cycle-resize
+  :ensure t
+  :config
+  (with-library cycle-resize
+    (global-unset-key (kbd "C-x C-_"))
+    (global-set-key (kbd "C-x C-_")
+                    (lambda () (interactive) (exec-temp-bind
+                                              'cycle-resize-window-vertically
+                                              "C-_")))
+    (global-unset-key (kbd "C-x C-\\"))
+    (global-set-key (kbd "C-x C-\\")
+                    (lambda () (interactive) (exec-temp-bind
+                                              'cycle-resize-window-horizontally
+                                              "C-\\")))
+    ;; You also can configure the dimensions (in %) the package will cycle through
+    ;; By default, it is: 80% -> 50% -> 20% -> 50%, and so on...
+    (setq cycle-resize-steps '(75 50 25 50))))
 
 ;;; Configure company
 ;;; It should be disabled when auto-complete mode is activated.
-(with-library company
-  (with-library auto-complete
-    (defun disable-company () (company-mode -1))
+(use-package company
+  :ensure t
+  :config
+  (with-library company
+    (with-library auto-complete
+      (defun disable-company () (company-mode -1))
 
-    (add-hook 'auto-complete-mode 'disable-company)))
+      (add-hook 'auto-complete-mode 'disable-company))))
 
 ;;; Enable auto-complete by default, but if company-mode is enabled, then
 ;;; disable auto-complete mode.
-(with-library auto-complete
-  (global-auto-complete-mode)
-  (with-library company
-    (defun disable-auto-complete () (auto-complete-mode -1))
+(use-package auto-complete
+  :ensure t
+  :config
+  (with-library auto-complete
+    (global-auto-complete-mode)
+    (with-library company
+      (defun disable-auto-complete () (auto-complete-mode -1))
+      (add-hook 'company-mode-hook 'disable-auto-complete))))
 
-    (add-hook 'company-mode-hook 'disable-auto-complete)))
+(use-package linear-undo
+  :ensure t
+  :config
+  (with-library linear-undo
+    (linear-undo-mode t)
+    (global-unset-key (kbd "C-_"))
+    (global-set-key (kbd "C-_")
+                    (lambda () (interactive) (linear-undo/undo-1)))
+    (global-unset-key (kbd "M--"))
+    (global-set-key (kbd "M--")
+                    (lambda () (interactive) (linear-undo/redo-1)))))
 
-(with-library linear-undo
-  (linear-undo-mode t)
-  (global-unset-key (kbd "C-_"))
-  (global-set-key (kbd "C-_")
-                  (lambda () (interactive) (linear-undo/undo-1)))
-  (global-unset-key (kbd "M--"))
-  (global-set-key (kbd "M--")
-                  (lambda () (interactive) (linear-undo/redo-1))))
-
-(with-library multiple-cursors
-  ;; extended mode to mark instances, multiple M-3 simply add forward
-  (global-set-key (kbd "M-3") 'mc/mark-more-like-this-extended)
-  ;; mark instances backwards of whatever is marked in the region
-  (global-set-key (kbd "M-#") 'mc/mark-previous-like-this)
-  ;; mark all instances of whatever is marked in the region
-  (global-set-key (kbd "C-x M-3") 'mc/mark-all-dwim)
-  ;; create a separate caret for every line under the cursor
-  (global-set-key (kbd "C-x M-l") 'mc/edit-lines))
+(use-package multiple-cursors
+  :ensure t
+  :config
+  (with-library multiple-cursors
+    ;; extended mode to mark instances, multiple M-3 simply add forward
+    (global-set-key (kbd "M-3") 'mc/mark-more-like-this-extended)
+    ;; mark instances backwards of whatever is marked in the region
+    (global-set-key (kbd "M-#") 'mc/mark-previous-like-this)
+    ;; mark all instances of whatever is marked in the region
+    (global-set-key (kbd "C-x M-3") 'mc/mark-all-dwim)
+    ;; create a separate caret for every line under the cursor
+    (global-set-key (kbd "C-x M-l") 'mc/edit-lines)))
 
 (defun custom-java-mode-hook ()
   "Set options that only apply to 'java-mode'."
@@ -258,26 +293,31 @@
 (add-hook 'java-mode-hook 'custom-java-mode-hook)
 
 ;; Start server with: omnisharp-start-omnisharp-server
-(with-library omnisharp
-  (with-library company
-    (eval-after-load
-        'company
-      '(add-to-list 'company-backends 'company-omnisharp)))
+(use-package omnisharp
+  :ensure t
+  :config
+  (with-library omnisharp
+    (with-library company
+      (eval-after-load
+          'company
+        '(add-to-list 'company-backends 'company-omnisharp)))
 
-  (defun marcel-csharp-mode-setup ()
-    ;; disable auto-complete mode and enable company-mode
-    (with-library auto-complete (auto-complete-mode nil))
-    (with-library company (company-mode t))
-    (with-library flycheck (flycheck-mode t))
-    (omnisharp-mode t)
-    (local-set-key (kbd "C-c r r") 'omnisharp-run-code-action-refactoring)
-    (local-set-key (kbd "C-c C-c") 'recompile))
+    (defun marcel-csharp-mode-setup ()
+      ;; disable auto-complete mode and enable company-mode
+      (with-library auto-complete (auto-complete-mode nil))
+      (with-library company (company-mode t))
+      (with-library flycheck (flycheck-mode t))
+      (omnisharp-mode t)
+      (local-set-key (kbd "C-c r r") 'omnisharp-run-code-action-refactoring)
+      (local-set-key (kbd "C-c C-c") 'recompile))
 
-  (add-hook 'csharp-mode-hook 'marcel-csharp-mode-setup))
+    (with-library csharp-mode
+      (add-hook 'csharp-mode-hook 'marcel-csharp-mode-setup))))
 
 (defun configure-general-programming ()
   "Configures settings that apply to any programming language.
 At the moment it configures indentation and paren highlighting"
+
   (with-library paren
     (show-paren-mode t))
   ;; set indentation configuration
