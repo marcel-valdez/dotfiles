@@ -1,0 +1,147 @@
+#!/usr/bin/env bash
+
+user=
+host=
+display=":0"
+size="1000x600"
+tempfilepath="/tmp/screenshot-$(/bin/date "+%m%d%y%H%M%S").png"
+outputfilepath=${tempfilepath}
+quiet=
+dry_run=
+
+function run() {
+  local cmd="$@"
+  if [[ ! -z "${dry_run}" ]]; then
+      print "${cmd[@]}"
+  else
+    ${cmd[@]}
+  fi
+}
+
+function warn() {
+  [[ ! -z "${quiet}" ]] && return 0
+  echo "WARNING: $@" >&2
+}
+
+function error() {
+  [[ ! -z "${quiet}" ]] && return 0
+  echo "ERROR: $@" >&2
+}
+
+function print() {
+  [[ ! -z "${quiet}" ]] && return 0
+  echo "$@"
+}
+
+function usage() {
+cat <<EOF
+remote-screenshot [-d|--display <display>] [-u|--user <user>]
+                  [-h|--host <host>] [-s|--size <widthxheight>]
+                  [-o|--output <filepath>] [-q|--quiet] [-n|--dry_run]
+                  [user] [host] [filepath]
+EOF
+}
+
+function print_parameters () {
+cat <<EOF
+user=${user}
+host=${host}
+display=${DISPLAY}
+size=${size}
+EOF
+}
+
+while [[ $# -gt 0 ]]; do
+  arg=$1
+  case $arg in
+    -d|--display)
+      display=$2
+      shift
+      ;;
+    -u|--user)
+      user=$2
+      shift
+      ;;
+    -h|--host)
+      host=$2
+      shift
+      ;;
+    -s|--size)
+      size=$2
+      shift
+      ;;
+    -o|--output)
+      outputfilepath=$2
+      shift
+      ;;
+    -q|--quiet)
+      quiet=1
+      ;;
+    -n|--dry_run)
+      dry_run=1
+      ;;
+    *)
+      break
+      ;;
+  esac
+  shift
+done
+
+if [[ $# -eq 0 ]]; then
+    if [[ -z ${user} ]]; then
+        echo "User parameter is missing." >&2
+        usage
+        exit 1
+    fi
+
+    if [[ -z ${host} ]]; then
+        echo "Host parameter is missing." >&2
+        usage
+        exit 1
+    fi
+fi
+
+if [[ $# -eq 1 ]]; then
+    if [[ ! -z ${user} ]]; then
+        host=$1
+    elif [[ -z ${host} ]]; then
+        echo "Host parameter is missing." >&2
+        print_parameters
+        usage
+        exit 1
+    fi
+fi
+
+if [[ $# -gt 1 ]]; then
+    user=$1
+    host=$2
+    shift
+    shift
+fi
+
+if [[ $# -gt 0 ]]; then
+    outputfilepath=$1
+    shift
+fi
+
+if [[ $# -gt 0 ]]; then
+    warn "Unused parameters $@" >&2
+fi
+
+print "Taking screenshot on remote host."
+run ssh "${user}@${host}" -t "DISPLAY=${display} import -window root -resize ${size} -delay 100 ${tempfilepath}"
+if [[ ! $? -eq 0 ]]; then
+    error "There was an error issuing the remote screenshot command."
+    exit 1
+fi
+
+run scp "${user}@${host}:${tempfilepath}" "${outputfilepath}"
+if [[ ! $? -eq 0 ]]; then
+    error "There was an error copying the remote screenshot file."
+    exit 1
+else
+  print "Screenshot file found at: ${outputfilepath}"
+fi
+
+print "Cleaning up remote screenshot file"
+run ssh "${user}@${host}" -t "rm ${tempfilepath}"
