@@ -74,3 +74,5 @@ alias g-upload-pack='git-load-pack'
 
 alias tag-all='rm TAGS; find . -name "*.php" -o -name "*.phpt" -o -name "*.c" -o -name "*.cpp" -o -name "*.c++"  -o -name "*.h" -o -name "*.hpp" -o -name "*.py" -o -name "*.pl" -o -name "*.pm" -o -name "*.java" -o -name "*.thrift" | ctags -L -'
 alias tag-cpp='rm TAGS; find . -name "*.c" -o -name "*.cpp" -o -name "*.h" -o -name "*.hpp" | ctags -L -'
+alias marcelito-screenshot='remote-screenshot reaper 192.168.1.22 ~/tmp/screenshot.png'
+alias marcelito-message='ssh reaper@192.168.1.22 -t DISPLAY=:0 notify-send "From Dad"'
