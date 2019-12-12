@@ -35,10 +35,18 @@ function print() {
 
 function usage() {
 cat <<EOF
-remote-screenshot [-d|--display <display>] [-u|--user <user>]
-                  [-h|--host <host>] [-s|--size <widthxheight>]
-                  [-o|--output <filepath>] [-q|--quiet] [-n|--dry_run]
-                  [user] [host] [filepath]
+remote-screenshot [-d|--display <display>] [-u|--user <user>] [-h|--host <host>] \
+[-s|--size <widthxheight>] [-o|--output <filepath>] [-q|--quiet] \
+[-n|--dry_run] [user] [host] [filepath]
+
+<display> The X Server display to use.
+<user> The user as which to execute remote commands.
+<host> The remote hostname or IP address.
+<widthxheight> The scaled size of the screenshot picture in pixels. e.g. 900x600
+<filepath> The filepath on which to put the screenshot picture locally.
+
+-q|--quiet: Add this option to run without printing any messages.
+-n|--dry_run: Only print the commands without executing them.
 EOF
 }
 
