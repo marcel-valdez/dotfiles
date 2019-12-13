@@ -357,7 +357,7 @@ At the moment it configures indentation and paren highlighting"
  '(line-number-mode t)
  '(package-selected-packages
    (quote
-    (chef-mode omnisharp graphviz-dot-mode cycle-resize company use-package mc-extras multiple-cursors linear-undo helm-mt multi-term hl-anything helm helm-xref windresize async xclip)))
+    (markdown-mode markdown-preview-eww markdown-preview-mode markdownfmt omnisharp graphviz-dot-mode cycle-resize company use-package mc-extras multiple-cursors linear-undo helm-mt multi-term hl-anything helm helm-xref windresize async xclip)))
  '(show-paren-mode t)
  '(tool-bar-mode nil)
  '(winner-mode t))
