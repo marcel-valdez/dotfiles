@@ -40,5 +40,10 @@ command and psses the saved buffer filename as the sole parameter."
 
 (add-hook 'after-save-hook #'run-on-save)
 
+(defun is-wsl-p ()
+  "Determine if the system is WSL Linux."
+  (and (string-equal system-type "gnu/linux")
+       (string-match "Microsoft" (shell-command-to-string "/bin/uname -r"))))
+
 (provide 'marcel-core-macros)
 ;;; marcel-core-macros.el ends here

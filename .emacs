@@ -50,11 +50,29 @@
 (menu-bar-mode -1)
 ;; If we are in TMUX within an X environment
 (if (and (getenv "TMUX") (getenv "DISPLAY"))
-    ;; use xclip for copy-pasting
-    (use-package xclip
-      :ensure t
-      :config
-      (with-library xclip (xclip-mode 1))))
+    (if (is-wsl-p)
+        ;; if we're in Linux WSL, use custom clipboard scripts
+        (use-package wsl-copy
+          :load-path "lisp/"
+          ;; setup keybindings
+          :bind (("C-x M-c" . wsl-copy-region)
+                 ("C-x M-v" . wsl-copy-paste))
+          :config
+          (with-library wsl-copy))
+      (progn
+        ;; use xclip for copy-pasting
+        (use-package xclip
+          :ensure t
+          :config
+          (with-library xclip (xclip-mode 1)))
+        ;; if xclip is not available for whatever reason, use simpleclip
+        (use-package simpleclip
+          :if (not (featurep 'xclip))
+          :ensure t
+          :config
+          ;; double-check xclip does not exist, in case there are race-conditions
+          (unless (featurep 'xclip)
+            (with-library simpleclip (simpleclip-mode 1)))))))
 ;; if running in a separate X window
 (if (display-graphic-p)
     (use-package multi-term
@@ -347,7 +365,7 @@ At the moment it configures indentation and paren highlighting"
  '(company-backends
    (quote
     (company-tasks company-reviewers company-bbdb company-nxml company-css company-capf
-                   (company-dabbrev-code company-keywords))))
+		   (company-dabbrev-code company-keywords))))
  '(company-minimum-prefix-length 1)
  '(custom-enabled-themes (quote (tango-dark)))
  '(custom-safe-themes
