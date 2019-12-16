@@ -34,7 +34,7 @@ function error() {
 
 function success() {
   [[ ! -z "${quiet}" ]] && return 0
-  echo -e "${GREEN}ERROR: $@${NC}" >&2
+  echo -e "${GREEN}SUCCESS: $@${NC}" >&2
 }
 
 function print() {
