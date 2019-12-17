@@ -14,23 +14,29 @@ function ::debug() {
   ! [ -z "${DEBUG}" ] && ::log "$@"
 }
 
+function ::now_millis {
+  echo $(date +%s%N | cut -b1-13)
+}
+
 function print_error() {
   echo -e "\e[31m\nERROR: $1 \e[0m\n"
 }
 
 function usage() {
   cat <<EOF
-${SCRIPT} [--help|-h] [<--directory|-d <dir>>] <--file|-f <file>|--regx|-r <regx>> <command arg1 arg2 ... >
+${SCRIPT} [--help|-h] [<--directory|-d <dir>>] <--file|-f <file>|--regx|-r <regx>> \
+[--recursive|-R> <command arg1 arg2 ... >
 
 Note that this script triggers on the following inotify filesystem events:
   close_write,moved_to,modify
 
---help: Shows this help message and exits.
---directory: The directory on which to listen to any file changes. (e.g. /tmp/foo)
+--help|-h: Shows this help message and exits.
+--directory|-d: The directory on which to listen to any file changes. (e.g. /tmp/foo)
     Note: Defaults to the current directory.
---file: When this file changes, the command will be called.
---regx: A regular expression that when a modified file's name matches, triggers the command.
+--file|-f: When this file changes, the command will be called.
+--regx|-r: A regular expression that when a modified file's name matches, triggers the command.
     Note: Overrides --file.
+--recursive|-r: Whether to watch directories recursively or not. Default: false.
 
 command arg1 arg2...: The command to execute when a file or file regx matches. You can use the
 special name __file__ to replace it with the filename of the file that triggered the command.
@@ -42,6 +48,7 @@ directory="$(pwd)"
 file=
 regx=
 command=
+recursive=
 while [ $# -gt 0 ]; do
   arg="$1"
   case "${arg}" in
@@ -56,6 +63,9 @@ while [ $# -gt 0 ]; do
     --regx|-r)
       regx="$2"
       shift
+      ;;
+    --recursive|-R)
+      recursive=1
       ;;
     --help)
       usage
@@ -73,6 +83,7 @@ done
 ::debug "file=${file}"
 ::debug "regx=${regx}"
 ::debug "command=${command}"
+::debug "recursive=${recursive}"
 
 
 if [ -z "${file}" ] && [ -z "${regx}" ]; then
@@ -89,24 +100,44 @@ fi
 
 
 ::log "Watching directory: ${directory}"
-inotifywait -e close_write,moved_to,modify -m "${directory}" |
+params=(-e close_write,moved_to,modify -m "${directory}")
+if [[ ${recursive} -eq 1 ]]; then
+    params+=(-r)
+fi
+
+last_run=0
+throttle_millis=250
+
+function throttle_cmd {
+  local cmd="$@"
+  local curr_millis=$(::now_millis)
+  local elapsed_millis=$((curr_millis-last_run))
+  if [[ ${elapsed_millis} -gt ${throttle_millis} ]]; then
+      last_run=${curr_millis} # lock run for ${throttle_millis}
+      ::log "${cmd}"
+      ${cmd}
+      last_run=$(::now_millis) # allow run in ${throttle_millis}
+  else
+    ::debug "Command was throttled"
+  fi
+}
+
+inotifywait "${params[@]}" |
     while read -r directory events filename; do
       ::debug "Events triggered: ${events}"
       # TODO: Set a minimum time treshold to trigger the event. At the moment a
       # single file save from emacs triggers two rapid-fire MODIFY events.
       if ! [ -z ${regx} ]; then
            if [[ "${filename}" =~ ${regx} ]]; then
-              ::log "Matched regx: ${filename}"
-              effective_command=$(echo ${command} | sed s/__file__/"${filename}"/g)
-              ::log "${effective_command}"
-              ${effective_command}
-              continue
+               ::log "Matched regx: ${filename}"
+               effective_command=$(echo ${command} | sed s/__file__/"${filename}"/g)
+               throttle_cmd ${effective_command}
+               continue
           fi
       elif [ "${filename}" = "${file}" ]; then
           ::log "Matched filename: ${filename}"
           effective_command=$(echo ${command} | sed s/__file__/"${filename}"/g)
-          ::log "${effective_command}"
-          ${effective_command}
+          throttle_cmd ${effective_command}
           continue
       fi
       ::debug "Ignored filename: ${filename}"
