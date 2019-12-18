@@ -326,6 +326,8 @@
       (with-library company (company-mode t))
       (with-library flycheck (flycheck-mode t))
       (omnisharp-mode t)
+      (local-set-key (kbd "M-,") 'pop-tag-mark)
+      (local-set-key (kbd "M-.") 'omnisharp-go-to-definition)
       (local-set-key (kbd "C-c r r") 'omnisharp-run-code-action-refactoring)
       (local-set-key (kbd "C-c C-c") 'recompile))
 
@@ -371,11 +373,11 @@ At the moment it configures indentation and paren highlighting"
  '(custom-safe-themes
    (quote
     ("6068d911f0ad3f9e6834d4849038ef3a317510f23683ff9656da7d49a5ab3ed5" "d4890c4d8d262c61decb7c0e43b1dc5c92b378e9acada6c04d9e94f00cc70ead" "4badd47b5ba16df46b849137903f2210d344f3c7021e979ff8ed68b8c3827d84" default)))
- '(graphviz-dot-indent-width 2)
+ '(graphviz-dot-indent-width 2 t)
  '(line-number-mode t)
  '(package-selected-packages
    (quote
-    (markdown-mode markdown-preview-eww markdown-preview-mode markdownfmt omnisharp graphviz-dot-mode cycle-resize company use-package mc-extras multiple-cursors linear-undo helm-mt multi-term hl-anything helm helm-xref windresize async xclip)))
+    (async chef-mode company cycle-resize graphviz-dot-mode helm helm-mt helm-xref hl-anything linear-undo markdown-mode markdown-preview-eww markdown-preview-mode markdownfmt mc-extras multi-term multiple-cursors omnisharp powershell use-package windresize xclip)))
  '(show-paren-mode t)
  '(tool-bar-mode nil)
  '(winner-mode t))
