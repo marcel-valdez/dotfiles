@@ -177,6 +177,11 @@ if [[ "$(uname)" =~ "Linux" ]]; then
 fi
 
 export PATH="${PATH}:${HOME}/bin" # add local bin folder to path
+
+if [[ -d "${HOME}/.local/bin" ]]; then
+  export PATH="${PATH}:${HOME}/.local/bin"
+fi
+
 export PATH="${PATH}:${HOME}/.rvm/bin" # Add RVM to PATH for scripting
 export PATH="${PATH}:${HOME}/modules/buck/bin" # Add buck to the PATH
 
