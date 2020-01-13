@@ -120,12 +120,14 @@ function throttle_cmd {
   local curr_millis=$(::now_millis)
   local elapsed_millis=$((curr_millis-last_run))
   if [[ ${elapsed_millis} -gt ${throttle_millis} ]]; then
-    last_run=${curr_millis} # lock run for ${throttle_millis}
+    last_run=$((curr_millis+1000)) # lock run for 1000 + ${throttle_millis}
     ::log "${cmd}"
     ${cmd}
     last_run=$(::now_millis) # allow run in ${throttle_millis}
   else
-    ::debug "Command was throttled"
+    ::debug "Command was throttled. \
+Last run: ${last_run}. Current run: ${curr_millis}. \
+Ellapsed millis: ${elapsed_millis}."
   fi
 }
 
