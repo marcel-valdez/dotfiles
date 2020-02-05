@@ -55,8 +55,8 @@
         (use-package wsl-copy
           :load-path "lisp/"
           ;; setup keybindings
-          :bind (("C-x M-c" . wsl-copy-region)
-                 ("C-x M-v" . wsl-copy-paste))
+          :bind (("C-x M-c" . wsl/copy-region)
+                 ("C-x M-v" . wsl/copy-paste))
           :config
           (with-library wsl-copy))
       (progn
@@ -399,3 +399,4 @@ At the moment it configures indentation and paren highlighting"
 (put 'upcase-region 'disabled nil)
 (put 'downcase-region 'disabled nil)
 (load-theme 'company-dark)
+(put 'scroll-left 'disabled nil)
