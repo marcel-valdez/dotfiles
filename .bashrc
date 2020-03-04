@@ -194,7 +194,7 @@ fi
 export NVM_DIR="${HOME}/.nvm"
 [[ -s "${NVM_DIR}/nvm.sh" ]] && source "${NVM_DIR}/nvm.sh"  # This loads nvm
 # This sets up the default node version and loads it
-export NODE_VERSION="9.5.0"
+export NODE_VERSION="13.9.0"
 node-check-use --silent
 
 [[ -f "${HOME}/.fzf.bash" ]] && source "${HOME}/.fzf.bash"
