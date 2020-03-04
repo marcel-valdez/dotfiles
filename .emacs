@@ -328,6 +328,35 @@
     (with-library csharp-mode
       (add-hook 'csharp-mode 'marcel-omnisharp-keys t))))
 
+(use-package js2-mode
+  :ensure t
+  :config
+  (with-library js2-mode
+    (add-to-list 'auto-mode-alist '("\\.mjs\\'" . js2-mode))
+    (defun marcel-js2-keys ()
+      (local-set-key (kbd "M-j") (lambda () (interactive) (other-window 1))))
+    (add-hook 'js2-mode 'marcel-js2-keys)))
+
+(use-package eslint-fix
+  :ensure t
+  :config
+  (with-library eslint-fix
+    (setq eslint-fix-executable "/home/marcel/.nvm/versions/node/v13.9.0/bin/eslint")
+    (eval-after-load 'js-mode
+      '(add-hook 'js-mode-hook (lambda () (add-hook 'after-save-hook 'eslint-fix nil t))))
+    (eval-after-load 'js2-mode
+      '(add-hook 'js2-mode-hook (lambda () (add-hook 'after-save-hook 'eslint-fix nil t))))))
+
+(use-package flymake-jslint
+  :ensure t
+  :config
+  (with-library flymake-jslint
+    (setq flymake-jslint-command "/home/marcel/.nvm/versions/node/v13.9.0/bin/jslint")
+    (eval-after-load 'js2-mode
+      '(add-hook 'js2-mode-hook 'flymake-jslint-load))
+    (eval-after-load 'js-mode
+      '(add-hook 'js-mode-hook 'flymake-jslint-load))))
+
 (custom-set-variables
  ;; custom-set-variables was added by Custom.
  ;; If you edit it by hand, you could mess it up, so be careful.
@@ -335,7 +364,8 @@
  ;; If there is more than one, they won't work right.
  '(package-selected-packages
    (quote
-    (omnisharp csharp-mode erc-status-sidebar markdown-mode flyspell-correct flycheck helm-descbinds helm-dash company-ctags ggtags helm-gtags telephone-line use-ttf use-package use-package-ensure-system-package zeal-at-point flycheck-checkbashisms graphviz-dot-mode flyspell-correct-helm helm-flycheck better-defaults jedi elpy company xclip helm git helm-grepint helm-helm-commands helm-ispell helm-ls-git helm-proc helm-pydoc helm-rubygems-org helm-themes helm-wordnet helm-xref hgignore-mode undo-tree rotate rjsx-mode multiple-cursors multi-term markdownfmt markdown-toc markdown-preview-mode helm-git gtags flycheck-tip flycheck-package cycle-resize auto-complete)))
+    (javascript-mode omnisharp csharp-mode erc-status-sidebar markdown-mode flyspell-correct flycheck helm-descbinds helm-dash company-ctags ggtags helm-gtags telephone-line use-ttf use-package use-package-ensure-system-package zeal-at-point flycheck-checkbashisms graphviz-dot-mode flyspell-correct-helm helm-flycheck better-defaults jedi elpy company xclip helm git helm-grepint helm-helm-commands helm-ispell helm-ls-git helm-proc helm-pydoc helm-rubygems-org helm-themes helm-wordnet helm-xref hgignore-mode undo-tree rotate rjsx-mode multiple-cursors multi-term markdownfmt markdown-toc markdown-preview-mode helm-git gtags flycheck-tip flycheck-package cycle-resize auto-complete)))
+ '(safe-local-variable-values (quote ((xref-etags-mode . t))))
  '(show-paren-mode t))
 (custom-set-faces
  ;; custom-set-faces was added by Custom.
