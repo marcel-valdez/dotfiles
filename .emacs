@@ -30,6 +30,7 @@
 ;; (with-library better-defaults)
 (with-library use-package)
 (with-library use-package-ensure)
+(with-library tail-buffer)
 
 ;;; re-binds certain keys when inside a TMUX session
 (if (display-graphic-p)
