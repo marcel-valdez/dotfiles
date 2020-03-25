@@ -155,8 +155,14 @@ if [[ $# -gt 0 ]]; then
     print_parameters >&2
 fi
 
+remote_script=$(cat <<EOF
+ DISPLAY=${display} import -window root -resize ${size} -delay 100 ${tempfilepath};
+ (sleep 10 && rm ${tempfilepath}) &
+EOF
+)
+
 print "Taking screenshot on remote host."
-run ssh "${user}@${host}" -t "DISPLAY=${display} import -window root -resize ${size} -delay 100 ${tempfilepath}"
+run ssh "${user}@${host}" -t "${remote_script}"
 if [[ ! $? -eq 0 ]]; then
     error "There was an error issuing the remote screenshot command."
     exit 1
@@ -169,6 +175,3 @@ if [[ ! $? -eq 0 ]]; then
 else
   success "Screenshot file found at: ${outputfilepath}"
 fi
-
-print "Cleaning up remote screenshot file"
-run ssh "${user}@${host}" -t "rm ${tempfilepath}"
