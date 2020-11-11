@@ -414,3 +414,11 @@ function wait-for-process() {
       echo "Failed to wait for process ${pid}" 1>&2
   done
 }
+
+function diff-color {
+  diff -burN --color=always $@
+}
+
+function less-color {
+  less -r $@
+}
