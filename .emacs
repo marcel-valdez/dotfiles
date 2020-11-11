@@ -38,6 +38,7 @@
 ;; (with-library better-defaults)
 (with-library use-package)
 (with-library use-package-ensure)
+(with-library tail-buffer)
 
 (use-package helm-xref :ensure t)
 (use-package flycheck
@@ -55,8 +56,8 @@
         (use-package wsl-copy
           :load-path "lisp/"
           ;; setup keybindings
-          :bind (("C-x M-c" . wsl/copy-region)
-                 ("C-x M-v" . wsl/copy-paste))
+          :bind (("C-x M-c" . wsl-copy/copy-region)
+                 ("C-x M-v" . wsl-copy/paste))
           :config
           (with-library wsl-copy))
       (progn
