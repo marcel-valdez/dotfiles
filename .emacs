@@ -184,7 +184,18 @@
              :config
              (require 'telephone-line)
              (require 'telephone-line-config)
-               (telephone-line-mode t))
+             (setq telephone-line-lhs
+                   '((nil   . (telephone-line-evil-tag-segment))
+                     (accent . (telephone-line-vc-segment
+                                telephone-line-erc-modified-channels-segment
+                                telephone-line-process-segment))
+                     (evil    . (telephone-line-minor-mode-segment
+                                telephone-line-buffer-segment))))
+             (setq telephone-line-rhs
+                   '((nil    . (telephone-line-misc-info-segment))
+                     (accent . (telephone-line-major-mode-segment))
+                     (evil   . (telephone-line-airline-position-segment))))
+             (telephone-line-mode t))
 
 ;; switch between windows quickly
 (global-unset-key (kbd "M-j"))
