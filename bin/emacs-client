@@ -1,8 +1,7 @@
 #!/usr/bin/env bash
 
-emacs_binary=$(type -p emacsclient) 2>/dev/null
-
-
+[[ -z ${EMACS_SOCKET} ]] && EMACS_SOCKET="default"
+emacs_binary=$(type -p emacsclient) &>/dev/null
 if ! [[ $? -eq 0 ]]; then
   echo "There is no emacsclient binary in PATH." >&2
   exit 1
@@ -13,9 +12,16 @@ fi
 
 options=()
 if ! [[ "${TERM}" =~ "eterm" ]]; then
-    # we want a new frame on this tty if we're not within emacs
-    # already.
-    options+=(--tty)
+  # we want a new frame on this tty if we're not within emacs
+  # already.
+  # WARNING: When called from inside an emacs terminal, the emacs instance
+  # that will handle the file will be the one that starts the server with the
+  # given socket name.
+  # So what ends up happening is that you open the from within your emacs editor
+  # and then a different instance handles the actual editing of the file
+  # (meaning you'd have to go and fine the instance  started the emacs server on
+  # the socket named ${EMACS_SOCKET}.
+  options+=(--tty)
 fi
 
-${emacs_binary} --socket-name=default "${options[@]}" "$@"
+${emacs_binary} --socket-name="${EMACS_SOCKET}" "${options[@]}" "$@"
