@@ -36,7 +36,7 @@ Note that this script triggers on the following inotify filesystem events:
 --file|-f: When this file changes, the command will be called.
 --regx|-r: A regular expression that when a modified file's name matches, triggers the command.
     Note: Overrides --file.
---recursive|-r: Whether to watch directories recursively or not. Default: false.
+--recursive|-R: Whether to watch directories recursively or not. Default: false.
 
 command arg1 arg2...: The command to execute when a file or file regx matches. You can use the
 special name __file__ to replace it with the filename of the file that triggered the command.
