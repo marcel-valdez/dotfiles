@@ -39,7 +39,10 @@
 (with-library use-package)
 (with-library use-package-ensure)
 (with-library tail-buffer)
-
+(use-package editorconfig
+  :ensure t
+  :config
+  (editorconfig-mode 1))
 (use-package helm-xref :ensure t)
 (use-package flycheck
   :ensure t
