@@ -7,9 +7,13 @@ if [ ${NUM} -gt 0 ]; then
   exit
 fi
 
-while [ true ]; do
+displays_array=("0")
+if [[ -e /tmp/.X11-unix/ ]]; then
   displays=$(ls /tmp/.X11-unix/ | sed 's/X//g')
   readarray -t displays_array <<< ${displays}
+fi
+
+while [ true ]; do
   paste_buffer=$(nc -l "${HOST}" "${PORT}") # wait for next paste to clipboard
   for display in ${displays_array[@]} # paste to all available displays
   do
