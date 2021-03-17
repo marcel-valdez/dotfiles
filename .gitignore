@@ -17,6 +17,7 @@
 !.emacs
 !.xbindkeysrc.scm
 !.quotes.conkyrc
+!.wezterm.lua
 !lib/
 
 # include the bin folder
