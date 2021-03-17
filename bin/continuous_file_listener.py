@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/env python3.8
 
 import sys
 import time
@@ -8,6 +8,8 @@ from continuous_file_executor import watch
 
 def execute_command(command, exec_state, output):
   try:
+    output.write(f'command type: {type(command)}')
+    output.write(f'command str: {command}')
     (_, cmd_stdout, cmd_stderror) = subprocess.Popen(command)
     last_char = cmd_stdout.read(1)
     while last_char != '':
@@ -47,8 +49,8 @@ if __name__ == '__main__':
     print("Usage: " + sys.argv[0] + " <filename> <command> <arg1> <arg2> ... <argN>")
     exit(1)
 
-  FILENAME = sys.argv[1]
-  COMMAND_ARGS = sys.argv[2:len(sys.argv)]
-  COMMAND = ' '.join(map(quote_when_spaced, filter(not_empty, COMMAND_ARGS)))
+  filename_arg = sys.argv[1]
+  raw_cmd_args = sys.argv[2:len(sys.argv)]
+  cmd_args = list(map(quote_when_spaced, filter(not_empty, raw_cmd_args)))
 
-  main(FILENAME, COMMAND)
+  main(filename_arg, cmd_args)

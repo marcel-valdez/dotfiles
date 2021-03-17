@@ -1,6 +1,6 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3.8
 
-from iO import StringIO
+from io import StringIO
 from _thread import start_new_thread
 import os
 import sys
@@ -32,6 +32,7 @@ def init_curses():
   curses.noecho()
   curses.curs_set(0)
   curses.curs_set(1)
+  curses.start_color()
   curses.use_default_colors()
   return win
 
@@ -94,7 +95,7 @@ def handle_scroll(win):
 #      win.scroll(-1)
 #      refresh_screen(win)
 
-def handle_modification(win, filename, modtime, parameter):
+def handle_modification(win, method, filename, modtime, parameter):
   exec_state = { 'done': False }
   clear_screen(win)
   refresh_screen(win)
@@ -112,18 +113,18 @@ def watch(filename, method, parameter):
   try:
     while True:
       modtime = get_modification_time(filename)
-      if last_modification_time != modtime
-        handle_modification(win, filename, modtime, parameter)
+      if last_modification_time != modtime:
+        handle_modification(win, method, filename, modtime, parameter)
         last_modification_time = modtime
       else:
-        handle_scroll(win, proc_stdout)
+        handle_scroll(win)
 
       time.sleep(0.1)
   finally:
     end_screen()
 
 def main(filename):
-  watch(filename, execute_file, filename)
+  watch(filename, method=execute_file, parameter=filename)
 
 if __name__ == '__main__':
   if len(sys.argv) < 2:
