@@ -164,7 +164,8 @@ if [[ "$(uname)" =~ "Linux" ]]; then
     export EDITOR="${GIT_EDITOR}"
   fi
   # if we are not in a tmux session
-  if [[ -z "${TMUX}" ]] && [[ ! "${TERM}" =~ "eterm" ]]; then
+  if [[ -z "${TMUX}" ]] && [[ ! "${TERM}" =~ "eterm" ]] && \
+       [[ ! "${TERM_PROGRAM}" = "vscode" ]]; then
     # initialize environment if running for the first time
     [ is_first_time_starting_tmux ] && initialize_environment
     # this will make the terminal attach to an existing tmux session or create one
@@ -172,6 +173,9 @@ if [[ "$(uname)" =~ "Linux" ]]; then
   else
     # A new TMUX pane was created
     __ignore__=1 # only added so BASH does not hate us
+    if [[ -e "/usr/share/doc/tmux/examples/bash_completion_tmux.sh" ]]; then
+      source /usr/share/doc/tmux/examples/bash_completion_tmux.sh
+    fi
     # put commands here that should execute with every opened pane
   fi
 fi
