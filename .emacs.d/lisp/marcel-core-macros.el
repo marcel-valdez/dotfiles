@@ -26,7 +26,7 @@ If the BODY fails during execution, the error is allowed to bubble up, it is not
 (defun run-on-save ()
   "Execute the file in the current buffer.
 If variable run-on-save-cmd is set for the current buffer, then it runs that
-command and psses the saved buffer filename as the sole parameter."
+command and passes the saved buffer filename as the sole parameter."
   (when (bound-and-true-p run-on-save-mode)
     (display-message-or-buffer
      (if (string= run-on-save-cmd "")
