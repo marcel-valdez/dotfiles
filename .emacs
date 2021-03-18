@@ -130,9 +130,10 @@
     (global-set-key (kbd "M-s o") 'helm-occur)
     (global-set-key (kbd "M-x") 'helm-M-x)
     (global-set-key (kbd "C-x C-b") 'helm-buffers-list)
+    ;; Very specific to JetBrains Darcula theme on wezterm
     (set-face-attribute 'helm-selection nil
-                        :background "purple"
-                        :foreground "white")))
+                        :background "brightblack"
+                        :foreground nil)))
 
 ;; puts all backup files in the .emacs.d/backup directory, rather than on the
 ;; same folder as the file being edited
@@ -214,8 +215,11 @@
   ;; to mean something else related to window management
   (global-set-key (kbd "C-x T")
                   (lambda () (interactive) (rotate-windows -1)))
+  ;; Sometimes Alt+<arrow> translates into ESC <arrow>
   (global-set-key (kbd "M-<up>") 'move-text-up)
-  (global-set-key (kbd "M-<down>") 'move-text-down))
+  (global-set-key (kbd "ESC <up>") 'move-text-up)
+  (global-set-key (kbd "M-<down>") 'move-text-down)
+  (global-set-key (kbd "ESC <down>") 'move-text-down))
 
 ;; switch between frames quickly
 (defun init:next-frame ()
@@ -382,7 +386,7 @@ At the moment it configures indentation and paren highlighting"
  '(company-backends
    (quote
     (company-tasks company-reviewers company-bbdb company-nxml company-css company-capf
-		   (company-dabbrev-code company-keywords))))
+                   (company-dabbrev-code company-keywords))))
  '(company-minimum-prefix-length 1)
  '(custom-enabled-themes (quote (tango-dark)))
  '(custom-safe-themes
@@ -408,7 +412,6 @@ At the moment it configures indentation and paren highlighting"
  '(company-tooltip ((t (:background "black" :foreground "color-244"))))
  '(company-tooltip-common ((t (:foreground "brightwhite" :weight extra-bold))))
  '(company-tooltip-selection ((t (:background "brightblack"))))
- '(helm-selection ((t (:background "brightblack" :foreground "green"))))
  '(region ((t (:background "color-236"))))
  '(whitespace-line ((t (:background "color-239" :foreground "color-250")))))
 (put 'upcase-region 'disabled nil)
