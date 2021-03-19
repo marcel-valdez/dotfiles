@@ -135,6 +135,18 @@
                         :background "brightblack"
                         :foreground nil)))
 
+(use-package neotree
+  :ensure t
+  :config
+  (with-library neotree
+    (global-set-key (kbd "C-x C-t") 'neotree-toggle)
+    (global-set-key (kbd "C-x C-r")
+                    (lambda ()
+                      (interactive)
+                      (let ((current-window (get-buffer-window)))
+                        (neotree-find)
+                        (select-window current-window))))))
+
 ;; puts all backup files in the .emacs.d/backup directory, rather than on the
 ;; same folder as the file being edited
 (setq backup-directory-alist '(("." . "~/.emacs.d/backup/"))
