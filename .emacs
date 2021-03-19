@@ -140,8 +140,17 @@
   :ensure t
   :config
   (with-library neotree
+    (defun neotree:sync-to-buffer ()
+      "Syncs neotree to match the current buffer"
+      (interactive)
+      (if neotree-toggled-in
+          (let ((current-window (get-buffer-window)))
+            (neotree-find)
+            (select-window current-window))))
+    (global-set-key (kbd "C-x C-r") 'neotree:sync-to-buffer)
+
     (defun neotree:toggle-to-buffer ()
-      "Toggles neotrree and updates it to match current buffer."
+      "Toggles neotree and updates it to match current buffer."
       (interactive)
       (if neotree-toggled-in
           (progn
