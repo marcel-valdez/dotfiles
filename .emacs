@@ -151,7 +151,7 @@
           (neotree-find)
           (setq neotree-toggled-in t)
           (select-window current-window))))
-    (global-set-key (kbd "C-x C-t") 'neotree:update-to-buffer)))
+    (global-set-key (kbd "C-x C-t") 'neotree:toggle-to-buffer)))
 
 
 ;; puts all backup files in the .emacs.d/backup directory, rather than on the
