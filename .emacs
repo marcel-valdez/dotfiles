@@ -135,17 +135,24 @@
                         :background "brightblack"
                         :foreground nil)))
 
+(setq neotree-toggled-in nil)
 (use-package neotree
   :ensure t
   :config
   (with-library neotree
-    (global-set-key (kbd "C-x C-t") 'neotree-toggle)
-    (global-set-key (kbd "C-x C-r")
-                    (lambda ()
-                      (interactive)
-                      (let ((current-window (get-buffer-window)))
-                        (neotree-find)
-                        (select-window current-window))))))
+    (defun neotree:toggle-to-buffer ()
+      "Toggles neotrree and updates it to match current buffer."
+      (interactive)
+      (if neotree-toggled-in
+          (progn
+            (neotree-hide)
+            (setq neotree-toggled-in nil))
+        (let ((current-window (get-buffer-window)))
+          (neotree-find)
+          (setq neotree-toggled-in t)
+          (select-window current-window))))
+    (global-set-key (kbd "C-x C-t") 'neotree:update-to-buffer)))
+
 
 ;; puts all backup files in the .emacs.d/backup directory, rather than on the
 ;; same folder as the file being edited
