@@ -59,6 +59,8 @@ export HISTFILESIZE=50000
 # update the values of LINES and COLUMNS.
 shopt -s checkwinsize
 
+export TERM=xterm-color
+
 # If set, the pattern "**" used in a pathname expansion context will
 # match all files and zero or more directories and subdirectories.
 # shopt -s globstar
@@ -194,7 +196,8 @@ fi
 export NVM_DIR="${HOME}/.nvm"
 [[ -s "${NVM_DIR}/nvm.sh" ]] && source "${NVM_DIR}/nvm.sh"  # This loads nvm
 # This sets up the default node version and loads it
-export NODE_VERSION="13.9.0"
+export NODE_VERSION="15.5.1"
 node-check-use --silent
 
 [[ -f "${HOME}/.fzf.bash" ]] && source "${HOME}/.fzf.bash"
+[ -s "$NVM_DIR/bash_completion" ] && \. "$NVM_DIR/bash_completion"  # This loads nvm bash_completion
