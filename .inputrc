@@ -25,7 +25,7 @@ set bind-tty-special-chars off
 
 # do not bell on tab-completion
 # set bell-style none
-# set bell-style visible
+set bell-style visible
 
 # some defaults / modifications for the emacs mode
 $if mode=emacs
