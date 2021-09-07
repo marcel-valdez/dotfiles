@@ -31,7 +31,7 @@ command and passes the saved buffer filename as the sole parameter."
     (display-message-or-buffer
      (if (string= run-on-save-cmd "")
          (shell-command-to-string buffer-file-name)
-       (shell-command-to-string concat(run-on-save-cmd buffer-file-name))))))
+       (shell-command-to-string (concat run-on-save-cmd buffer-file-name))))))
 
 (define-minor-mode run-on-save-mode
   "Execute a script every time a file is saved."
