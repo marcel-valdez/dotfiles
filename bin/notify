@@ -12,12 +12,36 @@ now = Time.now
 time = "#{'%02d' % now.hour}:#{'%02d' % now.min}"
 title = "#{time} #{ARGV[0]}"
 message = ARGV[1]
+other_args = ARGV.slice(2) || []
 
-cmd = "notify-send \"#{title}\" \"#{message}\""
-# favor GNTP over notify-send
-if File.exists?("/usr/bin/gntp-send")
-  cmd = "gntp-send -s localhost \"#{title}\" \"#{message}\""
+
+def notify_linux(title, message, other_args)
+  cmd = "notify-send \"#{title}\" \"#{message}\""
+  # favor GNTP over notify-send
+  if File.exists?("/usr/bin/gntp-send")
+    cmd = "gntp-send -s localhost \"#{title}\" \"#{message}\""
+  end
+  `echo #{Shellwords.escape(title)} #{Shellwords.escape(message)} >> $HOME/.logs/notify.log`
+  other_args_str = other_args.join(" ")
+  spawn "#{cmd} #{other_args_str}"
 end
 
-`echo #{Shellwords.escape(title)} #{Shellwords.escape(message)} >> $HOME/.logs/notify.log`
-`#{cmd}`
+
+def notify_windows(title, message, other_args)
+  cmd = "msg.exe ${USER} \"#{title}\n #{message}\""
+  if File.exists?("/mnt/c/Users/marcelvaldez/apps/snoretoast.exe")
+    cmd = "~/win_home/apps/snoretoast.exe -t \"#{title}\" -m \"#{message}\""
+  else
+    print "File does not exist!"
+  end
+
+  other_args_str = other_args.join(" ")
+  spawn "#{cmd} #{other_args_str}"
+end
+
+
+if File.exists?("/mnt/c/windows/system32/wsl.exe")
+  notify_windows(title, message, other_args)
+else
+  notify_linux(title, message, other_args)
+end

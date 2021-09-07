@@ -422,3 +422,11 @@ function diff-color {
 function less-color {
   less -r $@
 }
+
+function ls-sort-date {
+  ls -lt "$@"
+}
+
+function start-notification-daemon {
+  DISPLAY=:0 /usr/lib/notification-daemon/notification-daemon
+}

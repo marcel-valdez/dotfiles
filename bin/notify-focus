@@ -1,0 +1,76 @@
+#!/usr/bin/env bash
+
+debug() {
+  if [[ "${DEBUG}" ]]; then
+    echo "$@" >&2
+  fi
+}
+
+notification_expire_ms=1800000
+icon="/mnt/c/Users/marcelvaldez/Pictures/notification-icon-white-32x32.png"
+vlc_bin="/mnt/c/users/marcelvaldez/apps/vlc/vlc.exe"
+sound_file="C:\\Users\\marcelvaldez\\sounds\\swinging-617.mp3"
+
+
+title="$1"
+message="$2"
+
+
+[[ -z "${DISPLAY}" ]] && export DISPLAY=:0
+
+# SETS THE WINDOWS variable to an array of window ids
+get_notification_wids() {
+  eval "$(xdotool search --shell xfce4-notify)"
+}
+
+get_vlc_pids() {
+  tasklist.exe /FI "IMAGENAME eq vlc.exe" /FO CSV | tail -n '+2' | \
+    cut -d',' -f2 | sed 's/"//g'
+}
+
+
+main() {
+  get_notification_wids &>>/tmp/notify-focus.log
+  orig_windows_len=${#WINDOWS[@]}
+  debug "[PRE] xfce4-notify windows:"
+  for window in "${WINDOWS[@]}"; do
+    debug "  ${window}"
+  done
+  debug "Number of xfce4-notify Windows: ${orig_windows_len}"
+  if [[ ${orig_windows_len} -eq 0 ]]; then
+    # Two windows are created when the first notification is issued.
+    orig_windows_len=1
+  fi
+
+  notify-send --icon "${icon}" --expire-time "${notification_expire_ms}" \
+              --app-name "Focus" "${title}" "${message}" &>>/tmp/notify-focus.log
+
+  sleep 1
+  get_notification_wids &>>/tmp/notify-focus.log
+  debug "[POST] xfce4-notify windows:"
+  for window in "${WINDOWS[@]}"; do
+    debug "  ${window}"
+  done
+  notification_window="${WINDOWS[${orig_windows_len}]}"
+  debug "New notification window: ${notification_window}"
+
+
+  vlcs_before=($(get_vlc_pids))
+  vlcs_before_len=${#vlcs_before[@]}
+  "${vlc_bin}" -I dummy --loop --dummy-quiet "${sound_file}" &>>/tmp/notify-focus.log &
+  vlcs_after=($(get_vlc_pids))
+  vlc_pid=${vlcs_after[${vlcs_before_len}]}
+
+  {
+    # Wait for the user to close the notification window
+    while xdotool getwindowpid "${notification_window}" &>>/tmp/notify-focus.log; do
+      debug "Waiting for window ${notification_window} to close"
+      sleep 1
+    done
+
+    debug "Window ${notification_window} has been closed, killing VLC"
+    taskkill.exe /T /F /PID ${vlc_pid} &>>/tmp/notify-focus.log
+  } &
+}
+
+main
