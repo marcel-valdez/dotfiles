@@ -366,7 +366,9 @@ function emacs() {
   if [[ "${TERM}" =~ "eterm" ]]; then
     emacs-client "$@"
   else
-    /usr/bin/emacs --no-window-system "$@" &>"/tmp/emacs-${USER}-${RANDOM}.log"
+    # We shouldn't redirect stdout to the log, because the user needs it
+    # when recovering from an unexpected exit.
+    /usr/bin/emacs --no-window-system "$@" 2>"/tmp/emacs-${USER}-${RANDOM}.log"
   fi
 }
 
@@ -416,11 +418,33 @@ function wait-for-process() {
 }
 
 function diff-color {
-  diff -burN --color=always $@
+  diff -burN --color=always "$@"
 }
 
 function less-color {
-  less -r $@
+  less -r "$@"
+}
+
+function hg-children {
+  # prints the current commit's immediate children
+  local rev="$1"
+  [[ -z "${rev}" ]] && rev="."
+  hg log -r "descendants(${rev})" -T '{node} ' | cut -d' ' -f2-9
+}
+
+function hg-show-one {
+  # Shows the commit hash and the first line
+  local rev="$1"
+  [[ -z "${rev}" ]] && rev="."
+  hg log -r "${rev}" -T '{node} {firstline(desc)}'
+}
+
+function hg-show-children {
+  for child in $(hg-children "$@"); do
+    hg-show-one "${child}"
+    echo
+    hg status --change "${child}";
+  done
 }
 
 function ls-sort-date {
