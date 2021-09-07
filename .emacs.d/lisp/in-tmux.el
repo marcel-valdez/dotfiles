@@ -47,6 +47,8 @@
           (define-key key-translation-map (kbd (format "M-[ 3 ; %d ~" x)) (kbd (format "%s<delete>" tkey)))
           ;; Ctrl+1
           (define-key key-translation-map (kbd (format "M-[ 1 ; %d q" x)) (kbd (format "%s1" tkey)))
+          ;; Ctrl+2
+          (define-key key-translation-map (kbd (format "M-[ 1 ; %d r" x)) (kbd (format "%s2" tkey)))
           ;; Ctrl+3
           (define-key key-translation-map (kbd (format "M-[ 1 ; %d s" x)) (kbd (format "%s3" tkey)))
           ;; Ctrl+4
