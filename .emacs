@@ -20,7 +20,7 @@
 ;; You may delete these explanatory comments.
 
 (package-initialize)
-(add-to-list 'package-archives '("marmalade" . "http://marmalade-repo.org/packages/"))
+;; (add-to-list 'package-archives '("marmalade" . "http://marmalade-repo.org/packages/"))
 (add-to-list 'package-archives '("melpa" . "https://melpa.org/packages/"))
 (add-to-list 'package-archives '("elpa" . "http://elpa.org/packages/"))
 
@@ -49,6 +49,16 @@
   :config
   (with-library flycheck
     (global-flycheck-mode)))
+
+(use-package python-mode
+  :ensure t
+  :config
+  ;(defun flycheck-mypy ()
+    ;(with-library flycheck
+      ;(flycheck-next-checker 'python-mypy)))
+   ;(add-hook 'python-mode 'flycheck-mypy)
+  )
+
 
 ;; Remove the menu bar (get one extra line of real estate
 (menu-bar-mode -1)
@@ -420,11 +430,11 @@ At the moment it configures indentation and paren highlighting"
  '(custom-safe-themes
    (quote
     ("6068d911f0ad3f9e6834d4849038ef3a317510f23683ff9656da7d49a5ab3ed5" "d4890c4d8d262c61decb7c0e43b1dc5c92b378e9acada6c04d9e94f00cc70ead" "4badd47b5ba16df46b849137903f2210d344f3c7021e979ff8ed68b8c3827d84" default)))
- '(graphviz-dot-indent-width 2)
+ '(graphviz-dot-indent-width 2 t)
  '(line-number-mode t)
  '(package-selected-packages
    (quote
-    (async chef-mode company cycle-resize graphviz-dot-mode helm helm-mt helm-xref hl-anything linear-undo markdown-mode markdown-preview-eww markdown-preview-mode markdownfmt mc-extras multi-term multiple-cursors omnisharp powershell use-package windresize xclip)))
+    (python-mode bazel-mode csharp-mode flymake flycheck dash dash-functional which-key dap-mode company-jedi lsp-treemacs treemacs cquery helm-ls-hg helm-lsp lsp-mode lsp-pyre lsp-ui neotree lua-mode async chef-mode company cycle-resize graphviz-dot-mode helm helm-mt helm-xref hl-anything linear-undo markdown-mode markdown-preview-eww markdown-preview-mode markdownfmt mc-extras multi-term multiple-cursors omnisharp powershell use-package windresize xclip)))
  '(show-paren-mode t)
  '(tool-bar-mode nil)
  '(winner-mode t))
@@ -440,6 +450,8 @@ At the moment it configures indentation and paren highlighting"
  '(company-tooltip ((t (:background "black" :foreground "color-244"))))
  '(company-tooltip-common ((t (:foreground "brightwhite" :weight extra-bold))))
  '(company-tooltip-selection ((t (:background "brightblack"))))
+ '(helm-selection ((t (:background "brightblack"))))
+ '(mode-line ((t (:background "black" :foreground "white" :box (:line-width -1 :style released-button)))))
  '(region ((t (:background "color-236"))))
  '(whitespace-line ((t (:background "color-239" :foreground "color-250")))))
 (put 'upcase-region 'disabled nil)
