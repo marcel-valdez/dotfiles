@@ -1,5 +1,11 @@
 # Save SSH key
 
+debug_ssh() {
+  if [[ "${DEBUG_SSH}" ]]; then
+    echo "$@"
+  fi
+}
+
 if [ ! -z "${DO_NOT_ADD_KEYS_TO_AGENT}" ]; then
   return 0
 fi
@@ -22,12 +28,14 @@ clear_ssh_add_l_cache
 
 cache_ssh_add_l() {
   if [ -z "${SSH_KEYS}" ]; then
+    debug_ssh "cache_ssh_add_l"
     SSH_KEYS=$(ssh-add -l 2>/dev/null)
     SSH_ADD_STATUS=$?
   fi
 }
 
 agent_is_running() {
+  debug_ssh "agent_is_running"
   if [ ! -z "$SSH_AUTH_SOCK" ]; then
     cache_ssh_add_l
     # ssh-add returns:
