@@ -28,7 +28,7 @@
 ;; You may delete these explanatory comments.
 
 (package-initialize)
-(add-to-list 'package-archives '("marmalade" . "http://marmalade-repo.org/packages/"))
+;; (add-to-list 'package-archives '("marmalade" . "http://marmalade-repo.org/packages/"))
 (add-to-list 'package-archives '("melpa" . "http://melpa.org/packages/"))
 (add-to-list 'package-archives '("elpa" . "http://elpa.org/packages/"))
 
@@ -37,6 +37,12 @@
 ;; interfere
 ;; core macros used for basic functionality
 (require 'marcel-core-macros)
+
+;; initialize use-package
+(unless (package-installed-p 'use-package)
+  (package-refresh-contents)
+  (package-install 'use-package))
+
 ;; loads packages only available at the office
 ;; uses the 'google package by default.
 (with-library at-office)
@@ -149,6 +155,26 @@
 (global-unset-key (kbd "C-x _"))
 (global-set-key (kbd "C-x _") (lambda () (interactive) (split-window-vertically)))
 
+
+;; configure the status bar using telephone-line
+(use-package telephone-line
+  :ensure t
+  :config
+  (require 'telephone-line)
+  (require 'telephone-line-config)
+  (setq telephone-line-lhs
+        '((nil   . (telephone-line-evil-tag-segment))
+          (accent . (telephone-line-vc-segment
+                     telephone-line-erc-modified-channels-segment
+                     telephone-line-process-segment))
+          (evil    . (telephone-line-minor-mode-segment
+                      telephone-line-buffer-segment))))
+  (setq telephone-line-rhs
+        '((nil    . (telephone-line-misc-info-segment))
+          (accent . (telephone-line-major-mode-segment))
+          (evil   . (telephone-line-airline-position-segment))))
+  (telephone-line-mode t))
+
 ;;(with-library auto-complete (global-auto-complete-mode))
 (with-library undo-tree
   ;; remap undo-redo using undo-tree
@@ -216,14 +242,14 @@
  ;; If there is more than one, they won't work right.
  '(c-basic-offset 2)
  '(column-number-mode t)
- '(custom-enabled-themes (quote (tango-dark)))
+ '(custom-enabled-themes '(tango-dark))
  '(custom-safe-themes
-   (quote
-    ("6068d911f0ad3f9e6834d4849038ef3a317510f23683ff9656da7d49a5ab3ed5" "d4890c4d8d262c61decb7c0e43b1dc5c92b378e9acada6c04d9e94f00cc70ead" "4badd47b5ba16df46b849137903f2210d344f3c7021e979ff8ed68b8c3827d84" default)))
+   '("6068d911f0ad3f9e6834d4849038ef3a317510f23683ff9656da7d49a5ab3ed5" "d4890c4d8d262c61decb7c0e43b1dc5c92b378e9acada6c04d9e94f00cc70ead" "4badd47b5ba16df46b849137903f2210d344f3c7021e979ff8ed68b8c3827d84" default))
  '(google-lsp-kythe-server "/google/data/ro/teams/grok/tools/kythe_languageserver")
  '(graphviz-dot-indent-width 2 t)
  '(line-number-mode t)
- '(package-selected-packages (quote (windresize async xclip undo-tree)))
+ '(package-selected-packages
+   '(telephone-line use-package multiple-cursors multi-term helm-flycheck helm-xref windresize async xclip undo-tree))
  '(show-paren-mode t)
  '(tool-bar-mode nil))
 (custom-set-faces
