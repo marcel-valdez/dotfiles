@@ -63,6 +63,12 @@ function g-branch-out() {
 # start npm functions
 
 function node-check-use() {
+  if ! type nvm &>/dev/null; then
+    # Do not proceed if NVM is not installed
+    echo "WARNING: NVM is not installed on this machine."
+    return 1
+  fi
+
   node_version=$(node --version 2>/dev/null)
   if [ "${node_version}" != "v${NODE_VERSION}" ]; then
     node_version_installed=$(nvm ls 2>/dev/null | grep "${NODE_VERSION}")
@@ -398,4 +404,15 @@ function wait-for-process() {
       tail --pid=${pid} -f &>/dev/null ||\
       echo "Failed to wait for process ${pid}" 1>&2
   done
+}
+
+function fixup_ssh_auth_sock()  {
+  if [[ -n ${SSH_AUTH_SOCK} && ! -e ${SSH_AUTH_SOCK} ]]
+  then
+    local new_sock=$(echo /tmp/ssh-*/agent*)
+     if [[ -n ${new_sock} ]]
+     then
+       export SSH_AUTH_SOCK=${new_sock}
+     fi
+  fi
 }
