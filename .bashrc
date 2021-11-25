@@ -190,7 +190,7 @@ fi
 # export J2D_PIXMAPS="shared"
 export NVM_DIR="$HOME/.nvm"
 export CHECK_PACKAGES_CONFIG="$HOME/.launchpad-helper"
-export NODE_VERSION="9.5.0"
+export NODE_VERSION="lts"
 export BIN_UTILS_PASS_PHRASE_FILE="$HOME/.bin-utils-pass-phrase"
 export SUBLIME_PROJECTS_FOLDER="$HOME/sublime_projects"
 
