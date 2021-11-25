@@ -192,6 +192,8 @@
 ;; move a line up-down easily
 (global-set-key (kbd "M-<up>") 'move-text-up)
 (global-set-key (kbd "M-<down>") 'move-text-down)
+(global-set-key (kbd "ESC <up>") 'move-text-up)
+(global-set-key (kbd "ESC <down>") 'move-text-down)
 
 ;; switch between windows quickly
 (global-unset-key (kbd "M-j"))
