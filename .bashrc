@@ -8,6 +8,12 @@ case $- in
       *) return;;
 esac
 
+if [[ "${DISPLAY}" ]]; then
+    if type setxkbmap &>/dev/null; then
+        setxkbmap -option terminate:ctrl_alt_bksp
+    fi
+fi
+
 DEFAULT_TMUX_SESSION="default"
 [[ -z "${TMUX_INIT_SESSION}" ]] && TMUX_INIT_SESSION="${DEFAULT_TMUX_SESSION}"
 
@@ -59,7 +65,7 @@ export HISTFILESIZE=50000
 # update the values of LINES and COLUMNS.
 shopt -s checkwinsize
 
-export TERM=xterm-color
+export TERM="xterm-color"
 
 # If set, the pattern "**" used in a pathname expansion context will
 # match all files and zero or more directories and subdirectories.
@@ -173,6 +179,7 @@ if [[ "$(uname)" =~ "Linux" ]]; then
     # this will make the terminal attach to an existing tmux session or create one
     tmux_attach_session
   else
+    export TERM="xterm-256color"
     # A new TMUX pane was created
     __ignore__=1 # only added so BASH does not hate us
     if [[ -e "/usr/share/doc/tmux/examples/bash_completion_tmux.sh" ]]; then
@@ -200,8 +207,13 @@ fi
 export NVM_DIR="${HOME}/.nvm"
 [[ -s "${NVM_DIR}/nvm.sh" ]] && source "${NVM_DIR}/nvm.sh"  # This loads nvm
 # This sets up the default node version and loads it
-export NODE_VERSION="15.5.1"
+export NODE_VERSION="lts"
 node-check-use --silent
 
+# Enable fzf keybindings for Bash:
+[[ -f /usr/share/doc/fzf/examples/key-bindings.bash ]] && source /usr/share/doc/fzf/examples/key-bindings.bash
+
+# Enable fuzzy auto-completion for Bash:
+[[ -f /usr/share/doc/fzf/examples/completion.bash ]] && source /usr/share/doc/fzf/examples/completion.bash
 [[ -f "${HOME}/.fzf.bash" ]] && source "${HOME}/.fzf.bash"
 [ -s "$NVM_DIR/bash_completion" ] && \. "$NVM_DIR/bash_completion"  # This loads nvm bash_completion
