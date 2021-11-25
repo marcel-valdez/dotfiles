@@ -141,8 +141,28 @@ function wifi-enable-background-scan() {
 
 
 # start npm functions
+function node-lts-version() {
+  local node_version_file="/tmp/${USER}_NODE_VERSION"
+  local lts_node_version=
+  if [[ -e "${node_version_file}" ]]; then
+    lts_node_version=$(cat "${node_version_file}")
+  fi
+
+  if [[ -z "${lts_node_version}" ]]; then
+    lts_node_version=$(nvm ls-remote --lts | tail -1 | grep -oP "(?<=v)[0-9a-b\.]+")
+    echo "${lts_node_version}" > "${node_version_file}"
+  fi
+
+  echo "${lts_node_version}"
+}
+
 function node-check-use() {
   local node_version=$(node --version 2>/dev/null)
+  if [[ "${NODE_VERSION}" == "lts" ]] || [[ "${NODE_VERSION}" == "LTS" ]]; then
+    NODE_VERSION="$(node-lts-version)"
+    export NODE_VERSION
+  fi
+
   if [ "${node_version}" != "v${NODE_VERSION}" ]; then
     local node_version_installed=$(nvm ls 2>/dev/null | grep ${NODE_VERSION})
     if [ "${node_version_installed}" == "" ]; then
@@ -278,4 +298,51 @@ function generate-dotfiles-tags() {
   type etags &>/dev/null && etags ~/.bashrc ~/.bash_functions ~/.bash_aliases\
                                   ~/.bash_ssh ~/.bash_profile ~/.bash_logout\
                                   ~/.profile ~/.xinitrc ~/.xinputrc ~/.xsession
+}
+
+function set-window-title {
+    local new_title="$@"
+    echo -e "\x1b]2;${new_title}\x1b\\"
+}
+
+function imgcat-url {
+    local url="$1"
+    if [[ -z "${url}" ]]; then
+        url=$(cat)
+    fi
+
+    if [[ -z "${url}" ]]; then
+        echo "No URL provided, stopping" >&2
+        return 1
+    fi
+
+    local clean_url=$(echo "${url}" | sed 's|[\r\n\t]||g')
+    if [[ "${TMUX}" ]] || ! type wezterm &>/dev/null; then
+        if type imgcat &>/dev/null; then
+            echo "We're within a TMUX session, using normal imgcat" >&2
+            wget -O /dev/stdout "${clean_url}" | imgcat
+        else
+            echo "You need to install imgcat" >&2
+            return 1
+        fi
+    elif type wezterm &>/dev/null; then
+        wget -O /dev/stdout "${clean_url}" | wezterm imgcat
+    fi
+}
+
+
+function cpu-get-perf-modes {
+    cat /sys/devices/system/cpu/cpu*/cpufreq/scaling_available_governors
+}
+
+function cpu-get-perf-mode {
+    cat /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor
+}
+
+function cpu-set-high-perf-mode {
+    echo "performance" | sudo tee /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor
+}
+
+function cpu-set-save-perf-mode {
+    echo "powersave" | sudo tee /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor
 }
