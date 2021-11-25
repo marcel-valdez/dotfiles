@@ -61,6 +61,21 @@ function g-branch-out() {
 # end git functions
 
 # start npm functions
+function node-lts-version() {
+  local node_version_file="/tmp/${USER}_NODE_VERSION"
+  local lts_node_version=
+  if [[ -e "${node_version_file}" ]]; then
+    lts_node_version=$(cat "${node_version_file}")
+  fi
+
+  if [[ -z "${lts_node_version}" ]]; then
+    lts_node_version=$(nvm ls-remote --lts | tail -1 | grep -oP "(?<=v)[0-9a-b\.]+")
+    echo "${lts_node_version}" > "${node_version_file}"
+  fi
+
+  echo "${lts_node_version}"
+}
+
 
 function node-check-use() {
   if ! type nvm &>/dev/null; then
@@ -69,8 +84,13 @@ function node-check-use() {
     return 1
   fi
 
+  if [[ "${NODE_VERSION}" == "lts" ]] || [[ "${NODE_VERSION}" == "LTS" ]]; then
+    NODE_VERSION="$(node-lts-version)"
+    export NODE_VERSION
+  fi
+
   node_version=$(node --version 2>/dev/null)
-  if [ "${node_version}" != "v${NODE_VERSION}" ]; then
+  if [[ "${node_version}" != "v${NODE_VERSION}" ]]; then
     node_version_installed=$(nvm ls 2>/dev/null | grep "${NODE_VERSION}")
     if [ "${node_version_installed}" == "" ]; then
       echo "Node v${NODE_VERSION} is not installed, installing now."
@@ -415,4 +435,43 @@ function fixup_ssh_auth_sock()  {
        export SSH_AUTH_SOCK=${new_sock}
      fi
   fi
+}
+
+function imgcat-url {
+  local url="$1"
+  if [[ -z "${url}" ]]; then
+    url=$(cat)
+  fi
+
+  if [[ -z "${url}" ]]; then
+    echo "No URL provided, stopping" >&2
+    return 1
+  fi
+
+  local clean_url=$(echo "${url}" | sed 's|[\r\n\t]||g')
+  if [[ "${TMUX}" ]] || ! type wezterm &>/dev/null; then
+    if type imgcat &>/dev/null; then
+      echo "We're within a TMUX session, using normal imgcat" >&2
+      wget -O /dev/stdout "${clean_url}" | imgcat
+    else
+      echo "You need to install imgcat" >&2
+      return 1
+    fi
+  elif type wezterm &>/dev/null; then
+    wget -O /dev/stdout "${clean_url}" | wezterm imgcat
+  fi
+}
+
+
+function gnome-terminal-dump-conf {
+  dconf dump /org/gnome/terminal/
+}
+
+function gnome-terminal-load-conf {
+  local conf_file="$1"
+  if [[ -z "${conf_file}" ]]; then
+    conf_file="${HOME}/.gterminal.conf"
+  fi
+
+  cat "${conf_file}" | dconf load /org/gnome/terminal/legacy/profiles:/
 }
