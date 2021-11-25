@@ -27,8 +27,10 @@
 # In order to unignore a set of files under a directory:
 # 1. unignore the directory
 !bin/
+!scripts/
 # 2. unignore the set of files
 !bin/*
+!scripts/*
 # Optionally, re-ignore files you don't want from the set
 bin/dex
 bin/mail-notify-data
