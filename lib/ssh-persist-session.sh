@@ -36,7 +36,7 @@ cache_ssh_add_l() {
 
 agent_is_running() {
   debug_ssh "agent_is_running"
-  if [ ! -z "$SSH_AUTH_SOCK" ]; then
+  if [[ "${SSH_AUTH_SOCK}" ]]; then
     cache_ssh_add_l
     # ssh-add returns:
     # 0 = agent running, has keys
