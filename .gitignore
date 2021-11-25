@@ -23,6 +23,9 @@
 # include the bin folder
 !bin/
 !bin/*
+# include the scripts folder
+!scripts/
+!scripts/*
 # with the exception of these binaries
 bin/dex
 
