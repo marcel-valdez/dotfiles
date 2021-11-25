@@ -3,7 +3,7 @@
 return {
    color_scheme = "Hybrid", -- FirefoxDev, Hybrid, JetBrains Darcula, Tomorrow Night, Molokai, Sundried, Japanesque, NightLion v2, FirefoxDev, Wryan, Monokai Remastered, Hardcore, Teerb, Wombat, Operator Mono Dark, OneHalfDark, Ripped Casts, lovelace, Pencil Dark
    enable_tab_bar = false,
-   window_decorations = "RESIZE",
+   window_decorations = "NONE",
    -- weight: Thin, ExtraLight, Light, Regular, Medium, SemiBold, Bold, ExtraBold
    -- stretch: Normal, SemiCondensed, Condensed, ExtraCondensed
    font = wezterm.font_with_fallback({
