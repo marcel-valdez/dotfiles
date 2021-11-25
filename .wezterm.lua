@@ -15,6 +15,8 @@ return {
    adjust_window_size_when_changing_font_size = false,
    keys = {
       { key="2", mods="CTRL", action=wezterm.action{SendString="\x00"} },
-      { key="2", mods="SHIFT|CTRL", action="DisableDefaultAssignment" }
+      { key="2", mods="SHIFT|CTRL", action="DisableDefaultAssignment" },
+      { key="PageDown", mods="SHIFT|CTRL", action=wezterm.action{ ActivateTabRelative=1 } },
+      { key="PageUp", mods="SHIFT|CTRL", action=wezterm.action{ ActivateTabRelative=-1 } },
    }
 }
