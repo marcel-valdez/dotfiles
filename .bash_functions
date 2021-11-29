@@ -437,6 +437,10 @@ function fixup_ssh_auth_sock()  {
   fi
 }
 
+function less-color() {
+  less -R "$@"
+}
+
 function imgcat-url {
   local url="$1"
   if [[ -z "${url}" ]]; then
