@@ -122,7 +122,10 @@ else
   WORKDIR='\w'
 fi
 
-[ -z ${PS1_HOST} ] && PS1_HOST=$(hostname) && PS1_HOST=${PS1_HOST/.mtv.*/}
+if [[ -z ${PS1_HOST} ]]; then
+  PS1_HOST=$(hostname)
+  PS1_HOST=${PS1_HOST/.mtv.*/}
+fi
 
 if [ "${color_prompt}" = yes ]; then
   PS1='${debian_chroot:+($debian_chroot)}\[\033[01;32m\]@${PS1_HOST}\[\033[00m\]:\[\033[01;34m\]'${WORKDIR}'\[\033[00m\]'${PS1_SUFFIX}
@@ -190,7 +193,7 @@ fi
 # export J2D_PIXMAPS="shared"
 export NVM_DIR="$HOME/.nvm"
 export CHECK_PACKAGES_CONFIG="$HOME/.launchpad-helper"
-export NODE_VERSION="lts"
+export NODE_VERSION="15.5.1"
 export BIN_UTILS_PASS_PHRASE_FILE="$HOME/.bin-utils-pass-phrase"
 export SUBLIME_PROJECTS_FOLDER="$HOME/sublime_projects"
 
@@ -205,6 +208,7 @@ if [ "$(expr substr $(uname) 1 5)" == "Linux" ]; then
   # if the terminal has not been initialized yet
   if [ -z "${TERMINAL_SESSION_INITIALIZED}" ]; then
     # This is slow, so we do not want to do it for every TMUX pane
+    DO_NOT_ADD_KEYS_TO_AGENT=1
     log_debug "Loading SSH session"
     source "${HOME}/lib/ssh-persist-session.sh"
     log_debug "Loaded SSH session"
@@ -252,4 +256,8 @@ export https_proxy=''
 export ftp_proxy=''
 export socks_proxy=''
 
-[ -f ~/.fzf.bash ] && source ~/.fzf.bash
+# Enable fzf keybindings for Bash:
+[[ -f /usr/share/doc/fzf/examples/key-bindings.bash ]] && source /usr/share/doc/fzf/examples/key-bindings.bash
+# Enable fuzzy auto-completion for Bash:
+[[ -f /usr/share/doc/fzf/examples/completion.bash ]] && source /usr/share/doc/fzf/examples/completion.bash
+[[ -f "${HOME}/.fzf.bash" ]] && source "${HOME}/.fzf.bash"
