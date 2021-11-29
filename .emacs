@@ -141,7 +141,9 @@
   (global-set-key (kbd "C-x T")
                   (lambda () (interactive) (rotate-windows -1)))
   (global-set-key (kbd "M-<up>") 'move-text-up)
-  (global-set-key (kbd "M-<down>") 'move-text-down))
+  (global-set-key (kbd "ESC <up>") 'move-text-up)
+  (global-set-key (kbd "M-<down>") 'move-text-down)
+  (global-set-key (kbd "ESC <down>") 'move-text-down))
 
 ;; switch between frames quickly
 (global-unset-key (kbd "C-M-j"))
@@ -155,6 +157,22 @@
 (global-unset-key (kbd "C-x _"))
 (global-set-key (kbd "C-x _") (lambda () (interactive) (split-window-vertically)))
 
+;; Flashes the current line after navigating.
+(use-package nav-flash
+  :ensure t
+  :config)
+
+(use-package lsp-treemacs
+  :ensure t
+  :config)
+
+(use-package lsp-ui
+  :ensure t
+  :config)
+
+(use-package rotate
+  :ensure t
+  :config)
 
 ;; configure the status bar using telephone-line
 (use-package telephone-line
@@ -245,7 +263,6 @@
  '(custom-enabled-themes '(tango-dark))
  '(custom-safe-themes
    '("6068d911f0ad3f9e6834d4849038ef3a317510f23683ff9656da7d49a5ab3ed5" "d4890c4d8d262c61decb7c0e43b1dc5c92b378e9acada6c04d9e94f00cc70ead" "4badd47b5ba16df46b849137903f2210d344f3c7021e979ff8ed68b8c3827d84" default))
- '(google-lsp-kythe-server "/google/data/ro/teams/grok/tools/kythe_languageserver")
  '(graphviz-dot-indent-width 2 t)
  '(line-number-mode t)
  '(package-selected-packages
