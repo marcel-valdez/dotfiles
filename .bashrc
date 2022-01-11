@@ -189,28 +189,28 @@ fi
 log_debug "Loaded bash_completion"
 
 # Path additions
-if [ -d "$HOME/bin" ]; then
+if [ -d "${HOME}/bin" ]; then
   export PATH=$PATH:"$HOME/bin"
 fi
 
-if [ -d "$HOME/.local/bin" ]; then
-  export PATH=$PATH:"$HOME/.local/bin"
+if [ -d "${HOME}/.local/bin" ]; then
+  export PATH="${PATH}:${HOME}/.local/bin"
 fi
 # Add RVM to PATH for scripting
 # custom environment variables
 # export J2D_PIXMAPS="shared"
-export NVM_DIR="$HOME/.nvm"
-export CHECK_PACKAGES_CONFIG="$HOME/.launchpad-helper"
-export NODE_VERSION="15.5.1"
-export BIN_UTILS_PASS_PHRASE_FILE="$HOME/.bin-utils-pass-phrase"
-export SUBLIME_PROJECTS_FOLDER="$HOME/sublime_projects"
+export NVM_DIR="${HOME}/.nvm"
+export CHECK_PACKAGES_CONFIG="${HOME}/.launchpad-helper"
+export NODE_VERSION="16.13.1"
+export BIN_UTILS_PASS_PHRASE_FILE="${HOME}/.bin-utils-pass-phrase"
+export SUBLIME_PROJECTS_FOLDER="${HOME}/sublime_projects"
 
 if [ "$(expr substr $(uname) 1 5)" == "Linux" ]; then
   if [[ "$TERM" =~ "eterm" ]]; then
     export EDITOR="emacs-client"
     export GIT_EDITOR=$EDITOR
   else
-    export EDITOR="emacs --no-window-system"
+    export EDITOR="emacs --no-window-synstem"
     export GIT_EDITOR=$EDITOR
   fi
   # if the terminal has not been initialized yet
@@ -240,17 +240,17 @@ fi
 
 # This loads nvm
 log_debug "Loading NVM"
-[ -s "$NVM_DIR/nvm.sh" ] && source "$NVM_DIR/nvm.sh"
+[ -s "${NVM_DIR}/nvm.sh" ] && source "${NVM_DIR}/nvm.sh"
 # This loads nvm bash_completion
 log_debug "Loading NVM bash completion"
-[ -s "$NVM_DIR/bash_completion" ] && \. "$NVM_DIR/bash_completion"
+[ -s "${NVM_DIR}/bash_completion" ] && \. "${NVM_DIR}/bash_completion"
 log_debug "Loaded NVM"
 
 # Load RVM into a shell session *as a function*
 log_debug "Loading RVM"
-[[ -s "$HOME/.rvm/scripts/rvm" ]] && source "$HOME/.rvm/scripts/rvm"
+[[ -s "${HOME}/.rvm/scripts/rvm" ]] && source "${HOME}/.rvm/scripts/rvm"
 log_debug "Loaded RVM"
-export PATH="$PATH:$HOME/.rvm/bin" # Add RVM to PATH for scripting
+export PATH="${PATH}:${HOME}/.rvm/bin" # Add RVM to PATH for scripting
 
 # This sets up the default node version and loads it
 log_debug "Loading node.js"
