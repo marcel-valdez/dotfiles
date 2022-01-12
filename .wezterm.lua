@@ -13,10 +13,16 @@ return {
       { family="Terminus"}
    }),
    adjust_window_size_when_changing_font_size = false,
+   disable_default_key_bindings = true,
    keys = {
-      { key="2", mods="CTRL", action=wezterm.action{SendString="\x00"} },
-      { key="2", mods="SHIFT|CTRL", action="DisableDefaultAssignment" },
-      { key="PageDown", mods="SHIFT|CTRL", action=wezterm.action{ ActivateTabRelative=1 } },
-      { key="PageUp", mods="SHIFT|CTRL", action=wezterm.action{ ActivateTabRelative=-1 } },
+      { key="2", mods="CTRL", action = wezterm.action{ SendString="\x00"} },
+      { key="PageDown", mods="SHIFT|CTRL", action = wezterm.action { ActivateTabRelative=1 } },
+      { key="PageUp", mods="SHIFT|CTRL", action = wezterm.action { ActivateTabRelative=-1 } },
+      { key="V", mods="CTRL", action=wezterm.action { PasteFrom="Clipboard" } },
+      { key="R", mods="SUPER", action = "ReloadConfiguration" },
+      { key = "-", mods="CTRL", action = "DecreaseFontSize" },
+      { key = "=", mods="CTRL", action = "IncreaseFontSize" },
+      { key = "w", mods="SUPER", action = wezterm.action { CloseCurrentTab = { confirm = true } } },
+      { key = "t", mods="SUPER", action = wezterm.action { SpawnTab="CurrentPaneDomain" } },
    }
 }
