@@ -153,6 +153,16 @@ alias l='ls -CF'
 [[ -f "${HOME}/.bash_aliases" ]] && source "${HOME}/.bash_aliases"
 [[ -f "${HOME}/.bash_functions" ]] && source "${HOME}/.bash_functions"
 
+export PATH="${PATH}:${HOME}/bin" # add local bin folder to path
+
+if [[ -d "${HOME}/.local/bin" ]]; then
+  export PATH="${PATH}:${HOME}/.local/bin"
+fi
+
+export PATH="${PATH}:${HOME}/.rvm/bin" # Add RVM to PATH for scripting
+export PATH="${PATH}:${HOME}/modules/buck/bin" # Add buck to the PATH
+
+
 # enable programmable completion features (you don't need to enable
 # this, if it's already enabled in /etc/bash.bashrc and /etc/profile
 # sources /etc/bash.bashrc).
@@ -188,15 +198,6 @@ if [[ "$(uname)" =~ "Linux" ]]; then
     # put commands here that should execute with every opened pane
   fi
 fi
-
-export PATH="${PATH}:${HOME}/bin" # add local bin folder to path
-
-if [[ -d "${HOME}/.local/bin" ]]; then
-  export PATH="${PATH}:${HOME}/.local/bin"
-fi
-
-export PATH="${PATH}:${HOME}/.rvm/bin" # Add RVM to PATH for scripting
-export PATH="${PATH}:${HOME}/modules/buck/bin" # Add buck to the PATH
 
 if [[ -z "${MONO_PATH}" ]]; then
   export MONO_PATH="/usr/bin/continuoustests"

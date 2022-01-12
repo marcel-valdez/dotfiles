@@ -164,7 +164,7 @@ function node-check-use() {
   fi
 
   if [ "${node_version}" != "v${NODE_VERSION}" ]; then
-    local node_version_installed=$(nvm ls 2>/dev/null | grep ${NODE_VERSION})
+    local node_version_installed=$(nvm ls 2>/dev/null | grep "${NODE_VERSION}")
     if [ "${node_version_installed}" == "" ]; then
       echo Node v$NODE_VERSION is not installed, installing now.
       nvm install "v${NODE_VERSION}"
