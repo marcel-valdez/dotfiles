@@ -210,7 +210,7 @@ if [ "$(expr substr $(uname) 1 5)" == "Linux" ]; then
     export EDITOR="emacs-client"
     export GIT_EDITOR=$EDITOR
   else
-    export EDITOR="emacs --no-window-synstem"
+    export EDITOR="emacs --no-window-system"
     export GIT_EDITOR=$EDITOR
   fi
   # if the terminal has not been initialized yet
