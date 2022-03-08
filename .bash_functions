@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 # EMACS_VERSION="25.1.91"
-EMACS_VERSION="26.3"
+EMACS_VERSION="27.2"
 
 # alert function for long running commands.  Use like so:
 #   sleep 10; alert
@@ -69,10 +69,23 @@ function fails() {
 
 function emacs() {
   local emacs_bin="$(which emacs)"
-  if [[ "${EMACS_VERSION}" != "" ]] && [[ -e "/usr/local/bin/emacs-${EMACS_VERSION}" ]]; then
-    emacs_bin="/usr/local/bin/emacs-${EMACS_VERSION}"
-  else
-    echo "Emacs binary /usr/local/bin/emacs-${EMACS_VERSION} not found. Using ${emacs_bin} instead." >&2
+  # prioritize the snap installation of emacs
+  if [[ -x "/snap/bin/emacs" ]]; then
+      emacs_bin="/snap/bin/emacs"
+  fi
+  # prioritize user-local install of emacs
+  if [[ -x "${HOME}/.local/bin/emacs" ]]; then
+      emacs_bin="${HOME}/.local/bin/emacs"
+  fi
+
+  if [[ "${EMACS_VERSION}" != "" ]]; then
+     if [[ -x "/usr/local/bin/emacs-${EMACS_VERSION}" ]]; then
+         emacs_bin="/usr/local/bin/emacs-${EMACS_VERSION}"
+     elif [[ -x "/usr/snap/bin/emacs-${EMACS_VERSION}" ]]; then
+         emacs_bin="/snap/bin/emacs-${EMACS_VERSION}"
+     else
+         echo "Emacs binary for version ${EMACS_VERSION} not found. Using ${emacs_bin} instead." >&2
+     fi
   fi
   "${emacs_bin}" -nw "$@"
 }
