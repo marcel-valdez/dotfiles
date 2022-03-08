@@ -22,7 +22,7 @@
 # set backup
 
 ## The directory to put unique backup files in.
-set backupdir "$HOME/.nano_bak"
+set backupdir "~/.nano_bak"
 
 ## Do backwards searches by default.
 # set backwards
@@ -42,7 +42,7 @@ set backupdir "$HOME/.nano_bak"
 
 ## Constantly display the cursor position in the statusbar.  Note that
 ## this overrides "quickblank".
-set const
+# set const
 
 ## Use cut to end of line by default.
 # set cut
@@ -235,10 +235,10 @@ unbind ^Space main
 bind ^Space mark all
 
 unbind M-C main
-bind M-C copytext main
+# bind M-C copytext main
 
 unbind M-V main
-bind M-V uncut main
+# bind M-V uncut main
 
 unbind M-X main
 bind M-X cut main
@@ -334,4 +334,4 @@ bind M-# findprevious main
 ## XML-type files
 #include "/usr/share/nano/xml.nanorc"
 
-include "/home/marcel/.nano/syntax/ALL.nanorc"
+include "~/.nano/syntax/ALL.nanorc"
