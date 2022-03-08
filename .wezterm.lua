@@ -19,7 +19,7 @@ return {
         weight="Regular",
         stretch="Normal",
         italic=false,
-        harfbuzz_features={"liga=0"}
+        harfbuzz_features={"calt=0","liga=0"}
       },
       { family="Noto Sans Mono", weight="Regular", stretch="Normal", italic=false },
       { family="Source Code Pro"},
