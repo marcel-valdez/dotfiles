@@ -44,3 +44,8 @@ bin/mail-notify-data
 *#
 **/*#*
 **/*#*#
+
+# ignore recipes folder (it has its own git repo)
+
+recipes/*
+recipes/**/*
