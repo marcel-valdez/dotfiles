@@ -32,6 +32,10 @@
 (with-library use-package-ensure)
 (with-library tail-buffer)
 
+;; Core emacs packages configuratons
+;; Don't ask to reload TAGS file.
+(setq tags-revert-without-query 1)
+
 ;;; re-binds certain keys when inside a TMUX session
 (if (display-graphic-p)
     ;; if emacs is run as a GUI window
@@ -99,6 +103,18 @@
       (flyspell-mode))
     (add-hook 'markdown-mode-hook 'markdown-enable-flyspell)))
 
+(use-package web-beautify
+  :ensure t
+  :config
+  (with-library web-beautify
+                 (eval-after-load 'js2-mode
+                   '(define-key js2-mode-map (kbd "C-c b") 'web-beautify-js))
+                 (eval-after-load 'json-mode
+                   '(defin-key json-mode-map (kbd "C-c b") 'web-beautify-js))
+                 (eval-after-load 'sgml-mode
+                   '(define-key html-mode-map (kbd "C-c b") 'web-beautify-html))
+                 (eval-after-load 'css-mode
+                   '(define-key 'css-mode-map (kbd "C-c b") 'web-beautify-css))))
 
 ;; set whitespace visualization
 (use-package whitespace
@@ -116,14 +132,14 @@
 ;; set indentation configuration
 (defun set-custom-indent ()
   "Set custom indentation settings (two spaces) in all modes."
-  (setq-local js2-basic-offset 2)
+  (setq-local js2-basic-offset 4)
   (setq-local js2-bounce-indent-p t)
-  (setq-local js-indent-level 2)
+  (setq-local js-indent-level 4)
   (setq-local cperl-indent-level 2)
-  (setq-local sh-basic-offset 2)
-  (setq-local sh-indentation 2)
+;;  (setq-local sh-basic-offset 2)
+;;  (setq-local sh-indentation 2)
   (setq-local smie-indent-basic 2)
-  (setq-local c-basic-offset 2)
+;;  (setq-local c-basic-offset 2)
   (setq-local indent-tabs-mode nil)
   (setq-local tab-width 2)
   (setq-local standard-indent 2)
@@ -192,8 +208,11 @@
 ;; move a line up-down easily
 (global-set-key (kbd "M-<up>") 'move-text-up)
 (global-set-key (kbd "M-<down>") 'move-text-down)
+;; Sometimes Alt-Up/Down is detected as ESC up/down (wezterm-specific)
 (global-set-key (kbd "ESC <up>") 'move-text-up)
 (global-set-key (kbd "ESC <down>") 'move-text-down)
+;; sometimes End is detected as <select> (wezterm-specific)
+(global-set-key (kbd "<select>") 'move-end-of-line)
 
 ;; switch between windows quickly
 (global-unset-key (kbd "M-j"))
@@ -365,6 +384,8 @@
  ;; If you edit it by hand, you could mess it up, so be careful.
  ;; Your init file should contain only one such instance.
  ;; If there is more than one, they won't work right.
+ '(elpy-formatter 'black)
+ '(elpy-rpc-virtualenv-path 'current)
  '(package-selected-packages
    (quote
     (javascript-mode omnisharp csharp-mode erc-status-sidebar markdown-mode flyspell-correct flycheck helm-descbinds helm-dash company-ctags ggtags helm-gtags telephone-line use-ttf use-package use-package-ensure-system-package zeal-at-point flycheck-checkbashisms graphviz-dot-mode flyspell-correct-helm helm-flycheck better-defaults jedi elpy company xclip helm git helm-grepint helm-helm-commands helm-ispell helm-ls-git helm-proc helm-pydoc helm-rubygems-org helm-themes helm-wordnet helm-xref hgignore-mode undo-tree rotate rjsx-mode multiple-cursors multi-term markdownfmt markdown-toc markdown-preview-mode helm-git gtags flycheck-tip flycheck-package cycle-resize auto-complete)))
