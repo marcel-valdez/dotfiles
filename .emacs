@@ -99,6 +99,7 @@
 
 (with-library helm-config
   (helm-mode 1)
+  (helm-autoresize-mode)
   (global-set-key (kbd "C-x C-f") 'helm-find-files)
   (global-set-key (kbd "M-s o") 'helm-occur)
   (global-set-key (kbd "M-x") 'helm-M-x)
@@ -170,6 +171,11 @@
 
 (use-package lsp-ui
   :ensure t
+  :config)
+
+(use-package helm-lsp
+  :ensure t
+  :commands helm-lsp-workspace-symbol
   :config)
 
 (use-package rotate
