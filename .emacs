@@ -182,6 +182,28 @@
   :ensure t
   :config)
 
+(use-package elpy
+  :ensure t)
+
+(use-package jedi
+  :ensure t
+  :config
+  (with-library jedi
+    (defun jedi:python-mode-hook ()
+      (with-library elpy
+        (setq elpy-modules
+              (delq 'elpy-module-company
+                    (delq 'elpy-module-flymake elpy-modules)))
+        (add-hook 'elpy-mode-hook 'flycheck-mode)
+        (add-hook 'elpy-mode-hook 'auto-complete-mode)
+        (company-mode -1)
+        (elpy-mode t))
+      (setq jedi:setup-keys t)
+      (setq jedi:complete-on-dot t)
+      (setq-local whitespace-line-column 100))
+    (add-hook 'python-mode-hook 'jedi:setup)
+    (add-hook 'python-mode-hook 'jedi:python-mode-hook)))
+
 ;; configure the status bar using telephone-line
 (use-package telephone-line
   :ensure t
