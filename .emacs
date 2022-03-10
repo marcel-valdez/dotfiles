@@ -131,6 +131,7 @@
 (global-set-key (kbd "M-j") (lambda () (interactive) (other-window 1)))
 (global-unset-key (kbd "M-k"))
 (global-set-key (kbd "M-k") (lambda () (interactive) (other-window -1)))
+(global-set-key (kbd "M-W") 'copy-to-remote-clipboard)
 
 ;; swap windows
 (with-library kbd-shortcut-functions

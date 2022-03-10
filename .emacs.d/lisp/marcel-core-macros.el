@@ -21,5 +21,21 @@ If the BODY fails during execution, the error is allowed to bubble up, it is not
 
 (put 'with-library 'lisp-indent-function 1)
 
+(defvar copy-to-remote-clipboard-exe-str)
+
+(setq copy-to-remote-clipboard-exe-str "~/bin/copy-to-remote-clipboard")
+
+(defun copy-to-remote-clipboard(&optional beg end)
+  "Send contents of region bounded by BEG and END to the remote clipboard.
+The command used to copy to the remote clipboard is the script defined by the
+variable copy-to-remote-clipboard-exe-str"
+
+  (interactive "r")
+  (let ((return-code
+        (shell-command-on-region beg end copy-to-remote-clipboard-exe-str nil nil "*Errors*" t)))
+    (if
+        (eq return-code 0)
+        (display-message-or-buffer "Copied to remote clipboard"))))
+
 (provide 'marcel-core-macros)
 ;;; marcel-core-macros.el ends here
