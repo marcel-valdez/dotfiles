@@ -48,7 +48,8 @@
 (with-library at-office)
 (with-library helm-xref)
 (with-library flycheck
-  (global-flycheck-mode))
+  (global-flycheck-mode)
+  (setq flycheck-pylintrc nil))
 
 ;; Remove the menu bar (get one extra line of real estate
 (menu-bar-mode -1)
