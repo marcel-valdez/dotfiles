@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 
+source "${HOME}/.bash_functions"
 source "${HOME}/.googlerc.d/.googlerc"
 
 GCLOUD_FOLDERS=("notes")
@@ -72,6 +73,7 @@ function setup_reverse_tunnel {
   # Assumes that the gcloud_tunnel parameters are specified in ~/.ssh/config,
   # otherwise here we'd specify:
   # ssh -f -N -R ${REVERSE_TUNNEL_PORT}:localhost:${REVERSE_TUNNEL_PORT} ${USER}@${GCLOUD_HOST}
+  # See: go/effective-ssh
   ssh -f -N gcloud_tunnel
 }
 
