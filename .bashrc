@@ -78,14 +78,6 @@ log_debug "Loading .google* sources"
 if [ -f "${HOME}/.googlerc.d/.googlerc" ]; then
   source "${HOME}/.googlerc.d/.googlerc"
 fi
-
-if [ -f "${HOME}/.googlerc.d/.google_aliases" ]; then
-  source "${HOME}/.googlerc.d/.google_aliases"
-fi
-
-if [ -f "${HOME}/.googlerc.d/.google_functions" ]; then
-  source "${HOME}/.googlerc.d/.google_functions"
-fi
 log_debug "Loaded .google* sources"
 
 # set a fancy prompt (non-color, unless we know we "want" color)
