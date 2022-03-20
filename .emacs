@@ -69,6 +69,8 @@
       (with-library helm-dash
         (setq helm-dash-browser-func 'eww)))))
 
+(use-package lua-mode
+  :ensure t)
 (use-package zeal-at-point
   :ensure t
   :config
