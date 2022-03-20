@@ -175,8 +175,15 @@ if ! shopt -oq posix; then
 fi
 
 if [[ "$(uname)" =~ "Linux" ]]; then
-  export GIT_EDITOR="emacs -nw"
+  export GIT_EDITOR="${HOME}/.local/bin/emacs -nw"
+  if ! [[ -x "${GIT_EDITOR}" ]]; then
+      export GIT_EDITOR="/snap/bin/emacs -nw"
+  fi
+  if ! [[ -x "${GIT_EDITOR}" ]]; then
+      export GIT_EDITOR="/usr/bin/emacs -nw"
+  fi
   export EDITOR="${GIT_EDITOR}"
+
   if [[ "${TERM}" =~ "eterm" ]]; then
     export GIT_EDITOR="emacsclient"
     export EDITOR="${GIT_EDITOR}"
