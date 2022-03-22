@@ -180,7 +180,12 @@
 
 (use-package rotate
   :ensure t
-  :config)
+  :config
+  (progn
+    (global-set-key (kbd "C-x M--")
+                    (lambda () (interactive) (rotate:even-vertical)))
+    (global-set-key (kbd "C-x M-\\")
+                      (lambda () (interactive) (rotate:even-horizontal)))))
 
 (with-library at-office
   (if at-office-is-work-laptop
