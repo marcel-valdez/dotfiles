@@ -26,7 +26,7 @@
 ]]
 
 conky.config = {
-    alignment = 'bottom_left',
+    alignment = 'bottom_right',
 -- daemonize conky in the background?
     background = true,
     border_width = 1,
