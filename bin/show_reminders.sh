@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-REMINDERS_FILE="${HOME}/.reminders.txt"
+REMINDERS_FILE="${HOME}/notes/.reminders.txt"
 
 function show_reminders {
   local contents=
