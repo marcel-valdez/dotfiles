@@ -77,9 +77,22 @@ function setup_reverse_tunnel {
   ssh -f -N gcloud_tunnel
 }
 
+function restart_master_session {
+  # Stop the master session if it already exists
+  if ssh "${GCLOUD_HOST}" -O check &>/dev/null; then
+     echo "Stopping the previous master SSH session."
+     ssh "${GCLOUD_HOST}" -O exit
+  fi
+  # Initiate an SSH session in order to start the Master SSH Session
+  # assumes there is a master session configuration.
+  echo "Starting a new master SSH session."
+  ssh -N "${USER}@${CLOUD_HOST}"
+}
+
 function main {
   refresh_gcert
   if ! is_gcloud_host; then
+    restart_master_session
     mount_remote_gcloud_folders
     if ! is_clipboard_daemon_running; then
       echo "Clipboard Daemon is not running yet, starting it in the background."
