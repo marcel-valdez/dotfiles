@@ -15,8 +15,6 @@
              '("melpa" . "https://melpa.org/packages/"))
 (add-to-list 'package-archives
              '("elpa-gnu" . "https://elpa.gnu.org/packages/"))
-(setq inhibit-startup-screen t)
-(menu-bar-mode -1)
 
 ;; initialize packages
 (require 'cl)
@@ -26,15 +24,57 @@
   (package-refresh-contents)
   (package-install 'use-package))
 
+(setq-default
+ ad-redefinition-action 'accept         ; Silence warnings for redefinition
+ auto-save-list-file-prefix nil         ; Prevent tracking for auto-saves
+ cursor-in-non-selected-windows nil     ; Hide the cursor in inactive windows
+ cursor-type '(hbar . 2)                ; Underline-shaped cursor
+ custom-unlispify-menu-entries nil      ; Prefer kebab-case for titles
+ custom-unlispify-tag-names nil         ; Prefer kebab-case for symbols
+ ; delete-by-moving-to-trash t            ; Delete files to trash
+ ; fill-column 80                         ; Set width for automatic line breaks
+ gc-cons-threshold (* 8 1024 1024)      ; We're not using Game Boys anymore
+ help-window-select t                   ; Focus new help windows when opened
+ indent-tabs-mode nil                   ; Stop using tabs to indent
+ inhibit-startup-screen t               ; Disable start-up screen
+ initial-scratch-message ""             ; Empty the initial *scratch* buffer
+ mouse-yank-at-point t                  ; Yank at point rather than pointer
+ native-comp-async-report-warnings-errors 'silent ; Skip compilation error buffers
+ read-process-output-max (* 1024 1024)  ; Increase read size per process
+ recenter-positions '(5 top bottom)     ; Set re-centering positions
+ scroll-conservatively 101              ; Avoid recentering when scrolling far
+ scroll-margin 2                        ; Add a margin when scrolling vertically
+ select-enable-clipboard t              ; Merge system's and Emacs' clipboard
+ sentence-end-double-space nil          ; Use a single space after dots
+ show-help-function nil                 ; Disable help text everywhere
+ tab-always-indent 'complete            ; Indent first then try completions
+ uniquify-buffer-name-style 'forward    ; Uniquify buffer names
+ use-short-answers t                    ; Replace yes/no prompts with y/n
+ window-combination-resize t            ; Resize windows proportionally
+ x-stretch-cursor t                     ; Stretch cursor to the glyph width
+ tags-revert-without-query 1)           ; Don't ask to reload TAGS file.
+
+(blink-cursor-mode 0)                   ; Prefer a still cursor
+; (delete-selection-mode 1)               ; Replace region when inserting text
+(global-subword-mode 1)                 ; always enable identification of JavaStyleWords
+(column-number-mode)                    ; show column number on status bar
+(global-auto-revert-mode)               ; automatically refresh file if they are changed from underneath
+(mouse-avoidance-mode 'exile)           ; Avoid collision of mouse with point
+(put 'downcase-region 'disabled nil)    ; Enable downcase-region
+(put 'upcase-region 'disabled nil)      ; Enable upcase-region
+(set-default-coding-systems 'utf-8)     ; Default to utf-8 encoding
+(menu-bar-mode -1)                      ; Disable the top menu bar
+
 (with-library cl-generic)
 ;; (with-library better-defaults)
 (with-library use-package)
 (with-library use-package-ensure)
 (with-library tail-buffer)
 
-;; Core emacs packages configuratons
-;; Don't ask to reload TAGS file.
-(setq tags-revert-without-query 1)
+(add-function :after after-focus-change-function
+  (defun me/garbage-collect-maybe ()
+    (unless (frame-focus-state)
+      (garbage-collect))))
 
 ;;; re-binds certain keys when inside a TMUX session
 (if (display-graphic-p)
@@ -199,12 +239,6 @@
       (setq-local whitespace-line-column 100))
     (add-hook 'python-mode-hook 'jedi:setup)
     (add-hook 'python-mode-hook 'jedi:python-mode-hook)))
-;; always enable identification of JavaStyleWords
-(global-subword-mode)
-;; show column number on status bar
-(column-number-mode)
-;; automatically refresh file if they are changed from underneath
-(global-auto-revert-mode)
 
 ;;;; custom bindings
 ;; move a line up-down easily
@@ -399,16 +433,31 @@
  ;; Your init file should contain only one such instance.
  ;; If there is more than one, they won't work right.
  '(ac-candidate-face ((t (:inherit popup-face))))
+ '(bg:erc-color-face2 ((t (:background "color-21"))))
  '(company-preview-common ((t (:inherit (company-tooltip-selection company-tooltip)))))
  '(company-scrollbar-bg ((t (:background "cyan"))))
  '(company-scrollbar-fg ((t (:background "brightcyan"))))
  '(company-tooltip ((t (:background "black" :foreground "color-244"))))
  '(company-tooltip-common ((t (:foreground "brightwhite" :weight extra-bold))))
  '(company-tooltip-selection ((t (:background "brightblack"))))
+ '(completions-common-part ((t (:foreground "color-33"))))
+ '(custom-comment-tag ((t (:foreground "color-39"))))
+ '(custom-group-tag ((t (:inherit variable-pitch :foreground "color-27" :weight bold :height 1.2))))
+ '(custom-variable-obsolete ((t (:foreground "color-27"))))
+ '(custom-variable-tag ((t (:foreground "color-27" :weight bold))))
+ '(font-lock-comment-face ((t (:foreground "color-238"))))
+ '(font-lock-function-name-face ((t (:foreground "color-27"))))
+ '(font-lock-string-face ((t (:foreground "color-42"))))
+ '(fringe ((t (:background "color-235"))))
  '(helm-selection ((t (:background "brightblack" :foreground "green"))))
+ '(highlight-indent-face ((t (:background "color-237"))))
+ '(minibuffer-prompt ((t (:foreground "color-27"))))
  '(region ((t (:background "color-235"))))
+ '(shadow ((t (:foreground "color-240"))))
+ '(show-paren-match ((t (:background "color-23"))))
+ '(telephone-line-accent-active ((t (:inherit mode-line :background "color-234" :foreground "brightwhite"))))
+ '(telephone-line-accent-inactive ((t (:inherit mode-line-inactive :background "color-240" :foreground "color-250"))))
+ '(telephone-line-warning ((t (:inherit warning :foreground "color-166" :strike-through nil :underline nil))))
  '(whitespace-line ((t (:background "color-237" :foreground "color-250")))))
-(put 'downcase-region 'disabled nil)
-(put 'upcase-region 'disabled nil)
 
 ;;; .emacs ends here
