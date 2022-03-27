@@ -176,10 +176,10 @@ fi
 
 if [[ "$(uname)" =~ "Linux" ]]; then
   export GIT_EDITOR="${HOME}/.local/bin/emacs -nw"
-  if ! [[ -x "${GIT_EDITOR}" ]]; then
+  if ! [[ -x "${HOME}/.local/bin/emacs" ]]; then
       export GIT_EDITOR="/snap/bin/emacs -nw"
   fi
-  if ! [[ -x "${GIT_EDITOR}" ]]; then
+  if ! [[ -x "/snap/bin/emacs" ]]; then
       export GIT_EDITOR="/usr/bin/emacs -nw"
   fi
   export EDITOR="${GIT_EDITOR}"
