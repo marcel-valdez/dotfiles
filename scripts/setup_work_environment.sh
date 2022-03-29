@@ -5,8 +5,17 @@ source "${HOME}/.googlerc.d/.googlerc"
 
 GCLOUD_FOLDERS=("notes")
 GCLOUD_HOST="${USER}.c.googlers.com"
+OFFICE_HOST="${USER}.mtv.corp.google.com"
+LAPTOP_HOST="${USER}-glaptop"
+
 REVERSE_TUNNEL_PORT=3333
 CLIPBOARD_DAEMON_BIN="${HOME}/bin/clipboard-daemon.sh"
+
+function remote_cmd() {
+  local host="$1"
+  shift
+  ssh -ASnone -o LogLevel=QUIET -t "${USER}@${host}" "$@"
+}
 
 function is_folder_mounted {
   local _folder="$1"
@@ -60,6 +69,13 @@ function is_gcloud_host {
   [[ "${HOSTNAME}" == "${GCLOUD_HOST}" ]]
 }
 
+function is_office_host {
+  [[ "${HOSTNAME}" == "${OFFICE_HOST}" ]]
+}
+
+function is_laptop_host {
+  [[ "${HOSTNAME}" == "${LAPTOP_HOST}" ]]
+}
 
 function is_reverse_tunnel_setup() {
   cloud_ssh_cmd netstat -tulpen | grep ":${REVERSE_TUNNEL_PORT} " &>/dev/null
@@ -75,6 +91,18 @@ function setup_reverse_tunnel {
   # ssh -f -N -R ${REVERSE_TUNNEL_PORT}:localhost:${REVERSE_TUNNEL_PORT} ${USER}@${GCLOUD_HOST}
   # See: go/effective-ssh
   ssh -f -N gcloud_tunnel
+}
+
+function exit_remote_reverse_tunnel {
+  if is_laptop_host; then
+    if remote_cmd "${USER}@${OFFICE_HOST}" ssh gcloud_tunnel -O check &>/dev/null; then
+      echo "Shutting down reverse tunnel for ${OFFICE_HOST}"
+      remote_cmd "${USER}@${OFFICE_HOST}" ssh gcloud_tunnel -O exit
+    fi
+  fi
+  # We have no way of exiting the reverse tunnel of the laptop than to grep for
+  # SSH processes on the cloud instance and then kill the process corresponding
+  # to the laptop's SSH session.
 }
 
 function restart_master_session {
@@ -98,6 +126,7 @@ function main {
       echo "Clipboard Daemon is not running yet, starting it in the background."
       "${CLIPBOARD_DAEMON_BIN}" &>/dev/null &
     fi
+    exit_remote_reverse_tunnel
     if ! is_reverse_tunnel_setup; then
       echo "Reverse tunnel is not setup yet, setting it up in the background."
       setup_reverse_tunnel
