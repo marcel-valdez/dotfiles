@@ -32,6 +32,15 @@ cmd_exists xmodmap && [[ -e ~/.Xmodmap ]] &&\
   xmodmap ~/.Xmodmap >> ~/.xstartup.log
 
 # Initialize logitech trackball mouse (the /usr/share/X11/xorg.conf.d/10-evdev.conf did not work)
+
+if type conky &>/dev/null; then
+  if ! pgrep -af conky &>/dev/null; then
+    "${HOME}/bin/start-conky"
+  fi
+else
+  echo "conky not installed on this system, can't start it up." >> ~/.xstartup.log
+fi
+
 trackball_name="Logitech USB Trackball"
 if xinput list --name-only | grep "${trackball_name}" &>/dev/null; then
   xinput set-prop "${trackball_name}" "libinput Left Handed Enabled" 1
