@@ -8,74 +8,61 @@ LONG_BREAK_TIME=55
 CYCLES_BETWEEN_LONG_BREAKS=3
 
 
-function _pause() {
+function now() {
+    date "+%H:%M:%S"
+}
+
+function log() {
+  echo "$(now) $@" >/tmp/pomodororc.log
+}
+
+function pause() {
   # custom code to run when the pomodoro is paused
   "${HOME}/bin/do-not-disturb" disable
 }
 
-function _resume() {
+function resume() {
   # custom code to run when the pomodoro is resumed
   "${HOME}/bin/do-not-disturb" enable
 }
 
-function _short_break_start() {
+function shortbreak_start() {
   # custom code to run when the pomodoro short break starts
   "${HOME}/bin/do-not-disturb" disable
 }
 
-function _short_break_end() {
+function shortbreak_end() {
   # custom code to run when the pomodoro short break starts
   # "${HOME}/bin/do-not-disturb" enable
   echo &>/dev/null  # NOOP
 }
 
-function _long_break_start() {
+function longbreak_start() {
   # custom code to run when the pomodoro short break starts
   "${HOME}/bin/do-not-disturb" disable
 }
 
-function _long_break_end() {
+function longbreak_end() {
   # custom code to run when the pomodoro short break starts
   # "${HOME}/bin/do-not-disturb" disable
   echo &>/dev/null  # NOOP
 }
 
-function _pomodoro_start() {
+function pomodoro_start() {
   "${HOME}/bin/do-not-disturb" enable
 }
 
-function _pomodoro_end() {
+function pomodoro_end() {
   "${HOME}/bin/do-not-disturb" disable
 }
 
 function run_command() {
-  case "$1" in
-    pause)
-      _pause
-      ;;
-    resume)
-      _resume
-      ;;
-    short_break_start)
-      _short_break_start
-      ;;
-    short_break_end)
-      _short_break_end
-      ;;
-    long_break_end)
-      _long_break_end
-      ;;
-    pomodoro_start)
-      _pomodoro_start
-      ;;
-    pomodoro_end)
-      _pomodoro_end
-      ;;
-    *)
-      echo "Unknown command: $1" >&2
-      exit 1
-      ;;
-  esac
+  local fn_name="$1"
+  if type -t "${fn_name}" &>/dev/null; then
+    ${fn_name}
+  else
+    log "No handler for event: ${fn_name}"
+  fi
 }
 
 function run_pomodoro() {
@@ -95,6 +82,7 @@ if [[ $# -eq 0 ]]; then
 else
   case "$1" in
     --command|-c)
+      log "Running command: $2"
       run_command "$2"
       ;;
     *)

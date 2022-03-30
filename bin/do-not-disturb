@@ -16,12 +16,16 @@ function is_do_not_disturb_disabled() {
 }
 
 if [[ "$1" ]]; then
-  if [[ "$1" == "disable" ]] && is_do_not_disturb_enabled; then
-    toggle_do_not_disturb
-    notify-send 'NOTICE' 'Notifications have been enabled!'
-  elif [[ "$1" == "enable" ]] && is_do_not_disturb_disabled; then
-    notify-send 'NOTICE' 'Notifications have been disabled!'
-    toggle_do_not_disturb
+  if [[ "$1" == "disable" ]]; then
+    if is_do_not_disturb_enabled; then
+      toggle_do_not_disturb
+      notify-send 'NOTICE' 'Notifications have been enabled!'
+    fi
+  elif [[ "$1" == "enable" ]]; then
+    if is_do_not_disturb_disabled; then
+      notify-send 'NOTICE' 'Notifications have been disabled!'
+      toggle_do_not_disturb
+    fi
   else
     echo "Unknown parameter: $1" >&2
     echo "Expecting: disable or enable." >&2
