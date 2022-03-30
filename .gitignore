@@ -76,6 +76,8 @@ bin/verify-packages
 !.fluxbox/keys
 !.fluxbox/startup
 
+!.pomodororc
+
 # Common backup/generated files
 .*~
 **/.*~

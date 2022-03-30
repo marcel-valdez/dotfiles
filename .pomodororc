@@ -1,0 +1,105 @@
+#!/usr/bin/env bash
+
+STORAGE=".pomodoro.d/"
+SOUND="yes"
+POMODORO_TIME=45
+SHORT_BREAK_TIME=10
+LONG_BREAK_TIME=55
+CYCLES_BETWEEN_LONG_BREAKS=3
+
+
+function _pause() {
+  # custom code to run when the pomodoro is paused
+  "${HOME}/bin/do-not-disturb" disable
+}
+
+function _resume() {
+  # custom code to run when the pomodoro is resumed
+  "${HOME}/bin/do-not-disturb" enable
+}
+
+function _short_break_start() {
+  # custom code to run when the pomodoro short break starts
+  "${HOME}/bin/do-not-disturb" disable
+}
+
+function _short_break_end() {
+  # custom code to run when the pomodoro short break starts
+  # "${HOME}/bin/do-not-disturb" enable
+  echo &>/dev/null  # NOOP
+}
+
+function _long_break_start() {
+  # custom code to run when the pomodoro short break starts
+  "${HOME}/bin/do-not-disturb" disable
+}
+
+function _long_break_end() {
+  # custom code to run when the pomodoro short break starts
+  # "${HOME}/bin/do-not-disturb" disable
+  echo &>/dev/null  # NOOP
+}
+
+function _pomodoro_start() {
+  "${HOME}/bin/do-not-disturb" enable
+}
+
+function _pomodoro_end() {
+  "${HOME}/bin/do-not-disturb" disable
+}
+
+function run_command() {
+  case "$1" in
+    pause)
+      _pause
+      ;;
+    resume)
+      _resume
+      ;;
+    short_break_start)
+      _short_break_start
+      ;;
+    short_break_end)
+      _short_break_end
+      ;;
+    long_break_end)
+      _long_break_end
+      ;;
+    pomodoro_start)
+      _pomodoro_start
+      ;;
+    pomodoro_end)
+      _pomodoro_end
+      ;;
+    *)
+      echo "Unknown command: $1" >&2
+      exit 1
+      ;;
+  esac
+}
+
+function run_pomodoro() {
+  "${HOME}/modules/pomodoro/pomodoro.sh" \
+    --storage "${STORAGE}" \
+    --sound "${sound}" \
+    --pomodoro_time "${POMODORO_TIME}" \
+    --short_break_time "${SHORT_BREAK_TIME}" \
+    --long_break_time "${LONG_BREAK_TIME}" \
+    --cycles_between_long_breaks "${CYCLES_BETWEEN_LONG_BREAKS}" \
+    --custom_cmd "${HOME}/.pomodororc"
+}
+
+if [[ $# -eq 0 ]]; then
+  run_pomodoro
+  exit $?
+else
+  case "$1" in
+    --command|-c)
+      run_command "$2"
+      ;;
+    *)
+      run_pomodoro "$@"
+      exit $?
+      ;;
+  esac
+fi
