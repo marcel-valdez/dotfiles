@@ -1,0 +1,41 @@
+#!/usr/bin/env bash
+
+# the main command to send
+function toggle_do_not_disturb() {
+  xfconf-query -c xfce4-notifyd -p /do-not-disturb -T
+}
+
+function is_do_not_disturb_enabled() {
+  local status=$(xfconf-query -c xfce4-notifyd -p /do-not-disturb)
+  [[ "${status}" == "true" ]]
+}
+
+function is_do_not_disturb_disabled() {
+  local status=$(xfconf-query -c xfce4-notifyd -p /do-not-disturb)
+  [[ "${status}" == "false" ]]
+}
+
+if [[ "$1" ]]; then
+  if [[ "$1" == "disable" ]] && is_do_not_disturb_enabled; then
+    toggle_do_not_disturb
+    notify-send 'NOTICE' 'Notifications have been enabled!'
+  elif [[ "$1" == "enable" ]] && is_do_not_disturb_disabled; then
+    notify-send 'NOTICE' 'Notifications have been disabled!'
+    toggle_do_not_disturb
+  else
+    echo "Unknown parameter: $1" >&2
+    echo "Expecting: disable or enable." >&2
+    exit 1
+  fi
+else
+  if is_do_not_disturb_disabled; then
+    notify-send 'NOTICE' 'Notifications have been disabled!'
+    toggle_do_not_disturb
+  elif is_do_not_disturb_enabled; then
+    toggle_do_not_disturb
+    notify-send 'NOTICE' 'Notifications have been enabled!'
+  else
+    echo "Unable to parse do not disturb status: $(xfconf-query -c xfce4-notifyd -p /do-not-disturb)" >&2
+    exit 1
+  fi
+fi
