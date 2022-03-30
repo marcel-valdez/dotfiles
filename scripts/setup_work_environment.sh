@@ -20,9 +20,9 @@ function mount_remote_gcloud_folders {
       if ! [[ -e "${HOME}/${folder}" ]]; then
         mkdir "${HOME}/${folder}"
       fi
-      local remote_folder="${GCLOUD_HOST}:/usr/local/google/home/${USER}/${folder}"
-      echo "Mounting ${remote_folder} on ${HOME}/${folder}"
-      sshfs -o reconnect "${USER}@${remote_folder}" "${HOME}/${folder}"
+      local remote_folder="/usr/local/google/home/${USER}/${folder}"
+      echo "Mounting ${GCLOUD_HOST}:${remote_folder} on ${HOME}/${folder}"
+      sshfs -o reconnect "${USER}@${GCLOUD_HOST}:${remote_folder}" "${HOME}/${folder}"
     fi
     # attempt to list directory contents in order to force reconnect of the SSHFS mount
     ls "${HOME}/${folder}" &>/dev/null
