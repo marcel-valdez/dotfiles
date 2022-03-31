@@ -13,7 +13,7 @@ function now() {
 }
 
 function log() {
-  echo "$(now) $@" >/tmp/pomodororc.log
+  echo "$(now) $@" >>/tmp/pomodororc.log
 }
 
 function pause() {
@@ -65,8 +65,12 @@ function run_command() {
   fi
 }
 
+function run_pomodoro_raw() {
+  "${HOME}/modules/pomodoro/pomodoro.sh" "$@"
+}
+
 function run_pomodoro() {
-  "${HOME}/modules/pomodoro/pomodoro.sh" \
+  run_pomodoro_raw \
     --storage "${STORAGE}" \
     --sound "${sound}" \
     --pomodoro_time "${POMODORO_TIME}" \
@@ -76,17 +80,20 @@ function run_pomodoro() {
     --custom_cmd "${HOME}/.pomodororc"
 }
 
+# First time we're trying to run pomodoro or we're re-rendering
 if [[ $# -eq 0 ]]; then
   run_pomodoro
   exit $?
 else
   case "$1" in
+    # An event was triggered by pomodoro
     --command|-c)
       log "Running command: $2"
       run_command "$2"
       ;;
+    # User clicked on the pomodoro icon
     *)
-      run_pomodoro "$@"
+      run_pomodoro_raw "$@"
       exit $?
       ;;
   esac
