@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-STORAGE=".pomodoro.d/"
+STORAGE="${HOME}/.pomodoro.d"
 SOUND="yes"
 POMODORO_TIME=45
 SHORT_BREAK_TIME=10
@@ -13,7 +13,7 @@ function now() {
 }
 
 function log() {
-  echo "$(now) $@" >>/tmp/pomodororc.log
+  echo "$(now) $@" >>/tmp/${USER}.pomodoro.log
 }
 
 function pause() {
@@ -23,7 +23,9 @@ function pause() {
 
 function resume() {
   # custom code to run when the pomodoro is resumed
-  "${HOME}/bin/do-not-disturb" enable
+  if [[ "$1" == "pomodoro" ]]; then
+    "${HOME}/bin/do-not-disturb" enable
+  fi
 }
 
 function shortbreak_start() {
@@ -59,7 +61,7 @@ function pomodoro_end() {
 function run_command() {
   local fn_name="$1"
   if type -t "${fn_name}" &>/dev/null; then
-    ${fn_name}
+    "$@"
   else
     log "No handler for event: ${fn_name}"
   fi
@@ -72,7 +74,7 @@ function run_pomodoro_raw() {
 function run_pomodoro() {
   run_pomodoro_raw \
     --storage "${STORAGE}" \
-    --sound "${sound}" \
+    --sound "${SOUND}" \
     --pomodoro_time "${POMODORO_TIME}" \
     --short_break_time "${SHORT_BREAK_TIME}" \
     --long_break_time "${LONG_BREAK_TIME}" \
@@ -89,7 +91,8 @@ else
     # An event was triggered by pomodoro
     --command|-c)
       log "Running command: $2"
-      run_command "$2"
+      shift
+      run_command "$@"
       ;;
     # User clicked on the pomodoro icon
     *)
