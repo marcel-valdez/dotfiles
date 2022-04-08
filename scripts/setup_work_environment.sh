@@ -12,9 +12,9 @@ REVERSE_TUNNEL_PORT=3333
 CLIPBOARD_DAEMON_BIN="${HOME}/bin/clipboard-daemon.sh"
 
 function remote_cmd() {
-  local host="$1"
+  local remote_host="$1"
   shift
-  ssh -ASnone -o LogLevel=QUIET -t "${USER}@${host}" "$@"
+  ssh -ASnone -o LogLevel=QUIET -t "${USER}@${remote_host}" "$@"
 }
 
 function is_folder_mounted {
@@ -46,15 +46,37 @@ function get_gcert_ssh_hours_remaining {
   check_gcert_ssh | grep -oP "[0-9]+(?=h\s[0-9]+m)"
 }
 
+function check_remote_gcert_loas {
+  remote_cmd "${GCLOUD_HOST}" /usr/bin/gcertstatus -check_ssh=false -check_loas2=true "$@"
+}
+
+function get_remote_gcert_loas_hours_remaining {
+  check_remote_gcert_loas | grep -oP "[0-9]+(?=h\s[0-9]+m)"
+}
+
+function remote_gcert {
+  remote_cmd "${GCLOUD_HOST}" gcert
+}
+
 function refresh_gcert {
-  if ! check_gcert_ssh -quiet=true; then
+  local is_remote="$1"
+  local check_gcert=check_gcert_ssh
+  local get_gcert_hours_remaining=get_gcert_ssh_hours_remaining
+  local refresh_gcert=gcert
+  if [[ "${is_remote}" ]]; then
+    check_gcert=check_remote_gcert_loas
+    get_gcert_hours_remaining=get_remote_gcert_load_hours_remaining
+    refresh_gcert=remote_gcert
+  fi
+
+  if ! ${check_gcert} -quiet=true; then
     echo "Refreshing gcert, as it is invalid now."
     gcert
   else
     local retries=3
     local remaining_hrs=
     while [[ ${retries} -gt 0 ]] && [[ -z "${remaining_hrs}" ]]; do
-      remaining_hrs=$(get_gcert_ssh_hours_remaining)
+      remaining_hrs=$(${get_gcert_hours_remaining})
       retries=$((retries-1))
     done
 
@@ -63,6 +85,10 @@ function refresh_gcert {
       gcert
     fi
   fi
+}
+
+function refresh_remote_gcert {
+  refresh_gcert 1
 }
 
 function is_gcloud_host {
@@ -95,9 +121,9 @@ function setup_reverse_tunnel {
 
 function exit_remote_reverse_tunnel {
   if is_laptop_host; then
-    if remote_cmd "${USER}@${OFFICE_HOST}" ssh gcloud_tunnel -O check &>/dev/null; then
+    if remote_cmd "${OFFICE_HOST}" ssh gcloud_tunnel -O check &>/dev/null; then
       echo "Shutting down reverse tunnel for ${OFFICE_HOST}"
-      remote_cmd "${USER}@${OFFICE_HOST}" ssh gcloud_tunnel -O exit
+      remote_cmd "${OFFICE_HOST}" ssh gcloud_tunnel -O exit
     fi
   fi
   # We have no way of exiting the reverse tunnel of the laptop than to grep for
@@ -131,7 +157,11 @@ function main {
       echo "Reverse tunnel is not setup yet, setting it up in the background."
       setup_reverse_tunnel
     fi
+    # refresh gcert on the remote host
+    refresh_remote_gcert
   fi
 }
 
-main
+if ! (return 0 2>/dev/null); then
+  main
+fi
