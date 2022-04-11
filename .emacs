@@ -53,6 +53,8 @@
 
 ;; Remove the menu bar (get one extra line of real estate
 (menu-bar-mode -1)
+;; Enable the mouse when running inside xterm
+(xterm-mouse-mode t)
 ;; If we are in TMUX within an X environment
 (if (and (getenv "TMUX") (getenv "DISPLAY"))
     ;; use xclip for copy-pasting
