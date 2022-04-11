@@ -180,6 +180,9 @@
   :commands helm-lsp-workspace-symbol
   :config)
 
+(use-package imenu-list
+  :ensure t)
+
 (use-package rotate
   :ensure t
   :config
@@ -213,6 +216,13 @@
               (setq-local whitespace-line-column 100))
             (add-hook 'python-mode-hook 'jedi:setup)
             (add-hook 'python-mode-hook 'jedi:python-mode-hook))))))
+
+;; configure bash shellcheck
+(use-package flymake-shellcheck
+  :ensure t
+  :commands flymake-shellcheck-load
+  :init
+  (add-hook 'sh-mode-hook 'flymake-shellcheck-load))
 
 ;; configure the status bar using telephone-line
 (use-package telephone-line
