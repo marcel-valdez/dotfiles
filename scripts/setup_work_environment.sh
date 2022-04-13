@@ -7,7 +7,6 @@ GCLOUD_FOLDERS=("notes")
 GCLOUD_HOST="${USER}.c.googlers.com"
 OFFICE_HOST="${USER}.mtv.corp.google.com"
 LAPTOP_HOST="${USER}-glaptop"
-
 REVERSE_TUNNEL_PORT=3333
 CLIPBOARD_DAEMON_BIN="${HOME}/bin/clipboard-daemon.sh"
 
@@ -140,25 +139,28 @@ function restart_master_session {
   # Initiate an SSH session in order to start the Master SSH Session
   # assumes there is a master session configuration.
   echo "Starting a new master SSH session."
-  ssh -N "${USER}@${CLOUD_HOST}"
+  ssh -N "${USER}@${GCLOUD_HOST}"
 }
 
 function main {
-  refresh_gcert
-  if ! is_gcloud_host; then
-    restart_master_session
-    mount_remote_gcloud_folders
-    if ! is_clipboard_daemon_running; then
-      echo "Clipboard Daemon is not running yet, starting it in the background."
-      "${CLIPBOARD_DAEMON_BIN}" &>/dev/null &
+  if [[ "$#" -gt 0 ]]; then
+    "$@"
+  else
+    refresh_gcert
+    if ! is_gcloud_host; then
+      restart_master_session
+      mount_remote_gcloud_folders
+      if ! is_clipboard_daemon_running; then
+        echo "Clipboard Daemon is not running yet, starting it in the background."
+        "${CLIPBOARD_DAEMON_BIN}" &>/dev/null &
+      fi
+      if ! is_reverse_tunnel_setup; then
+        echo "Reverse tunnel is not setup yet, setting it up in the background."
+        setup_reverse_tunnel
+      fi
+      # refresh gcert on the remote host
+      refresh_remote_gcert
     fi
-    exit_remote_reverse_tunnel
-    if ! is_reverse_tunnel_setup; then
-      echo "Reverse tunnel is not setup yet, setting it up in the background."
-      setup_reverse_tunnel
-    fi
-    # refresh gcert on the remote host
-    refresh_remote_gcert
   fi
 }
 
