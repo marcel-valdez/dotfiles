@@ -99,6 +99,35 @@
 (desktop-save-mode 0)
 ;; end: desktop package configuration
 
+(use-package org
+  :config
+  (defun custom:org-mode-hook ()
+    (org-indent-mode t))
+  (add-hook 'org-mode-hook 'custom:org-mode-hook)
+
+  (setq org-log-done 'time)
+  (setq org-log-into-drawer t)
+  (setq org-todo-keywords
+        '((sequence "LATER(l)" "TODO(t)" "DOING(n)" "BLOCKED(b)" "|" "DONE(d)" "CANCELLED(c)")))
+  (setq org-capture-templates
+        '(("m" "Misc Tasks")
+          ("mt" "Task" entry (file+olp "~/notes/misc.org" "Backlog")
+           "* TODO %?\n %U\n %a\n %i" :empty-lines 1)))
+
+  (org-babel-do-load-languages 'org-babel-load-languages
+                               '((python . t)
+                                 (js . t)
+                                 (dot . t)
+                                 (emacs-lisp . t)
+                                 (lisp . t)))
+  (setq org-refile-targets
+        '((nil :maxlevel . 3)
+          (org-agenda-files :maxlevel . 3)))
+  (setq org-agenda-text-search-extra-files
+        (directory-files-recursively "~/notes/" "md$"))
+  (setq org-agenda-files
+        '("~/notes/")))
+
 (with-library helm-config
   (helm-mode 1)
   (helm-autoresize-mode)
