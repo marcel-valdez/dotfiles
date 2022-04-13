@@ -209,7 +209,8 @@
         ;; For formatOtherKeys=1, the sequence is a bit shorter (bug#13839).
         (define-key key-translation-map
           (format "\e[%d;%du" (nth 1 bind) (nth 0 bind)) (nth 2 bind)))
-      )
+      ;; Enable xterm mouse, so we can navigate with the mouse
+      (xterm-mouse-mode t))
   )
 
 (provide 'in-tmux)
