@@ -126,7 +126,14 @@
     (xclip-mode)))
 (use-package multiple-cursors :ensure t)
 (use-package helm-ls-git :ensure t)
-(use-package elpy :ensure t)
+(use-package elpy
+  :ensure t
+  :init
+  (advice-add 'python-mode :before 'elpy-enable)
+  :config
+  (setq elpy-rpc-timeout 2)
+  (setq elpy-formatter 'black)
+  (setq elpy-rpc-virtualenv-path 'current))
 (use-package flycheck :ensure t)
 ;;  (defun flycheck-set-pylint ()
 ;;    (setq flycheck-checker 'python-pylint))
@@ -223,18 +230,20 @@
 
 (use-package jedi
   :ensure t
+  :init
+  (setq jedi:setup-keys t)
+  (setq jedi:server-args '("--log-traceback"))
   :config
   (with-library jedi
     (defun jedi:python-mode-hook ()
       (with-library elpy
-	(setq elpy-modules
-	      (delq 'elpy-module-company
-		    (delq 'elpy-module-flymake elpy-modules)))
-	(add-hook 'elpy-mode-hook 'flycheck-mode)
-	(add-hook 'elpy-mode-hook 'auto-complete-mode)
-	(company-mode -1)
-	(elpy-mode t))
-      (setq jedi:setup-keys t)
+        (setq elpy-modules
+              (delq 'elpy-module-company
+                    (delq 'elpy-module-flymake elpy-modules)))
+        (add-hook 'elpy-mode-hook 'flycheck-mode)
+        (add-hook 'elpy-mode-hook 'auto-complete-mode)
+        (company-mode -1)
+        (elpy-mode t))
       (setq jedi:complete-on-dot t)
       (setq-local whitespace-line-column 100))
     (add-hook 'python-mode-hook 'jedi:setup)
