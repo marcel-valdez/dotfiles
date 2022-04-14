@@ -144,6 +144,44 @@
   (with-library flyspell-correct
     (define-key flyspell-mode-map (kbd "C-;") 'flyspell-correct-wrapper)))
 
+(use-package org
+  :config
+  (defun custom:org-mode-hook ()
+    (org-indent-mode t))
+  (add-hook 'org-mode-hook 'custom:org-mode-hook)
+
+  (setq org-log-done 'time)
+  (setq org-log-into-drawer t)
+  (setq org-todo-keywords
+        '((sequence "LATER(l)" "TODO(t)" "DOING(n)" "BLOCKED(b)" "|" "DONE(d)" "CANCELLED(c)")))
+
+  (setq org-todo-keyword-faces
+        '(("LATER" . (:foreground "dodgerblue4" ))
+          ("TODO" . (:foreground "dodgerblue1" :weight bold))
+          ("DOING" . (:foreground "aquamarine1" :weight bold))
+          ("BLOCKED" . (:foreground "darkorange3"))
+          ("CANCELLED" . (:foreground "tan3"))
+          ("DONE" . (:foreground "darkgreen" :weight bold))))
+
+  (setq org-capture-templates
+        '(("m" "Misc Tasks")
+          ("mt" "Task" entry (file+olp "~/notes/misc.org" "Backlog")
+           "* TODO %?\n %U\n %a\n %i" :empty-lines 1)))
+
+  (org-babel-do-load-languages 'org-babel-load-languages
+                               '((python . t)
+                                 (js . t)
+                                 (dot . t)
+                                 (emacs-lisp . t)
+                                 (lisp . t)))
+  (setq org-refile-targets
+        '((nil :maxlevel . 3)
+          (org-agenda-files :maxlevel . 3)))
+  (setq org-agenda-text-search-extra-files
+        (directory-files-recursively "~/notes/" "md$"))
+  (setq org-agenda-files
+        '("~/notes/")))
+
 (use-package markdown-mode
   :ensure t
   :config
@@ -461,7 +499,8 @@
  '(helm-selection ((t (:background "brightblack" :foreground "green"))))
  '(highlight-indent-face ((t (:background "color-237"))))
  '(minibuffer-prompt ((t (:foreground "color-27"))))
- '(region ((t (:background "color-235"))))
+ '(org-hide ((t (:inherit fixed-pitch :foreground "gray7"))))
+ '(region ((t (:background "darkslategray"))))
  '(shadow ((t (:foreground "color-240"))))
  '(show-paren-match ((t (:background "color-23"))))
  '(telephone-line-accent-active ((t (:inherit mode-line :background "color-234" :foreground "brightwhite"))))
