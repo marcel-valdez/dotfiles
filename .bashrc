@@ -65,7 +65,7 @@ export HISTFILESIZE=50000
 # update the values of LINES and COLUMNS.
 shopt -s checkwinsize
 
-export TERM="xterm-color"
+export TERM="xterm-256color"
 
 # If set, the pattern "**" used in a pathname expansion context will
 # match all files and zero or more directories and subdirectories.
