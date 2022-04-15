@@ -46,7 +46,8 @@ function get_gcert_ssh_hours_remaining {
 }
 
 function check_remote_gcert_loas {
-  remote_cmd "${GCLOUD_HOST}" /usr/bin/gcertstatus -check_ssh=false -check_loas2=true "$@"
+  remote_cmd "${GCLOUD_HOST}" /usr/bin/gcertstatus -check_ssh=false \
+    -check_loas2=true "$@"
 }
 
 function get_remote_gcert_loas_hours_remaining {
@@ -61,16 +62,16 @@ function refresh_gcert {
   local is_remote="$1"
   local check_gcert=check_gcert_ssh
   local get_gcert_hours_remaining=get_gcert_ssh_hours_remaining
-  local refresh_gcert=gcert
+  local _refresh_gcert=gcert
   if [[ "${is_remote}" ]]; then
     check_gcert=check_remote_gcert_loas
     get_gcert_hours_remaining=get_remote_gcert_loas_hours_remaining
-    refresh_gcert=remote_gcert
+    _refresh_gcert=remote_gcert
   fi
 
   if ! ${check_gcert} -quiet=true; then
     echo "Refreshing gcert, as it is invalid now."
-    gcert
+    _refresh_gcert
   else
     local retries=3
     local remaining_hrs=
@@ -81,7 +82,7 @@ function refresh_gcert {
 
     if [[ "${remaining_hrs}" -lt 8 ]]; then
       echo "Less than 8 hr remaining (${remaining_hrs} hr left) in gcert. Refreshing now."
-      gcert
+      _refresh_gcert
     fi
   fi
 }
