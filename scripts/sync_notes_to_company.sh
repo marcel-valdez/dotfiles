@@ -53,8 +53,12 @@ function convert_staging_directory {
     local full_input_file="${STAGING_DIRECTORY}/${_file}"
     if [[ " ${_file} " =~ ".org " ]]; then
       local full_output_file="${PUBLISH_DIRECTORY}/${_file%.org}.md"
-      pandoc "${full_input_file}" --output="${full_output_file}" \
-        --from=org --to=markdown --standalone
+      printf "yes\\r\\nyes\\r\\nyes\\r\\nyes\\r\\nyes\\r\\n" | /usr/local/google/home/marcelvaldez/.local/bin/org2md -y "${full_input_file}"
+      local full_converted_file="${STAGING_DIRECTORY}/${_file%.org}.md"
+      cp "${full_converted_file}" "${full_output_file}"
+      #pandoc "${full_input_file}" --output="${full_output_file}" \
+      #  --from=org --to=markdown --standalone --toc --strip-comments \
+      #  --tab-stop 4
     else
       local full_output_file="${PUBLISH_DIRECTORY}/${_file}"
       cp "${full_input_file}" "${full_output_file}"
@@ -68,21 +72,23 @@ function sync_publish_with_company {
     "${PUBLISH_DIRECTORY}/" "${OUTPUT_DIRECTORY}/"
   pushd "${OUTPUT_DIRECTORY}"
   # NOTE: This does not handle recursive files copied over.
-  if /usr/bin/gcertstatus -check_remaining=60s --quiet; then
-    export SKIP_SUBMIT
-    EDITOR="${HOME}/scripts/gen_notes_cl_description.sh" g4 change
-    g4 upload
-    if [[ -z "${SKIP_SUBMIT}" ]]; then
-      g4 submit
-    fi
+  export SKIP_SUBMIT
+  EDITOR="${HOME}/scripts/gen_notes_cl_description.sh" g4 change
+  g4 upload
+  if [[ -z "${SKIP_SUBMIT}" ]]; then
+    g4 submit
   fi
   popd
 }
 
 function main {
-  copy_to_staging_directory
-  convert_staging_directory
-  sync_publish_with_company
+  if /usr/bin/gcertstatus -check_remaining=60s --quiet; then
+    copy_to_staging_directory
+    convert_staging_directory
+    sync_publish_with_company
+  else
+    echo "WARNING: gcert is no longer valid, therefore we can't sync notes to company doc." >&2
+  fi
 }
 
 main "$@"
