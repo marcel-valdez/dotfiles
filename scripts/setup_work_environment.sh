@@ -64,7 +64,7 @@ function refresh_gcert {
   local refresh_gcert=gcert
   if [[ "${is_remote}" ]]; then
     check_gcert=check_remote_gcert_loas
-    get_gcert_hours_remaining=get_remote_gcert_load_hours_remaining
+    get_gcert_hours_remaining=get_remote_gcert_loas_hours_remaining
     refresh_gcert=remote_gcert
   fi
 
