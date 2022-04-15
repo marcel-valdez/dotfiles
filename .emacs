@@ -145,9 +145,7 @@
       version-control t      ; Use version numbers on backups
       delete-old-versions t  ; Automatically delete excess backups
       kept-new-versions 20   ; how many of the newest versions to keep
-      kept-old-versions 5    ; and how many of the old
-      )
-
+      kept-old-versions 5)    ; and how many of the old
 
 ;; always enable identifications of JavaStyleWords
 (global-subword-mode)
@@ -353,7 +351,8 @@
  ;; If you edit it by hand, you could mess it up, so be careful.
  ;; Your init file should contain only one such instance.
  ;; If there is more than one, they won't work right.
- '(clang-include-fixer-highlight ((t (:background "white")))))
+ '(clang-include-fixer-highlight ((t (:background "white"))))
+ '(whitespace-line ((t (:background "color-238")))))
 (put 'upcase-region 'disabled nil)
 (put 'downcase-region 'disabled nil)
 (load-theme 'company-dark)
