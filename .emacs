@@ -105,6 +105,7 @@
     (org-indent-mode t))
   (add-hook 'org-mode-hook 'custom:org-mode-hook)
 
+  (require 'org-inlinetask)
   (setq org-log-done 'time)
   (setq org-log-into-drawer t)
   (setq org-todo-keywords
