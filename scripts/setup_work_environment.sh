@@ -69,9 +69,9 @@ function refresh_gcert {
     _refresh_gcert=remote_gcert
   fi
 
-  if ! ${check_gcert} -quiet=true; then
+  if ! "${check_gcert}" -quiet=true; then
     echo "Refreshing gcert, as it is invalid now."
-    _refresh_gcert
+    "${_refresh_gcert}"
   else
     local retries=3
     local remaining_hrs=
@@ -82,7 +82,7 @@ function refresh_gcert {
 
     if [[ "${remaining_hrs}" -lt 8 ]]; then
       echo "Less than 8 hr remaining (${remaining_hrs} hr left) in gcert. Refreshing now."
-      _refresh_gcert
+      "${_refresh_gcert}"
     fi
   fi
 }
