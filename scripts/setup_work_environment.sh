@@ -125,10 +125,23 @@ function exit_remote_reverse_tunnel {
       echo "Shutting down reverse tunnel for ${OFFICE_HOST}"
       remote_cmd "${OFFICE_HOST}" ssh gcloud_tunnel -O exit
     fi
+  else
+    # We have no way of issuing a command on the laptop because we can't SSH
+    # into it, therefore instead we tell the cloud instance to close the reverse
+    # tunnel port. Do note that this may end up killing the SSH session that
+    # opened the revese tunnel.
+    remote_cmd "${GCLOUD_HOST}" "/usr/local/google/home/${USER}/scripts/close_port.sh" "${REVERSE_TUNNEL_PORT}"
   fi
-  # We have no way of exiting the reverse tunnel of the laptop than to grep for
-  # SSH processes on the cloud instance and then kill the process corresponding
-  # to the laptop's SSH session.
+}
+
+function restart_reverse_tunnel {
+  exit_remote_reverse_tunnel
+  if ! is_reverse_tunnel_setup; then
+    setup_reverse_tunnel
+  else
+    echo "We were unable to close the pre-existing reverse tunnel to the cloud instance ${GCLOUD_HOST} at port ${REVERSE_TUNNEL_PORT}" >&2
+    echo "Therefore we can't re-create a new one for this host." >&2
+  fi
 }
 
 function restart_master_session {
@@ -155,9 +168,11 @@ function main {
         echo "Clipboard Daemon is not running yet, starting it in the background."
         "${CLIPBOARD_DAEMON_BIN}" &>/dev/null &
       fi
-      if ! is_reverse_tunnel_setup; then
-        echo "Reverse tunnel is not setup yet, setting it up in the background."
-        setup_reverse_tunnel
+      sleep "0.125s"
+      if is_clipboard_daemon_running; then
+        restart_reverse_tunnel
+      else
+        echo "We were unable to start the clipboard daemon, therefore we won't open the reverse tunnel for clipboard capturing." >&2
       fi
       # refresh gcert on the remote host
       refresh_remote_gcert
@@ -166,5 +181,5 @@ function main {
 }
 
 if ! (return 0 2>/dev/null); then
-  main
+  main "$@"
 fi
