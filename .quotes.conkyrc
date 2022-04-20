@@ -26,6 +26,10 @@
 ]]
 
 conky.config = {
+-- Draw it on the bottom right of the screen to the right.
+-- 0 = left screen, 1 = right screen (per display settings)
+-- See: https://github.com/brndnmtthws/conky/issues/249
+    xinerama_head = 1,
     alignment = 'bottom_right',
 -- daemonize conky in the background?
     background = true,
