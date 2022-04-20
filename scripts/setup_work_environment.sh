@@ -63,14 +63,16 @@ function refresh_gcert {
   local check_gcert=check_gcert_ssh
   local get_gcert_hours_remaining=get_gcert_ssh_hours_remaining
   local _refresh_gcert=gcert
+  local gcert_msg="gcert"
   if [[ "${is_remote}" ]]; then
     check_gcert=check_remote_gcert_loas
     get_gcert_hours_remaining=get_remote_gcert_loas_hours_remaining
     _refresh_gcert=remote_gcert
+    gcert_msg="remote gcert"
   fi
 
   if ! "${check_gcert}" -quiet=true; then
-    echo "Refreshing gcert, as it is invalid now."
+    echo "Refreshing ${gcert_msg}, as it is invalid now."
     "${_refresh_gcert}"
   else
     local retries=3
@@ -81,7 +83,7 @@ function refresh_gcert {
     done
 
     if [[ "${remaining_hrs}" -lt 8 ]]; then
-      echo "Less than 8 hr remaining (${remaining_hrs} hr left) in gcert. Refreshing now."
+      echo "Less than 8 hr remaining (${remaining_hrs} hr left) in ${gcert_msg}. Refreshing now."
       "${_refresh_gcert}"
     fi
   fi
@@ -137,6 +139,7 @@ function exit_remote_reverse_tunnel {
 function restart_reverse_tunnel {
   exit_remote_reverse_tunnel
   if ! is_reverse_tunnel_setup; then
+    echo "Setting up reverse tunnel to host ${GCLOUD_HOST} at port ${REVERSE_TUNNEL_PORT}"
     setup_reverse_tunnel
   else
     echo "We were unable to close the pre-existing reverse tunnel to the cloud instance ${GCLOUD_HOST} at port ${REVERSE_TUNNEL_PORT}" >&2
