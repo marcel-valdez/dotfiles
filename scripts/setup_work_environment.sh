@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
-source "${HOME}/.bash_functions"
-source "${HOME}/.googlerc.d/.googlerc"
+[[ -f "${HOME}/.bash_functions" ]] && source "${HOME}/.bash_functions"
+[[ -f "${HOME}/.googlerc.d/.googlerc" ]] && source "${HOME}/.googlerc.d/.googlerc"
 
 GCLOUD_FOLDERS=("notes")
 GCLOUD_HOST="${USER}.c.googlers.com"
@@ -10,10 +10,27 @@ LAPTOP_HOST="${USER}-glaptop"
 REVERSE_TUNNEL_PORT=3333
 CLIPBOARD_DAEMON_BIN="${HOME}/bin/clipboard-daemon.sh"
 
-function remote_cmd() {
+
+function is_gcloud_host {
+  [[ "${HOSTNAME}" == "${GCLOUD_HOST}" ]]
+}
+
+function is_office_host {
+  [[ "${HOSTNAME}" == "${OFFICE_HOST}" ]]
+}
+
+function is_laptop_host {
+  [[ "${HOSTNAME}" == "${LAPTOP_HOST}" ]]
+}
+
+function remote_ssh_cmd() {
   local remote_host="$1"
   shift
-  ssh -ASnone -o LogLevel=QUIET -t "${USER}@${remote_host}" "$@"
+  ssh -o LogLevel=QUIET -t "${USER}@${remote_host}" "$@"
+}
+
+function office_ssh_cmd() {
+  remote_ssh_cmd "${OFFICE_HOST}" "$@"
 }
 
 function is_folder_mounted {
@@ -45,35 +62,31 @@ function get_gcert_ssh_hours_remaining {
   check_gcert_ssh | grep -oP "[0-9]+(?=h\s[0-9]+m)"
 }
 
-function check_remote_gcert_loas {
-  remote_cmd "${GCLOUD_HOST}" /usr/bin/gcertstatus -check_ssh=false \
+function check_cloud_gcert_loas {
+  cloud_ssh_cmd /usr/bin/gcertstatus -check_ssh=false \
     -check_loas2=true "$@"
 }
 
-function get_remote_gcert_loas_hours_remaining {
-  check_remote_gcert_loas | grep -oP "[0-9]+(?=h\s[0-9]+m)"
-}
-
-function remote_gcert {
-  remote_cmd "${GCLOUD_HOST}" gcert
+function get_cloud_gcert_loas_hours_remaining {
+  check_cloud_gcert_loas | grep -oP "[0-9]+(?=h\s[0-9]+m)"
 }
 
 function refresh_gcert {
-  local is_remote="$1"
+  local for_cloud="$1"
   local check_gcert=check_gcert_ssh
   local get_gcert_hours_remaining=get_gcert_ssh_hours_remaining
-  local _refresh_gcert=gcert
+  local exec_gcert=gcert
   local gcert_msg="gcert"
-  if [[ "${is_remote}" ]]; then
-    check_gcert=check_remote_gcert_loas
-    get_gcert_hours_remaining=get_remote_gcert_loas_hours_remaining
-    _refresh_gcert=remote_gcert
-    gcert_msg="remote gcert"
+  if [[ "${for_cloud}" ]]; then
+    check_gcert=check_cloud_gcert_loas
+    get_gcert_hours_remaining=get_cloud_gcert_loas_hours_remaining
+    exec_gcert=cloud_gcert
+    gcert_msg="cloudtop gcert"
   fi
 
   if ! "${check_gcert}" -quiet=true; then
     echo "Refreshing ${gcert_msg}, as it is invalid now."
-    "${_refresh_gcert}"
+    "${exec_gcert}"
   else
     local retries=3
     local remaining_hrs=
@@ -84,25 +97,9 @@ function refresh_gcert {
 
     if [[ "${remaining_hrs}" -lt 8 ]]; then
       echo "Less than 8 hr remaining (${remaining_hrs} hr left) in ${gcert_msg}. Refreshing now."
-      "${_refresh_gcert}"
+      "${exec_gcert}"
     fi
   fi
-}
-
-function refresh_remote_gcert {
-  refresh_gcert 1
-}
-
-function is_gcloud_host {
-  [[ "${HOSTNAME}" == "${GCLOUD_HOST}" ]]
-}
-
-function is_office_host {
-  [[ "${HOSTNAME}" == "${OFFICE_HOST}" ]]
-}
-
-function is_laptop_host {
-  [[ "${HOSTNAME}" == "${LAPTOP_HOST}" ]]
 }
 
 function is_reverse_tunnel_setup() {
@@ -123,16 +120,17 @@ function setup_reverse_tunnel {
 
 function exit_remote_reverse_tunnel {
   if is_laptop_host; then
-    if remote_cmd "${OFFICE_HOST}" ssh gcloud_tunnel -O check &>/dev/null; then
+    if office_ssh_cmd ssh gcloud_tunnel -O check &>/dev/null; then
       echo "Shutting down reverse tunnel for ${OFFICE_HOST}"
-      remote_cmd "${OFFICE_HOST}" ssh gcloud_tunnel -O exit
+      office_ssh_cmd ssh gcloud_tunnel -O exit
     fi
   else
     # We have no way of issuing a command on the laptop because we can't SSH
     # into it, therefore instead we tell the cloud instance to close the reverse
     # tunnel port. Do note that this may end up killing the SSH session that
-    # opened the revese tunnel.
-    remote_cmd "${GCLOUD_HOST}" "/usr/local/google/home/${USER}/scripts/close_port.sh" "${REVERSE_TUNNEL_PORT}"
+    # opened the reverse tunnel.
+    echo "Closing the reverse tunnel port ${REVERSE_TUNNEL_PORT} directly on the cloud host ${GCLOUD_HOST}"
+    cloud_ssh_cmd "/usr/local/google/home/${USER}/scripts/close_port.sh" "${REVERSE_TUNNEL_PORT}"
   fi
 }
 
@@ -177,8 +175,8 @@ function main {
       else
         echo "We were unable to start the clipboard daemon, therefore we won't open the reverse tunnel for clipboard capturing." >&2
       fi
-      # refresh gcert on the remote host
-      refresh_remote_gcert
+      # refresh gcert on the cloud host
+      cloud_gcert
     fi
   fi
 }
