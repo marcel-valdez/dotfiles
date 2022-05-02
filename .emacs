@@ -135,6 +135,16 @@
   (setq elpy-formatter 'black)
   (setq elpy-rpc-virtualenv-path 'current))
 (use-package flycheck :ensure t)
+(use-package flymake-shellcheck
+  :ensure t
+  :commands flymake-shellcheck-load
+  :init
+  (add-hook 'sh-mode-hook 'flymake-shellcheck-load))
+
+(use-package flymake
+  :ensure t
+  :config
+  (add-hook 'sh-mode-hook 'flymake-mode))
 ;;  (defun flycheck-set-pylint ()
 ;;    (setq flycheck-checker 'python-pylint))
 ;;  (add-hook 'python-mode-hook 'flycheck-set-pylint))
@@ -149,23 +159,58 @@
   (defun custom:org-mode-hook ()
     (org-indent-mode t))
   (add-hook 'org-mode-hook 'custom:org-mode-hook)
+  (require 'org-inlinetask)
+  (add-to-list 'org-modules 'org-habit t)
+  (setq org-tags-match-list-sublevels 'indented)
+  (setq org-agenda-custom-commands
+       '(
+         ("P" "Projects" ((tags "PROJECT")))
+         ("H" "Work and Personal Lists"
+          ((agenda)
+           (tags-todo "WORK")
+           (tags-todo "PERSONAL")))
+         ("D" "Daily Action List"
+          (
+           (agenda "" (
+                       (org-agenda-ndays 1)
+                       (org-agenda-sorting-strategy
+                        (quote ((agenda time-up priority-down tag-up))))
+                       (org-deadline-warning-days 0)))))))
+  (defun custom:org-gtd ()
+    (interactive)
+    (find-file "~/gtd/gtd.org"))
+  (global-set-key (kbd "C-c C-g") 'custom:org-gtd)
 
+  (setq org-log-repeat 'time)
   (setq org-log-done 'time)
   (setq org-log-into-drawer t)
   (setq org-todo-keywords
-        '((sequence "LATER(l)" "TODO(t)" "DOING(n)" "BLOCKED(b)" "|" "DONE(d)" "CANCELLED(c)")))
+        '((sequence "TODO(t)" "APPT(a)" "DOING(o)" "WAITING(w)" "|" "DONE(d)" "CANCELLED(c)" "DEFERRED(f)" "PAUSED(p)")))
 
   (setq org-todo-keyword-faces
-        '(("LATER" . (:foreground "dodgerblue4" ))
+        '(
+          ;; Item is ready to be done at the earliest opportunity or by deadline
           ("TODO" . (:foreground "dodgerblue1" :weight bold))
+          ;; Used to tag an activity that can *only* be done at the specified time and date.
+          ("APPT" . (:foreground "dodgerblue3"))
+          ;; Tasks that are currently being worked on
           ("DOING" . (:foreground "aquamarine1" :weight bold))
-          ("BLOCKED" . (:foreground "darkorange3"))
+          ;; Task that is waiting on a response or availability of something or someone.
+          ("WAITING" . (:foreground "darkorange3"))
+          ;; Completed task
+          ("DONE" . (:foreground "darkgreen" :weight bold))
+          ;; Task will no longer be done, but for some reason I kept it on file
           ("CANCELLED" . (:foreground "tan3"))
-          ("DONE" . (:foreground "darkgreen" :weight bold))))
+          ;; Task is paused for the time being, in favour of another one, but should
+          ;; be picked up as soon as another work stream is done.
+          ("PAUSED" . (:foreground "rosybrown"))
+          ;; Task that is defined but shouldn't be picked up at earliest opportunity.
+          ;; The reason should be included in the task notes.
+          ("DEFERRED" . (:foreground "dodgerblue4"))))
 
   (setq org-capture-templates
-        '(("m" "Misc Tasks")
-          ("mt" "Task" entry (file+olp "~/notes/misc.org" "Backlog")
+        '(("g" "GTD Entries")
+          ("gt" "Task" entry (file+olp "~/gtd/gtd.org" "Tasks")
            "* TODO %?\n %U\n %a\n %i" :empty-lines 1)))
 
   (org-babel-do-load-languages 'org-babel-load-languages
@@ -179,8 +224,8 @@
           (org-agenda-files :maxlevel . 3)))
   (setq org-agenda-text-search-extra-files
         (directory-files-recursively "~/notes/" "md$"))
-  (setq org-agenda-files
-        '("~/notes/")))
+  (setq org-agenda-files '("~/notes/" "~/gtd/")))
+
 
 (use-package markdown-mode
   :ensure t
@@ -495,17 +540,29 @@
  '(custom-group-tag ((t (:inherit variable-pitch :foreground "dodgerblue2" :weight bold :height 1.2))))
  '(custom-variable-obsolete ((t (:foreground "dodgerblue2"))))
  '(custom-variable-tag ((t (:foreground "dodgerblue2" :weight bold))))
+ '(diff-added ((t (:inherit diff-changed :extend t :background "darkolivegreen4"))))
+ '(diff-file-header ((t (:extend t :background "gray1" :weight bold))))
+ '(diff-header ((t (:extend t :background "gray16"))))
+ '(diff-refine-added ((t (:inherit diff-refine-changed :background "darkgreen"))))
+ '(diff-refine-removed ((t (:inherit diff-refine-changed :background "firebrick3"))))
+ '(diff-removed ((t (:inherit diff-changed :extend t :background "firebrick4"))))
  '(font-lock-comment-face ((t (:foreground "gray27"))))
  '(font-lock-function-name-face ((t (:foreground "dodgerblue2"))))
  '(font-lock-string-face ((t (:foreground "tan"))))
  '(fringe ((t (:background "gray15"))))
  '(helm-selection ((t (:background "gray1" :foreground "cornflowerblue"))))
+ '(help-key-binding ((t (:background "gray10" :foreground "royalblue" :box (:line-width (1 . -1) :color "gray5")))))
+ '(highlight ((t (:background "midnightblue"))))
  '(highlight-indent-face ((t (:background "gray23"))))
  '(minibuffer-prompt ((t (:foreground "dodgerblue2"))))
  '(org-agenda-structure ((t (:foreground "royalblue"))))
  '(org-drawer ((t (:foreground "royalblue"))))
+ '(org-hide ((t (:inherit fixed-pitch :foreground "gray7"))))
  '(org-table ((t (:inherit fixed-pitch :foreground "royalblue"))))
+ '(package-status-dependency ((t (:inherit package-status-installed :foreground "chartreuse4"))))
+ '(package-status-installed ((t (:inherit font-lock-comment-face :foreground "seagreen"))))
  '(region ((t (:background "gray16"))))
+ '(sh-quoted-exec ((t (:foreground "chocolate1"))))
  '(shadow ((t (:foreground "gray27"))))
  '(show-paren-match ((t (:background "steelblue"))))
  '(telephone-line-accent-active ((t (:inherit mode-line :background "gray11" :foreground "brightwhite"))))
