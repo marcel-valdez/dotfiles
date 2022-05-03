@@ -5,6 +5,19 @@ set -o nounset  # Exit if we use an undeclared variable
 set -o pipefail  # Use the exit status of the last command taht threw a non-zero exit code
 # set -o xtrace  # Trace what gets executed, useful for debugging.
 
+LOG_FILE="/tmp/sync_notes_to_company.log"
+
+function now {
+  date "+%H:%M:%S"
+}
+
+function log {
+  local msg=
+  msg="$(now) $*"
+  echo "${msg}" >> "${LOG_FILE}"
+  echo "${msg}"
+}
+
 INPUT_DIRECTORY="${HOME}/notes"
 STAGING_DIRECTORY="/tmp/${USER}_notes_staging"
 PUBLISH_DIRECTORY="/tmp/${USER}_notes_publish"
@@ -68,9 +81,11 @@ function convert_staging_directory {
 
 SKIP_SUBMIT=
 function sync_publish_with_company {
+  pushd "${OUTPUT_DIRECTORY}"
+  g4 sync
+  # NOTE: We need the forward slash at the end to copy directory contents
   rsync --archive --verbose --human-readable --delete \
     "${PUBLISH_DIRECTORY}/" "${OUTPUT_DIRECTORY}/"
-  pushd "${OUTPUT_DIRECTORY}"
   # NOTE: This does not handle recursive files copied over.
   export SKIP_SUBMIT
   EDITOR="${HOME}/scripts/gen_notes_cl_description.sh" g4 change
@@ -83,11 +98,12 @@ function sync_publish_with_company {
 
 function main {
   if /usr/bin/gcertstatus -check_remaining=60s --quiet; then
+    log "Found a valid gcert, proceeding to sync notes with company docs"
     copy_to_staging_directory
     convert_staging_directory
     sync_publish_with_company
   else
-    echo "WARNING: gcert is no longer valid, therefore we can't sync notes to company doc." >&2
+    log "WARNING: gcert is no longer valid, therefore we can't sync notes to company doc." >&2
   fi
 }
 
