@@ -104,15 +104,88 @@
   (defun custom:org-mode-hook ()
     (org-indent-mode t))
   (add-hook 'org-mode-hook 'custom:org-mode-hook)
-
   (require 'org-inlinetask)
+  (add-to-list 'org-modules 'org-habit t)
+  (setq org-deadline-warning-days 7)
+  (setq org-tags-match-list-sublevels 'indented)
+  ;; Also see: (describe-variable 'org-stuck-projects)
+  (setq org-stuck-projects
+      '("+PROJECT/-DEFERRED-CANCELLED-PAUSED-DONE" ("DOING" "TODO" "APPT" "WAITING") nil
+        "\\<IGNORE\\>"))
+  ;; Also see: (describe-variable 'org-agenda-custom-commands)
+  (setq org-agenda-custom-commands
+       '(
+         ("P" "All Projects" ((tags "PROJECT")))
+         ("H" "Home / Personal Entries"
+          ((agenda)
+           (tags "PERSONAL")))
+         ("W" . "Work Commands") ;; prefix W command
+         ("Wa" "All Relevant Work Items"
+          ((agenda)
+           (tags "WORK-TODO={DONE\\|CANCELLED\\}")))
+         ("Wd" "Daily Action List"
+          (
+           ;; See: https://orgmode.org/manual/Filtering_002flimiting-agenda-items.html
+           (agenda ""
+                   ((org-agenda-filter-by-tag "WORK")
+                    (org-agenda-ndays 1)
+                    (org-agenda-sorting-strategy
+                     (quote ((agenda time-up priority-down tag-up))))
+                    (org-deadline-warning-days 1)))
+           ;; See: https://orgmode.org/manual/Matching-tags-and-properties.html
+           (tags "+WORK+TODO={DOING\\|TODO}")
+           (tags "+WORK+TODO=\"WAITING\"")))
+         ("R" "Weekly Review"
+          (
+           (agenda "" ((org-agenda-span 7)))
+           (stuck "") ;; See: https://orgmode.org/manual/Stuck-projects.html
+           (tags "PROJECT+TODO=\"\"")
+           (todo "WAITING")
+           (todo "DEFERRED")
+           (todo "PAUSED")
+           ))
+         ("D" "Daily Action List"
+          (
+           (agenda "" (
+                       (org-agenda-ndays 1)
+                       (org-agenda-sorting-strategy
+                        (quote ((agenda time-up priority-down tag-up))))
+                       (org-deadline-warning-days 0)))))))
+  (defun custom:org-gtd ()
+    (interactive)
+    (find-file "~/gtd/gtd.org"))
+  (global-set-key (kbd "C-c C-g") 'custom:org-gtd)
+
+  (setq org-log-repeat 'time)
   (setq org-log-done 'time)
   (setq org-log-into-drawer t)
   (setq org-todo-keywords
-        '((sequence "LATER(l)" "TODO(t)" "DOING(n)" "BLOCKED(b)" "|" "DONE(d)" "CANCELLED(c)")))
+        '((sequence "TODO(t)" "APPT(a)" "DOING(o)" "WAITING(w)" "|" "DONE(d)" "CANCELLED(c)" "DEFERRED(f)" "PAUSED(p)")))
+
+  (setq org-todo-keyword-faces
+        '(
+          ;; Item is ready to be done at the earliest opportunity or by deadline
+          ("TODO" . (:foreground "dodgerblue1" :weight bold))
+          ;; Used to tag an activity that can *only* be done at the specified time and date.
+          ("APPT" . (:foreground "dodgerblue3"))
+          ;; Tasks that are currently being worked on
+          ("DOING" . (:foreground "aquamarine1" :weight bold))
+          ;; Task that is waiting on a response or availability of something or someone.
+          ("WAITING" . (:foreground "darkorange3"))
+          ;; Completed task
+          ("DONE" . (:foreground "darkgreen" :weight bold))
+          ;; Task will no longer be done, but for some reason I kept it on file
+          ("CANCELLED" . (:foreground "tan3"))
+          ;; Task is paused for the time being, in favour of another one, but should
+          ;; be picked up as soon as another work stream is done.
+          ("PAUSED" . (:foreground "rosybrown"))
+          ;; Task that is defined but shouldn't be picked up at earliest opportunity.
+          ;; The reason should be included in the task notes.
+          ("DEFERRED" . (:foreground "dodgerblue4"))))
+
   (setq org-capture-templates
-        '(("m" "Misc Tasks")
-          ("mt" "Task" entry (file+olp "~/notes/misc.org" "Backlog")
+        '(("g" "GTD Entries")
+          ("gt" "Task" entry (file+olp "~/gtd/gtd.org" "Tasks")
            "* TODO %?\n %U\n %a\n %i" :empty-lines 1)))
 
   (org-babel-do-load-languages 'org-babel-load-languages
@@ -126,8 +199,7 @@
           (org-agenda-files :maxlevel . 3)))
   (setq org-agenda-text-search-extra-files
         (directory-files-recursively "~/notes/" "md$"))
-  (setq org-agenda-files
-        '("~/notes/")))
+  (setq org-agenda-files '("~/notes/" "~/gtd/")))
 
 (with-library helm-config
   (helm-mode 1)
@@ -353,6 +425,8 @@
  ;; Your init file should contain only one such instance.
  ;; If there is more than one, they won't work right.
  '(clang-include-fixer-highlight ((t (:background "white"))))
+ '(undo-tree-visualizer-active-branch-face ((t (:foreground "color-231" :weight bold))))
+ '(undo-tree-visualizer-default-face ((t (:foreground "brightwhite"))))
  '(whitespace-line ((t (:background "color-238")))))
 (put 'upcase-region 'disabled nil)
 (put 'downcase-region 'disabled nil)
