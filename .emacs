@@ -237,6 +237,9 @@
 (global-set-key (kbd "M-k") (lambda () (interactive) (other-window -1)))
 (global-set-key (kbd "M-W") 'copy-to-remote-clipboard)
 
+;; Wezterm Fixes: Ctrl+Alt+i (complete-symbol) registers as ESC <C-tab>
+(global-set-key (kbd "ESC <C-tab>") 'complete-symbol)
+
 ;; swap windows
 (with-library kbd-shortcut-functions
   (global-set-key (kbd "C-x t")
