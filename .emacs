@@ -133,8 +133,13 @@
                      (quote ((agenda time-up priority-down tag-up))))
                     (org-deadline-warning-days 1)))
            ;; See: https://orgmode.org/manual/Matching-tags-and-properties.html
-           (tags "+WORK+TODO={DOING\\|TODO}")
-           (tags "+WORK+TODO=\"WAITING\"")))
+           (tags "+WORK+TODO={DOING\\|TODO}+PRIORITY=\"0\"-STYLE=\"habit\"")
+           (tags "+WORK+TODO={DOING\\|TODO}-PRIORITY=\"0\"-PRIORITY=\"2\"-STYLE=\"habit\"")
+           (tags "+WORK+TODO=\"WAITING\"+PRIORITY=\"0\"-STYLE=\"habit\"")
+           (tags "+WORK+TODO=\"WAITING\"-PRIORITY=\"0\"-PRIORITY=\"2\"-STYLE=\"habit\"")
+           (tags "+WORK+TODO={DOING\\|TODO}+PRIORITY=\"2\"-STYLE=\"habit\"")
+           (tags "+WORK+TODO=\"WAITING\"+PRIORITY=\"2\"-STYLE=\"habit\"")
+           ))
          ("R" "Weekly Review"
           (
            (agenda "" ((org-agenda-span 7)))
@@ -416,7 +421,7 @@
  '(custom-enabled-themes '(tango-dark))
  '(custom-safe-themes
    '("6068d911f0ad3f9e6834d4849038ef3a317510f23683ff9656da7d49a5ab3ed5" "d4890c4d8d262c61decb7c0e43b1dc5c92b378e9acada6c04d9e94f00cc70ead" "4badd47b5ba16df46b849137903f2210d344f3c7021e979ff8ed68b8c3827d84" default))
- '(graphviz-dot-indent-width 2 t)
+ '(graphviz-dot-indent-width 2)
  '(line-number-mode t)
  '(package-selected-packages
    '(telephone-line use-package multiple-cursors multi-term helm-flycheck helm-xref windresize async xclip undo-tree))
