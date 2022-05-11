@@ -158,24 +158,81 @@
   :config
   (defun custom:org-mode-hook ()
     (org-indent-mode t))
+
   (add-hook 'org-mode-hook 'custom:org-mode-hook)
   (require 'org-inlinetask)
   (add-to-list 'org-modules 'org-habit t)
+  (setq org-deadline-warning-days 7)
   (setq org-tags-match-list-sublevels 'indented)
+  ;; Also see: (describe-variable 'org-stuck-projects)
+  (setq org-stuck-projects
+      '("+PROJECT/-DEFERRED-CANCELLED-PAUSED-DONE" ("DOING" "TODO" "APPT" "WAITING") nil
+        "\\<IGNORE\\>"))
+  ;; Also see: (describe-variable 'org-agenda-custom-commands)
   (setq org-agenda-custom-commands
-       '(
-         ("P" "Projects" ((tags "PROJECT")))
-         ("H" "Work and Personal Lists"
-          ((agenda)
-           (tags-todo "WORK")
-           (tags-todo "PERSONAL")))
+       '(("A" . "Overall Commands")
+         ("Ap" "All Projects" ((tags "PROJECT")))
+         ("P" . "Personal Entries") ;; prefix P command
+         ("Pa" "All Relevant Personal Items"
+          ((agenda ""
+                   ((org-agenda-sorting-strategy
+                     (quote ((agenda time-up priority-down tag-up))))
+                    (org-deadline-warning-days 1)))
+           (tags "-TODO={DONE\\|CANCELLED}"))
+          ((org-agenda-tag-filter-preset '("+{PERSONAL\\|BOTH}"))))
+         ("Pd" "Daily Action List"
+          ;; See: https://orgmode.org/manual/Filtering_002flimiting-agenda-items.html
+          ((agenda ""
+                   ((org-agenda-span 1)
+                    (org-agenda-ndays 1)
+                    (org-agenda-sorting-strategy
+                     (quote ((agenda time-up priority-down tag-up))))
+                    (org-deadline-warning-days 1)))
+           ;; See: https://orgmode.org/manual/Matching-tags-and-properties.html
+           (tags "+TODO={DOING\\|TODO}+PRIORITY=\"0\"-STYLE=\"habit\"")
+           (tags "+TODO={DOING\\|TODO}-PRIORITY=\"0\"-PRIORITY=\"2\"-STYLE=\"habit\"")
+           (tags "+TODO=\"WAITING\"+PRIORITY=\"0\"-STYLE=\"habit\"")
+           (tags "+TODO=\"WAITING\"-PRIORITY=\"0\"-PRIORITY=\"2\"-STYLE=\"habit\"")
+           (tags "+TODO={DOING\\|TODO}+PRIORITY=\"2\"-STYLE=\"habit\"")
+           (tags "+TODO=\"WAITING\"+PRIORITY=\"2\"-STYLE=\"habit\""))
+          ((org-agenda-tag-filter-preset '("+{PERSONAL\\|BOTH}"))))
+         ("W" . "Work Commands") ;; prefix W command
+         ("Wa" "All Relevant Work Items"
+          ((agenda ""
+                   ((org-agenda-sorting-strategy
+                     (quote ((agenda time-up priority-down tag-up))))
+                    (org-deadline-warning-days 1)))
+           (tags "-TODO={DONE\\|CANCELLED}")))
+         ("Wd" "Daily Action List"
+           ;; See: https://orgmode.org/manual/Filtering_002flimiting-agenda-items.html
+          ((agenda ""
+                   ((org-agenda-span 1)
+                    (org-agenda-ndays 1)
+                    (org-agenda-sorting-strategy
+                     (quote ((agenda time-up priority-down tag-up))))
+                    (org-deadline-warning-days 1)))
+           ;; See: https://orgmode.org/manual/Matching-tags-and-properties.html
+           (tags "+TODO={DOING\\|TODO}+PRIORITY=\"0\"-STYLE=\"habit\"")
+           (tags "+TODO={DOING\\|TODO}-PRIORITY=\"0\"-PRIORITY=\"2\"-STYLE=\"habit\"")
+           (tags "+TODO=\"WAITING\"+PRIORITY=\"0\"-STYLE=\"habit\"")
+           (tags "+TODO=\"WAITING\"-PRIORITY=\"0\"-PRIORITY=\"2\"-STYLE=\"habit\"")
+           (tags "+TODO={DOING\\|TODO}+PRIORITY=\"2\"-STYLE=\"habit\"")
+           (tags "+TODO=\"WAITING\"+PRIORITY=\"2\"-STYLE=\"habit\""))
+          ((org-agenda-tag-filter-preset '("+{WORK\\|BOTH}"))))
+         ("R" "Weekly Review"
+          ((agenda "" ((org-agenda-span 7)))
+           (stuck "") ;; See: https://orgmode.org/manual/Stuck-projects.html
+           (tags "PROJECT+TODO=\"\"")
+           (todo "WAITING")
+           (todo "DEFERRED")
+           (todo "PAUSED")
+           ))
          ("D" "Daily Action List"
-          (
-           (agenda "" (
-                       (org-agenda-ndays 1)
-                       (org-agenda-sorting-strategy
-                        (quote ((agenda time-up priority-down tag-up))))
-                       (org-deadline-warning-days 0)))))))
+          ((agenda ""
+                   ((org-agenda-ndays 1)
+                    (org-agenda-sorting-strategy
+                     (quote ((agenda time-up priority-down tag-up))))
+                    (org-deadline-warning-days 0)))))))
   (defun custom:org-gtd ()
     (interactive)
     (find-file "~/gtd/gtd.org"))
