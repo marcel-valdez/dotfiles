@@ -33,7 +33,7 @@ EXCLUDED_FILES=(
 )
 
 function get_all_content_files {
-  ls "${INPUT_DIRECTORY}" | grep -P '(METADATA|\.(md|org|png|jpg|jpeg|gif|svg))$'
+  ls -a "${INPUT_DIRECTORY}" | grep -P '(METADATA|\.(md|org|png|jpg|jpeg|gif|svg|org_settings|settings))$'
 }
 
 function get_included_content_files {
@@ -56,6 +56,8 @@ function copy_to_staging_directory {
   done
 }
 
+# Files that are needed in staging, but shouldn't be published.
+ONLY_STAGING_FILTER=".*\.(settings)$"
 function convert_staging_directory {
   if [[ -d "${PUBLISH_DIRECTORY}" ]]; then
     rm -fr "${PUBLISH_DIRECTORY}/"*
@@ -73,8 +75,10 @@ function convert_staging_directory {
       #  --from=org --to=markdown --standalone --toc --strip-comments \
       #  --tab-stop 4
     else
-      local full_output_file="${PUBLISH_DIRECTORY}/${_file}"
-      cp "${full_input_file}" "${full_output_file}"
+      if ! echo "${_file}" | grep -P "${ONLY_STAGING_FILTER}" &>/dev/null; then
+        local full_output_file="${PUBLISH_DIRECTORY}/${_file}"
+        cp "${full_input_file}" "${full_output_file}"
+      fi
     fi
   done
 }
