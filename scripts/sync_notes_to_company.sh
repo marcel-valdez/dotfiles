@@ -68,12 +68,11 @@ function convert_staging_directory {
     local full_input_file="${STAGING_DIRECTORY}/${_file}"
     if [[ " ${_file} " =~ ".org " ]]; then
       local full_output_file="${PUBLISH_DIRECTORY}/${_file%.org}.md"
-      printf "yes\\r\\nyes\\r\\nyes\\r\\nyes\\r\\nyes\\r\\n" | /usr/local/google/home/marcelvaldez/.local/bin/org2md -y "${full_input_file}"
-      local full_converted_file="${STAGING_DIRECTORY}/${_file%.org}.md"
-      cp "${full_converted_file}" "${full_output_file}"
-      #pandoc "${full_input_file}" --output="${full_output_file}" \
-      #  --from=org --to=markdown --standalone --toc --strip-comments \
-      #  --tab-stop 4
+      local md_converted_file="${STAGING_DIRECTORY}/${_file%.org}.md"
+      pandoc "${full_input_file}" --output="${md_converted_file}" \
+        --from=org --to=markdown_strict --standalone --toc --strip-comments \
+        --toc-depth=2 --tab-stop 4
+      cp "${md_converted_file}" "${full_output_file}"
     else
       if ! echo "${_file}" | grep -P "${ONLY_STAGING_FILTER}" &>/dev/null; then
         local full_output_file="${PUBLISH_DIRECTORY}/${_file}"
