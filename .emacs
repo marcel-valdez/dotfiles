@@ -12,6 +12,7 @@
 
 ;;; Code:
 (setq inhibit-startup-screen t)
+(setq load-prefer-newer t)
 
 ;; load ~/.emacs.d/lisp scripts (these are mine)
 (add-to-list 'load-path "~/.emacs.d/lisp")
@@ -117,6 +118,7 @@
   :config
   (defun custom:org-mode-hook ()
     (org-indent-mode t))
+
   (add-hook 'org-mode-hook 'custom:org-mode-hook)
   (require 'org-inlinetask)
   (add-to-list 'org-modules 'org-habit t)
@@ -128,35 +130,58 @@
         "\\<IGNORE\\>"))
   ;; Also see: (describe-variable 'org-agenda-custom-commands)
   (setq org-agenda-custom-commands
-       '(
-         ("P" "All Projects" ((tags "PROJECT")))
-         ("H" "Home / Personal Entries"
-          ((agenda)
-           (tags "PERSONAL")))
-         ("W" . "Work Commands") ;; prefix W command
-         ("Wa" "All Relevant Work Items"
-          ((agenda)
-           (tags "WORK-TODO={DONE\\|CANCELLED\\}")))
-         ("Wd" "Daily Action List"
-          (
-           ;; See: https://orgmode.org/manual/Filtering_002flimiting-agenda-items.html
-           (agenda ""
-                   ((org-agenda-filter-by-tag "WORK")
+       '(("A" . "Overall Commands")
+         ("Ap" "All Projects" ((tags "PROJECT")))
+         ("P" . "Personal Entries") ;; prefix P command
+         ("Pa" "All Relevant Personal Items"
+          ((agenda ""
+                   ((org-agenda-sorting-strategy
+                     (quote ((agenda time-up priority-down tag-up))))
+                    (org-deadline-warning-days 1)))
+           (tags "-TODO={DONE\\|CANCELLED}"))
+          ((org-agenda-tag-filter-preset '("+{PERSONAL\\|BOTH}"))))
+         ("Pd" "Daily Action List"
+          ;; See: https://orgmode.org/manual/Filtering_002flimiting-agenda-items.html
+          ((agenda ""
+                   ((org-agenda-span 1)
                     (org-agenda-ndays 1)
                     (org-agenda-sorting-strategy
                      (quote ((agenda time-up priority-down tag-up))))
                     (org-deadline-warning-days 1)))
            ;; See: https://orgmode.org/manual/Matching-tags-and-properties.html
-           (tags "+WORK+TODO={DOING\\|TODO}+PRIORITY=\"0\"-STYLE=\"habit\"")
-           (tags "+WORK+TODO={DOING\\|TODO}-PRIORITY=\"0\"-PRIORITY=\"2\"-STYLE=\"habit\"")
-           (tags "+WORK+TODO=\"WAITING\"+PRIORITY=\"0\"-STYLE=\"habit\"")
-           (tags "+WORK+TODO=\"WAITING\"-PRIORITY=\"0\"-PRIORITY=\"2\"-STYLE=\"habit\"")
-           (tags "+WORK+TODO={DOING\\|TODO}+PRIORITY=\"2\"-STYLE=\"habit\"")
-           (tags "+WORK+TODO=\"WAITING\"+PRIORITY=\"2\"-STYLE=\"habit\"")
-           ))
+           (tags "+TODO={DOING\\|TODO}+PRIORITY=\"0\"-STYLE=\"habit\"")
+           (tags "+TODO={DOING\\|TODO}-PRIORITY=\"0\"-PRIORITY=\"2\"-STYLE=\"habit\"")
+           (tags "+TODO=\"WAITING\"+PRIORITY=\"0\"-STYLE=\"habit\"")
+           (tags "+TODO=\"WAITING\"-PRIORITY=\"0\"-PRIORITY=\"2\"-STYLE=\"habit\"")
+           (tags "+TODO={DOING\\|TODO}+PRIORITY=\"2\"-STYLE=\"habit\"")
+           (tags "+TODO=\"WAITING\"+PRIORITY=\"2\"-STYLE=\"habit\""))
+          ((org-agenda-tag-filter-preset '("+{PERSONAL\\|BOTH}"))))
+         ("W" . "Work Commands") ;; prefix W command
+         ("Wa" "All Relevant Work Items"
+          ((agenda ""
+                   ((org-agenda-sorting-strategy
+                     (quote ((agenda time-up priority-down tag-up))))
+                    (org-deadline-warning-days 1)))
+           (tags "-TODO={DONE\\|CANCELLED}"))
+          ((org-agenda-tag-filter-preset '("+{WORK\\|BOTH}"))))
+         ("Wd" "Daily Action List"
+           ;; See: https://orgmode.org/manual/Filtering_002flimiting-agenda-items.html
+          ((agenda ""
+                   ((org-agenda-span 1)
+                    (org-agenda-ndays 1)
+                    (org-agenda-sorting-strategy
+                     (quote ((agenda time-up priority-down tag-up))))
+                    (org-deadline-warning-days 1)))
+           ;; See: https://orgmode.org/manual/Matching-tags-and-properties.html
+           (tags "+TODO={DOING\\|TODO}+PRIORITY=\"0\"-STYLE=\"habit\"")
+           (tags "+TODO={DOING\\|TODO}-PRIORITY=\"0\"-PRIORITY=\"2\"-STYLE=\"habit\"")
+           (tags "+TODO=\"WAITING\"+PRIORITY=\"0\"-STYLE=\"habit\"")
+           (tags "+TODO=\"WAITING\"-PRIORITY=\"0\"-PRIORITY=\"2\"-STYLE=\"habit\"")
+           (tags "+TODO={DOING\\|TODO}+PRIORITY=\"2\"-STYLE=\"habit\"")
+           (tags "+TODO=\"WAITING\"+PRIORITY=\"2\"-STYLE=\"habit\""))
+          ((org-agenda-tag-filter-preset '("+{WORK\\|BOTH}"))))
          ("R" "Weekly Review"
-          (
-           (agenda "" ((org-agenda-span 7)))
+          ((agenda "" ((org-agenda-span 7)))
            (stuck "") ;; See: https://orgmode.org/manual/Stuck-projects.html
            (tags "PROJECT+TODO=\"\"")
            (todo "WAITING")
@@ -164,12 +189,12 @@
            (todo "PAUSED")
            ))
          ("D" "Daily Action List"
-          (
-           (agenda "" (
-                       (org-agenda-ndays 1)
-                       (org-agenda-sorting-strategy
-                        (quote ((agenda time-up priority-down tag-up))))
-                       (org-deadline-warning-days 0)))))))
+          ((agenda ""
+                   ((org-agenda-ndays 1)
+                    (org-agenda-sorting-strategy
+                     (quote ((agenda time-up priority-down tag-up))))
+                    (org-deadline-warning-days 0)))))))
+
   (defun custom:org-gtd ()
     (interactive)
     (find-file "~/gtd/gtd.org"))
@@ -188,7 +213,8 @@
           ;; Used to tag an activity that can *only* be done at the specified time and date.
           ("APPT" . (:foreground "dodgerblue3"))
           ;; Tasks that are currently being worked on
-          ("DOING" . (:foreground "aquamarine1" :weight bold))
+          ("DOING" . (:foreground "aquamarine1" :w
+                                  eight bold))
           ;; Task that is waiting on a response or availability of something or someone.
           ("WAITING" . (:foreground "darkorange3"))
           ;; Completed task
