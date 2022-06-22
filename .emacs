@@ -365,6 +365,14 @@
             (add-hook 'python-mode-hook 'jedi:setup)
             (add-hook 'python-mode-hook 'jedi:python-mode-hook))))))
 
+(use-package company
+  :ensure t
+  :config
+  ;; Use company mode whenever we have eglot
+  (if (not at-office-is-work-laptop)
+      (progn
+        (add-hook 'python-mode-hook 'company-mode))))
+
 ;; configure bash shellcheck
 (use-package flymake-shellcheck
   :ensure t
@@ -447,7 +455,6 @@
   (setq-local js-indent-level 2)
   (setq-local graphviz-dot-indent-width 2))
 (add-hook 'prog-mode-hook 'set-custom-indent)
-
 ;;; .emacs ends here
 
 ;; theme configuration starts here
