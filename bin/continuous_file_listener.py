@@ -1,31 +1,39 @@
 #!/usr/bin/env python
 
-import os
 import sys
 import time
-from subprocess import call
+from subprocess import run
 from continuous_file_executor import *
 
 def execute_command(command, exec_state, output):
   try:
-    (cmd_stdin, cmd_stdout, cmd_stderror) = os.popen3(command)
-    last_char = cmd_stdout.read(1)
-    while last_char != '':
-      output.write(last_char)
-      last_char = cmd_stdout.read(1)
+    if command is str:
+      command = command.split(' ', encoding='utf-8')
+    process = run(command)
+    cmd_stdout = process.stdout
+    cmd_stderr = process.stderr
 
-    last_char = cmd_stderror.read(1)
-    while last_char != '':
-      output.write(last_char)
-      last_char = cmd_stderror.read(1)
+    def print_std(std):
+      if std is str:
+        print(std)
+      else:
+        last_char = std.read(1)
+        while last_char != '':
+          output.write(last_char)
+          last_char = std.read(1)
 
-  except Exception, e:
-    print "Error while executing command: " + ' '.join(map(str, command))
-    print "Details: " + str(e)
-  except SystemExit, exit:
-    print "-- Exit Status: " + str(exit)
+    if process.stdout:
+      print_std(process.stdout)
 
-  print "-- Done."
+    if process.stderr:
+      print_std(process.stderr)
+  except Exception as e:
+    print("Error while executing command: " + ' '.join(map(str, command)))
+    print("Details: " + str(e))
+  except SystemExit as se:
+    print("-- Exit Status: " + str(se))
+
+  print("-- Done.")
   time.sleep(0.1)
   exec_state['done'] = True
 
@@ -44,7 +52,7 @@ def notEmpty(arg):
 if __name__ == '__main__':
   script_name = sys.argv[0]
   if len(sys.argv) < 3:
-    print "Usage: " + sys.argv[0] + " <filename> <command> <arg1> <arg2> ... <argN>"
+    print("Usage: " + sys.argv[0] + " <filename> <command> <arg1> <arg2> ... <argN>")
     sys.exit(1)
 
   filename = sys.argv[1]
