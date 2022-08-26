@@ -56,6 +56,8 @@
 ;; Enable the mouse when running inside xterm
 (xterm-mouse-mode t)
 ;; If we are in TMUX within an X environment
+(if window-system
+    (set-frame-font "Azeret Mono 12" nil t))
 (if (and (getenv "TMUX") (getenv "DISPLAY"))
     ;; use xclip for copy-pasting
     (with-library xclip (xclip-mode 1)))
