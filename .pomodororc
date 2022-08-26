@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 
 STORAGE="${HOME}/.pomodoro.d"
-SOUND="yes"
+SOUND="off"
+NOTIFICATION_SOUND=
 POMODORO_TIME=45
 SHORT_BREAK_TIME=10
 LONG_BREAK_TIME=55
@@ -17,6 +18,7 @@ function log() {
 }
 
 function pause() {
+  NOTIFICATION_SOUND="${HOME}/res/pause_pomodoro.mp3"
   # custom code to run when the pomodoro is paused
   "${HOME}/bin/do-not-disturb" disable
 }
@@ -24,6 +26,7 @@ function pause() {
 function resume() {
   # custom code to run when the pomodoro is resumed
   if [[ "$1" == "pomodoro" ]]; then
+    NOTIFICATION_SOUND="${HOME}/res/bell_hop.mp3"
     "${HOME}/bin/do-not-disturb" enable
   fi
 }
@@ -51,10 +54,12 @@ function longbreak_end() {
 }
 
 function pomodoro_start() {
+  NOTIFICATION_SOUND="${HOME}/res/start_pomodoro.mp3"
   "${HOME}/bin/do-not-disturb" enable
 }
 
 function pomodoro_end() {
+  NOTIFICATION_SOUND="${HOME}/res/pomodoro_done.mp3"
   "${HOME}/bin/do-not-disturb" disable
 }
 
@@ -65,6 +70,11 @@ function run_command() {
   else
     log "No handler for event: ${fn_name}"
   fi
+
+#  if [[ "${NOTIFICATION_SOUND}" ]]; then
+#    play -q "${NOTIFICATION_SOUND}" &
+#    disown $!
+#  fi
 }
 
 function run_pomodoro_raw() {
