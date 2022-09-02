@@ -58,9 +58,11 @@
 
 (if window-system
     (progn
-      ;; (set-frame-font "Azeret Mono 12" nil t)
-      ;; (set-frame-font  "SauceCodePro Nerd Font Mono:pixelsize=16:foundry=ADBO:weight=semi-bold:slant=normal:width=normal:spacing=100:scalable=true" nil t)
-      (default-text-scale-mode)
+      (use-package default-text-scale
+        :ensure t
+        :config
+        (default-text-scale-mode))
+
       (custom-set-faces '(default ((t (:family "Azeret Mono")))))
 ;;      (global-unset-key (kbd "C-x C-+"))
 ;;      (global-set-key (kbd "C-x C-+") '(lambda () (interactive) (change-font-height +2)))
