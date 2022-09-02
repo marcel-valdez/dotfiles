@@ -84,5 +84,11 @@ ARG number of lines to move the text"
        (lambda () (interactive) (funcall exec-temp-bind:temp-fn)))
      map)))
 
+(defun change-font-height (delta)
+  "Change font height for an entire frame by DELTA amount."
+  (set-face-attribute 'default
+                      (selected-frame)
+                      :height (+ (face-attribute 'default :height) delta)))
+
 (provide 'kbd-shortcut-functions)
 ;;; kbd-shortcut-functions.el ends here
