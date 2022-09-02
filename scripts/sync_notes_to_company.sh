@@ -39,6 +39,9 @@ function get_all_content_files {
 function get_included_content_files {
   local _filter="${EXCLUDED_FILES[*]}"
   for _file in $(get_all_content_files); do
+    if ! [[ -f "${INPUT_DIRECTORY}/${_file}" ]]; then
+      continue  # malformed filename somewhere
+    fi
     if ! [[ " ${_filter} "  =~ " ${_file} " ]]; then
       echo "${_file}"
     fi
@@ -47,7 +50,7 @@ function get_included_content_files {
 
 function copy_to_staging_directory {
   if [[ -d "${STAGING_DIRECTORY}" ]]; then
-    rm -fr  "${STAGING_DIRECTORY}/"*
+    rm -fr "${STAGING_DIRECTORY}"
   fi
   mkdir -p "${STAGING_DIRECTORY}"
 
@@ -60,7 +63,7 @@ function copy_to_staging_directory {
 ONLY_STAGING_FILTER=".*\.(settings)$"
 function convert_staging_directory {
   if [[ -d "${PUBLISH_DIRECTORY}" ]]; then
-    rm -fr "${PUBLISH_DIRECTORY}/"*
+    rm -fr "${PUBLISH_DIRECTORY}"
   fi
   mkdir -p "${PUBLISH_DIRECTORY}"
 
@@ -92,6 +95,7 @@ function sync_publish_with_company {
   # NOTE: This does not handle recursive files copied over.
   export SKIP_SUBMIT
   EDITOR="${HOME}/scripts/gen_notes_cl_description.sh" g4 change
+  g4 fix
   g4 upload
   if [[ -z "${SKIP_SUBMIT}" ]]; then
     g4 submit
