@@ -55,9 +55,19 @@
 (menu-bar-mode -1)
 ;; Enable the mouse when running inside xterm
 (xterm-mouse-mode t)
-;; If we are in TMUX within an X environment
+
 (if window-system
-    (set-frame-font "Azeret Mono 12" nil t))
+    (progn
+      ;; (set-frame-font "Azeret Mono 12" nil t)
+      ;; (set-frame-font  "SauceCodePro Nerd Font Mono:pixelsize=16:foundry=ADBO:weight=semi-bold:slant=normal:width=normal:spacing=100:scalable=true" nil t)
+      (default-text-scale-mode)
+      (custom-set-faces '(default ((t (:family "Azeret Mono")))))
+;;      (global-unset-key (kbd "C-x C-+"))
+;;      (global-set-key (kbd "C-x C-+") '(lambda () (interactive) (change-font-height +2)))
+;;      (global-unset-key (kbd "C-x C--"))
+;;      (global-set-key (kbd "C-x C--") '(lambda () (interactive) (change-font-height -2)))
+      (toggle-scroll-bar -1)))
+;; If we are in TMUX within an X environment
 (if (and (getenv "TMUX") (getenv "DISPLAY"))
     ;; use xclip for copy-pasting
     (with-library xclip (xclip-mode 1)))
@@ -86,7 +96,7 @@
   (with-library in-tmux))
 
 (setq browse-url-browser-function 'browse-url-generic)
-(setq browse-url-generic-program "~/modules/chrome-remote-scripts/open-cantata-url")
+(setq browse-url-generic-program "/usr/bin/google-chrome")
 
 ;; Command history configuration
 (savehist-mode 1)
@@ -423,7 +433,7 @@
  '(custom-enabled-themes '(tango-dark))
  '(custom-safe-themes
    '("6068d911f0ad3f9e6834d4849038ef3a317510f23683ff9656da7d49a5ab3ed5" "d4890c4d8d262c61decb7c0e43b1dc5c92b378e9acada6c04d9e94f00cc70ead" "4badd47b5ba16df46b849137903f2210d344f3c7021e979ff8ed68b8c3827d84" default))
- '(graphviz-dot-indent-width 2)
+ '(graphviz-dot-indent-width 2 t)
  '(line-number-mode t)
  '(package-selected-packages
    '(telephone-line use-package multiple-cursors multi-term helm-flycheck helm-xref windresize async xclip undo-tree))
