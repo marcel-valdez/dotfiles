@@ -277,9 +277,9 @@
 
 ;; switch between windows quickly
 (global-unset-key (kbd "M-j"))
-(global-set-key (kbd "M-j") (lambda () (interactive) (other-window 1)))
+(global-set-key (kbd "M-j") (lambda () (interactive) (other-window -1)))
 (global-unset-key (kbd "M-k"))
-(global-set-key (kbd "M-k") (lambda () (interactive) (other-window -1)))
+(global-set-key (kbd "M-k") (lambda () (interactive) (other-window 1)))
 (global-set-key (kbd "M-W") 'copy-to-remote-clipboard)
 
 ;; Wezterm Fixes: Ctrl+Alt+i (complete-symbol) registers as ESC <C-tab>
@@ -299,10 +299,10 @@
   (global-set-key (kbd "ESC <down>") 'move-text-down))
 
 ;; switch between frames quickly
-(global-unset-key (kbd "C-M-j"))
-(global-set-key (kbd "C-M-j") (lambda () (interactive) (other-frame 1)))
 (global-unset-key (kbd "C-M-k"))
 (global-set-key (kbd "C-M-k") (lambda () (interactive) (other-frame -1)))
+(global-unset-key (kbd "C-M-j"))
+(global-set-key (kbd "C-M-j") (lambda () (interactive) (other-frame 1)))
 
 ;; split windows with sensible keys
 (global-unset-key (kbd "C-x |"))
@@ -428,13 +428,13 @@
         (newmap (make-sparse-keymap)))
     (set-keymap-parent newmap oldmap)
     (define-key newmap (kbd "M-j") nil)
-    (define-key newmap (kbd "M-j") (lambda () (interactive) (other-window 1)))
+    (define-key newmap (kbd "M-j") (lambda () (interactive) (other-window -1)))
     (define-key newmap (kbd "M-k") nil)
-    (define-key newmap (kbd "M-k") (lambda () (interactive) (other-window -1)))
+    (define-key newmap (kbd "M-k") (lambda () (interactive) (other-window 1)))
     (define-key newmap (kbd "C-M-j") nil)
-    (define-key newmap (kbd "C-M-j") (lambda () (interactive) (other-frame 1)))
+    (define-key newmap (kbd "C-M-j") (lambda () (interactive) (other-frame -1)))
     (define-key newmap (kbd "C-M-k") nil)
-    (define-key newmap (kbd "C-M-k") (lambda () (interactive) (other-frame -1)))
+    (define-key newmap (kbd "C-M-k") (lambda () (interactive) (other-frame 1)))
 
     (make-local-variable 'minor-mode-overriding-map-alist)
     (push `(java-mode . ,newmap) minor-mode-overriding-map-alist)
