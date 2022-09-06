@@ -63,7 +63,7 @@
         :ensure t
         :config
         (default-text-scale-mode))
-
+      (global-display-line-numbers-mode t)
       (custom-set-faces '(default ((t (:family "Azeret Mono")))))
 ;;      (global-unset-key (kbd "C-x C-+"))
 ;;      (global-set-key (kbd "C-x C-+") '(lambda () (interactive) (change-font-height +2)))
