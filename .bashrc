@@ -108,10 +108,10 @@ color_prompt=yes
 log_debug "Setting PS1 (prompt)"
 g4_functions_exist=$(type g4-client-name >&/dev/null && echo "yes")
 if [ "${g4_functions_exist}" == "yes" ]; then
-  PS1_SUFFIX='$(g4-client-ps1)\n$ '
+  PS1_SUFFIX='$(g4-client-ps1) \[\033[0m\[\033[38;5;237m\D{%H:%M:%S}\[\033[0;1m\n$\[\033[0m '
   WORKDIR='$(g4-workdir-ps1)'
 else
-  PS1_SUFFIX='\n\$ '
+  PS1_SUFFIX= '\[\033[38;5;237m\D{%H:%M:%S}\n\$\[\033[0m '
   WORKDIR='\w'
 fi
 
@@ -122,14 +122,14 @@ fi
 
 if [[ "${color_prompt}" = "yes" ]]; then
   log_debug "Using color_prompt PS1"
-  PS1="[Exit: \[\033[1;31m\]\${PIPESTATUS[@]/#0/\[\033[0m\]\[\033[1;32m\]0\[\033[1;31m\]}\[\033[0m\]] "
+  PS1="\[\033[00;1m[Exit: \[\033[01;31m\]\${PIPESTATUS[@]/#0/\[\033[00;1m\]\[\033[01;32m\]0\[\033[01;31m\]}\[\033[00;1m\]] "
 else
   log_debug "Using non-color prompt PS1"
   PS1="[Exit: \${PIPESTATUS[@]/#0/0}] "
 fi
 
 if [ "${color_prompt}" = yes ]; then
-  PS1="${PS1}"'${debian_chroot:+($debian_chroot)}\[\033[01;32m\]@${PS1_HOST}\[\033[00m\]:\[\033[01;34m\]'${WORKDIR}'\[\033[00m\]'${PS1_SUFFIX}
+  PS1="${PS1}"'${debian_chroot:+($debian_chroot)}\[\033[01;32m\]@${PS1_HOST}\[\033[00m\]:\[\033[01;34m\]'${WORKDIR}'\[\033[00;1m\]'${PS1_SUFFIX}
 else
   PS1="${PS1}"'${debian_chroot:+($debian_chroot)}@${PS1_HOST}:\w'${PS1_SUFFIX}
 fi
