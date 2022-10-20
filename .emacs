@@ -65,11 +65,13 @@
         (default-text-scale-mode))
       (global-display-line-numbers-mode t)
       (custom-set-faces '(default ((t (:family "Azeret Mono")))))
+      (load-theme 'company-dark)
 ;;      (global-unset-key (kbd "C-x C-+"))
 ;;      (global-set-key (kbd "C-x C-+") '(lambda () (interactive) (change-font-height +2)))
 ;;      (global-unset-key (kbd "C-x C--"))
-;;      (global-set-key (kbd "C-x C--") '(lambda () (interactive) (change-font-height -2)))
-      (toggle-scroll-bar -1)))
+      ;;      (global-set-key (kbd "C-x C--") '(lambda () (interactive) (change-font-height -2)))
+      (global-display-line-numbers-mode)
+      (scroll-bar-mode -1)))
 ;; If we are in TMUX within an X environment
 (if (and (getenv "TMUX") (getenv "DISPLAY"))
     ;; use xclip for copy-pasting
@@ -270,7 +272,7 @@
 ;; always enable refresh files from disk
 (global-auto-revert-mode)
 ;; always enable whitespace visualization
-(global-whitespace-mode)
+;; (global-whitespace-mode)
 (setq whitespace-line-column 80)
 ;; only highlight tab chars and trailing whitespace
 (setq whitespace-style '(tab-mark trailing lines-tail face))
@@ -485,4 +487,3 @@
  '(whitespace-line ((t (:background "color-238")))))
 (put 'upcase-region 'disabled nil)
 (put 'downcase-region 'disabled nil)
-(load-theme 'company-dark)
