@@ -104,7 +104,8 @@ fi
 
 # custom: It is 2017, colored prompt is ALWAYS available
 color_prompt=yes
-
+# Use MTV time.
+export TZ="US/Pacific"
 log_debug "Setting PS1 (prompt)"
 g4_functions_exist=$(type g4-client-name >&/dev/null && echo "yes")
 if [ "${g4_functions_exist}" == "yes" ]; then
