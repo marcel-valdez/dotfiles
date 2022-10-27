@@ -1,0 +1,20 @@
+#!/usr/bin/env bash
+REMOTE_HOST="$1"
+
+if [[ -z "${REMOTE_HOST}" ]]; then
+  if [[ "${CLOUD_HOST}" ]]; then
+    REMOTE_HOST="${CLOUD_HOST}"
+  else
+    echo "You must provide a remote host to connect to." >&2
+    exit 1
+  fi
+else
+  shift
+fi
+
+XPRA_REMOTE_DISPLAY="$1"
+if [[ -z "${XPRA_REMOTE_DISPLAY}" ]]; then
+  XPRA_REMOTE_DISPLAY="100"
+fi
+
+xpra attach --video-scaling=off --desktop-scaling=off --dpi=96 --ssh=/usr/bin/ssh "ssh://${REMOTE_HOST}/:${XPRA_REMOTE_DISPLAY}"
