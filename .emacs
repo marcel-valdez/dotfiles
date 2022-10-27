@@ -69,8 +69,7 @@
 ;;      (global-unset-key (kbd "C-x C-+"))
 ;;      (global-set-key (kbd "C-x C-+") '(lambda () (interactive) (change-font-height +2)))
 ;;      (global-unset-key (kbd "C-x C--"))
-      ;;      (global-set-key (kbd "C-x C--") '(lambda () (interactive) (change-font-height -2)))
-      (global-display-line-numbers-mode)
+;;      (global-set-key (kbd "C-x C--") '(lambda () (interactive) (change-font-height -2)))
       (scroll-bar-mode -1)))
 ;; If we are in TMUX within an X environment
 (if (and (getenv "TMUX") (getenv "DISPLAY"))
@@ -215,8 +214,7 @@
           ;; Used to tag an activity that can *only* be done at the specified time and date.
           ("APPT" . (:foreground "dodgerblue3"))
           ;; Tasks that are currently being worked on
-          ("DOING" . (:foreground "aquamarine1" :w
-                                  eight bold))
+          ("DOING" . (:foreground "aquamarine1" :weight bold))
           ;; Task that is waiting on a response or availability of something or someone.
           ("WAITING" . (:foreground "darkorange3"))
           ;; Completed task
@@ -302,9 +300,9 @@
 
 ;; switch between frames quickly
 (global-unset-key (kbd "C-M-k"))
-(global-set-key (kbd "C-M-k") (lambda () (interactive) (other-frame -1)))
+(global-set-key (kbd "C-M-k") (lambda () (interactive) (other-frame 1)))
 (global-unset-key (kbd "C-M-j"))
-(global-set-key (kbd "C-M-j") (lambda () (interactive) (other-frame 1)))
+(global-set-key (kbd "C-M-j") (lambda () (interactive) (other-frame -1)))
 
 ;; split windows with sensible keys
 (global-unset-key (kbd "C-x |"))
@@ -457,6 +455,7 @@
   (setq-local js-indent-level 2)
   (setq-local graphviz-dot-indent-width 2))
 (add-hook 'prog-mode-hook 'set-custom-indent)
+
 ;;; .emacs ends here
 
 ;; theme configuration starts here
@@ -473,7 +472,7 @@
  '(graphviz-dot-indent-width 2 t)
  '(line-number-mode t)
  '(package-selected-packages
-   '(telephone-line use-package multiple-cursors multi-term helm-flycheck helm-xref windresize async xclip undo-tree))
+   '(jedi elpy rotate lua-mode telephone-line use-package multiple-cursors multi-term helm-flycheck helm-xref windresize async xclip undo-tree))
  '(show-paren-mode t)
  '(tool-bar-mode nil))
 (custom-set-faces
