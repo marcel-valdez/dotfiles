@@ -479,3 +479,18 @@ function gnome-terminal-load-conf {
 
   cat "${conf_file}" | dconf load /org/gnome/terminal/legacy/profiles:/
 }
+
+function timestamp {
+  date "+%s"
+}
+
+function chrono-start {
+  __CHRONO_START=$(timestamp)
+  echo "${__CHRONO_START}"
+}
+
+function chrono-end {
+  local chrono_end=$(timestamp)
+  local chrono_duration_sec=$((chrono_end-__CHRONO_START))
+  echo "${chrono_duration_sec}"
+}
