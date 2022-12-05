@@ -1,0 +1,7 @@
+#!/usr/bin/env bash
+
+[[ -z "${XPRA_DISPLAY}" ]] && XPRA_DISPLAY=":100"
+
+export XPRA_DISPLAY
+
+xpra start "${XPRA_DISPLAY}"
