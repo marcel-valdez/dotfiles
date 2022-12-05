@@ -31,7 +31,7 @@
 (package-initialize)
 ;; (add-to-list 'package-archives '("marmalade" . "http://marmalade-repo.org/packages/"))
 (add-to-list 'package-archives '("melpa" . "http://melpa.org/packages/"))
-(add-to-list 'package-archives '("elpa" . "http://elpa.org/packages/"))
+(add-to-list 'package-archives '("elpa" . "http://elpa.gnu.org/packages/"))
 
 
 ;; TODO: cancel auto-complete mode when company-mode is enabled, as they
