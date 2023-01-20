@@ -80,7 +80,7 @@
 (if (display-graphic-p)
     (with-library multi-term
       ;; start an emacs server so editors use an emacs buffer
-      (setq-local server-name (concatenate 'string "server" (getenv "DISPLAY")))
+      (setq-local server-name (concat "server" (getenv "DISPLAY")))
       (server-start)
       ;; start multi-term custom configurations
       (global-unset-key (kbd "C-t"))
@@ -481,6 +481,7 @@
  ;; If you edit it by hand, you could mess it up, so be careful.
  ;; Your init file should contain only one such instance.
  ;; If there is more than one, they won't work right.
+ '(default ((t (:family "Azeret Mono"))))
  '(clang-include-fixer-highlight ((t (:background "white"))))
  '(undo-tree-visualizer-active-branch-face ((t (:foreground "color-231" :weight bold))))
  '(undo-tree-visualizer-default-face ((t (:foreground "brightwhite"))))
