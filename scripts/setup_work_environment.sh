@@ -3,7 +3,7 @@
 [[ -f "${HOME}/.bash_functions" ]] && source "${HOME}/.bash_functions"
 [[ -f "${HOME}/.googlerc.d/.googlerc" ]] && source "${HOME}/.googlerc.d/.googlerc"
 
-GCLOUD_FOLDERS=("notes")
+GCLOUD_FOLDERS=("notes" "gtd")
 GCLOUD_HOST="${USER}.c.googlers.com"
 OFFICE_HOST="${USER}.mtv.corp.google.com"
 LAPTOP_HOST="${USER}-glaptop"
@@ -161,9 +161,19 @@ function restart_master_session {
   ssh -N "${USER}@${GCLOUD_HOST}"
 }
 
+
+function list_functions {
+  grep -E '^[[:space:]]*([[:alnum:]_]+[[:space:]]*\(\)|function[[:space:]]+[[:alnum:]_]+)' "${SCRIPT}" |\
+    grep -Eo '[[:space:]][a-Z_]+' |\
+    grep -v "main" |\
+    sort
+}
+
 function main {
   if [[ "$#" -gt 0 ]]; then
-    "$@"
+    if [[ "$1" != "main" ]]; then
+      "$@"
+    fi
   else
     refresh_gcert
     if ! is_gcloud_host; then
@@ -186,5 +196,6 @@ function main {
 }
 
 if ! (return 0 2>/dev/null); then
+  SCRIPT=$0
   main "$@"
 fi
