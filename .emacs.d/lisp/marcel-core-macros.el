@@ -37,5 +37,12 @@ variable copy-to-remote-clipboard-exe-str"
         (eq return-code 0)
         (display-message-or-buffer "Copied to remote clipboard"))))
 
+
+(defun show-file-name ()
+  "Show the full path file name in the minibuffer."
+  (interactive)
+  (message (buffer-file-name))
+  (kill-new (file-truename buffer-file-name)))
+
 (provide 'marcel-core-macros)
 ;;; marcel-core-macros.el ends here
