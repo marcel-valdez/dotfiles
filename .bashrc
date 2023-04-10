@@ -109,10 +109,12 @@ export TZ="US/Pacific"
 log_debug "Setting PS1 (prompt)"
 g4_functions_exist=$(type g4-client-name >&/dev/null && echo "yes")
 if [ "${g4_functions_exist}" == "yes" ]; then
-  PS1_SUFFIX='$(g4-client-ps1) \[\033[0m\[\033[38;5;237m\D{%H:%M:%S}\n\[\033[0m\$ '
+  # NOTE: This requires 256 color support.
+  PS1_SUFFIX='$(g4-client-ps1) \[\033[0m\[\033[38;5;237m\D{%H:%M:%S}\[\033[0;0m\n\$ '
   WORKDIR='$(g4-workdir-ps1)'
 else
-  PS1_SUFFIX= '\[\033[38;5;237m\D{%H:%M:%S}\n\[\033[0m\$ '
+
+  PS1_SUFFIX=' \[\033[38;5;237m\D{%H:%M:%S}\[\033[0;0m\n\$ '
   WORKDIR='\w'
 fi
 
