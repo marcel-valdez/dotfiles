@@ -56,6 +56,8 @@
 (menu-bar-mode -1)
 ;; Enable the mouse when running inside xterm
 (xterm-mouse-mode t)
+(setq mouse-wheel-scroll-amount '(3 ((shift) . 3))) ;; 3 lines at a time
+(setq mouse-wheel-progressive-speed t) ;; accelerate scrolling
 
 (if window-system
     (progn
@@ -69,7 +71,8 @@
 ;;      (global-unset-key (kbd "C-x C-+"))
 ;;      (global-set-key (kbd "C-x C-+") '(lambda () (interactive) (change-font-height +2)))
 ;;      (global-unset-key (kbd "C-x C--"))
-;;      (global-set-key (kbd "C-x C--") '(lambda () (interactive) (change-font-height -2)))
+      ;;      (global-set-key (kbd "C-x C--") '(lambda () (interactive) (change-font-height -2)))
+      (global-display-line-numbers-mode)
       (scroll-bar-mode -1)))
 ;; If we are in TMUX within an X environment
 (if (and (getenv "TMUX") (getenv "DISPLAY"))
@@ -79,7 +82,7 @@
 (if (display-graphic-p)
     (with-library multi-term
       ;; start an emacs server so editors use an emacs buffer
-      (setq-local server-name (concat "server" (getenv "DISPLAY")))
+      (setq-local server-name (concatenate 'string "server" (getenv "DISPLAY")))
       (server-start)
       ;; start multi-term custom configurations
       (global-unset-key (kbd "C-t"))
@@ -245,6 +248,24 @@
   (setq org-agenda-text-search-extra-files
         (directory-files-recursively "~/notes/" "md$"))
   (setq org-agenda-files '("~/notes/" "~/gtd/")))
+
+;(use-package centaur-tabs :ensure t
+;  :hook (emacs-startup . centaur-tabs-mode)
+;  :init
+;  (setq centaur-tabs-set-modified-marker t
+;        centaur-tabs-set-modified-marker "*"
+;        centaur-tabs-cycle-scope 'tabs)
+;  :config
+;  (centaur-tabs-mode t)
+;  )
+
+(use-package perspective
+  ;:bind
+  ;("C-x C-b" . persp-list-buffers)         ; or use a nicer switcher, see below
+  :custom
+  (persp-mode-prefix-key (kbd "C-c M-p"))  ; pick your own prefix key here
+  :init
+  (persp-mode))
 
 (with-library helm-config
   (helm-mode 1)
