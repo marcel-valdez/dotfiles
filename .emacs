@@ -67,7 +67,7 @@
         (default-text-scale-mode))
       (global-display-line-numbers-mode t)
       (custom-set-faces '(default ((t (:family "Azeret Mono")))))
-      (load-theme 'company-dark)
+      (load-theme 'company-dark t)
 ;;      (global-unset-key (kbd "C-x C-+"))
 ;;      (global-set-key (kbd "C-x C-+") '(lambda () (interactive) (change-font-height +2)))
 ;;      (global-unset-key (kbd "C-x C--"))
@@ -82,7 +82,7 @@
 (if (display-graphic-p)
     (with-library multi-term
       ;; start an emacs server so editors use an emacs buffer
-      (setq-local server-name (concatenate 'string "server" (getenv "DISPLAY")))
+      (setq-local server-name (concat "server" (getenv "DISPLAY")))
       (server-start)
       ;; start multi-term custom configurations
       (global-unset-key (kbd "C-t"))
