@@ -56,6 +56,8 @@
 (menu-bar-mode -1)
 ;; Enable the mouse when running inside xterm
 (xterm-mouse-mode t)
+;; Disable the audible bell
+(setq visible-bell t)
 (setq mouse-wheel-scroll-amount '(3 ((shift) . 3))) ;; 3 lines at a time
 (setq mouse-wheel-progressive-speed t) ;; accelerate scrolling
 
