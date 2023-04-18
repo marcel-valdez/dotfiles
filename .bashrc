@@ -125,7 +125,7 @@ fi
 
 if [[ "${color_prompt}" = "yes" ]]; then
   log_debug "Using color_prompt PS1"
-  PS1="\[\033[00;1m[Exit: \[\033[01;31m\]\${PIPESTATUS[@]/#0/\[\033[00;1m\]\[\033[01;32m\]0\[\033[01;31m\]}\[\033[00;1m\]] "
+  PS1="\[\033[00;1m[Exit: \[\033[1;31m\]\${PIPESTATUS[@]/#0/\[\033[0;1m\]\[\033[1;32m\]0\[\033[1;31m\]}\[\033[0;1m\]] "
 else
   log_debug "Using non-color prompt PS1"
   PS1="[Exit: \${PIPESTATUS[@]/#0/0}] "
