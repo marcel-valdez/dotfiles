@@ -26,7 +26,7 @@ function is_laptop_host {
 function remote_ssh_cmd() {
   local remote_host="$1"
   shift
-  ssh -o LogLevel=QUIET -t "${USER}@${remote_host}" "$@"
+  sshpass -p "$(get_secret)" ssh -o LogLevel=QUIET -t "${USER}@${remote_host}" "$@"
 }
 
 function office_ssh_cmd() {
@@ -47,7 +47,7 @@ function mount_remote_gcloud_folders {
       fi
       local remote_folder="/usr/local/google/home/${USER}/${folder}"
       echo "Mounting ${GCLOUD_HOST}:${remote_folder} on ${HOME}/${folder}"
-      sshfs -o reconnect "${USER}@${GCLOUD_HOST}:${remote_folder}" "${HOME}/${folder}"
+      sshpass -p "$(get_secret)" sshfs -o reconnect "${USER}@${GCLOUD_HOST}:${remote_folder}" "${HOME}/${folder}"
     fi
     # attempt to list directory contents in order to force reconnect of the SSHFS mount
     ls "${HOME}/${folder}" &>/dev/null
@@ -119,7 +119,7 @@ function setup_reverse_tunnel {
   # otherwise here we'd specify:
   # ssh -f -N -R ${REVERSE_TUNNEL_PORT}:localhost:${REVERSE_TUNNEL_PORT} ${USER}@${GCLOUD_HOST}
   # See: go/effective-ssh
-  ssh -f -N gcloud_tunnel
+  sshpass -p "$(get_secret)" ssh -f -N gcloud_tunnel
 }
 
 function exit_remote_reverse_tunnel {
@@ -151,14 +151,14 @@ function restart_reverse_tunnel {
 
 function restart_master_session {
   # Stop the master session if it already exists
-  if ssh "${GCLOUD_HOST}" -O check &>/dev/null; then
+  if sshpass -p "$(get_secret)" ssh "${GCLOUD_HOST}" -O check &>/dev/null; then
      echo "Stopping the previous master SSH session."
-     ssh "${GCLOUD_HOST}" -O exit
+     sshpass -p "$(get_secret)" ssh "${GCLOUD_HOST}" -O exit
   fi
   # Initiate an SSH session in order to start the Master SSH Session
   # assumes there is a master session configuration.
   echo "Starting a new master SSH session."
-  ssh -N "${USER}@${GCLOUD_HOST}"
+  sshpass -p "$(get_secret)" ssh -N "${USER}@${GCLOUD_HOST}"
 }
 
 
