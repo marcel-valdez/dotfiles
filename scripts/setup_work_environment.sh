@@ -149,16 +149,28 @@ function restart_reverse_tunnel {
   fi
 }
 
+function start_master_session {
+  sshpass -p "$(get_secret)" ssh -N "${USER}@${GCLOUD_HOST}"
+}
+
+function kill_master_session {
+  sshpass -p "$(get_secret)" ssh "${GCLOUD_HOST}" -O exit
+}
+
+function is_master_session_active {
+  sshpass -p "$(get_secret)" ssh "${GCLOUD_HOST}" -O check
+}
+
 function restart_master_session {
   # Stop the master session if it already exists
-  if sshpass -p "$(get_secret)" ssh "${GCLOUD_HOST}" -O check &>/dev/null; then
+  if is_master_session_active &>/dev/null; then
      echo "Stopping the previous master SSH session."
-     sshpass -p "$(get_secret)" ssh "${GCLOUD_HOST}" -O exit
+     kill_master_session
   fi
   # Initiate an SSH session in order to start the Master SSH Session
   # assumes there is a master session configuration.
   echo "Starting a new master SSH session."
-  sshpass -p "$(get_secret)" ssh -N "${USER}@${GCLOUD_HOST}"
+  start_master_session
 }
 
 
