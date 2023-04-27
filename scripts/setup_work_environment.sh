@@ -26,6 +26,9 @@ function is_laptop_host {
 function remote_ssh_cmd() {
   local remote_host="$1"
   shift
+  # TODO: sshpass is doing something weird here where it doesn't allow gnubby
+  # to work when it executes like this. Could it be because we're in a master session
+  # already?
   sshpass -p "$(get_secret)" ssh -o LogLevel=QUIET -t "${USER}@${remote_host}" "$@"
 }
 
@@ -72,6 +75,7 @@ function get_cloud_gcert_loas_hours_remaining {
 }
 
 function cloud_gcert {
+  # gcert doesn't play well with sshpass for some reason.
   remote_ssh_cmd "${GCLOUD_HOST}" gcert
 }
 
@@ -133,6 +137,7 @@ function exit_remote_reverse_tunnel {
     # into it, therefore instead we tell the cloud instance to close the reverse
     # tunnel port. Do note that this may end up killing the SSH session that
     # opened the reverse tunnel.
+    # TODO: We need to conditionally do this. Only restart if the previous owner is not this workstation.
     echo "Closing the reverse tunnel port ${REVERSE_TUNNEL_PORT} directly on the cloud host ${GCLOUD_HOST}"
     cloud_ssh_cmd "/usr/local/google/home/${USER}/scripts/close_port.sh" "${REVERSE_TUNNEL_PORT}"
   fi
@@ -174,37 +179,91 @@ function restart_master_session {
 }
 
 
-function list_functions {
+function list_commands {
   grep -E '^[[:space:]]*([[:alnum:]_]+[[:space:]]*\(\)|function[[:space:]]+[[:alnum:]_]+)' "${SCRIPT}" |\
     grep -Eo '[[:space:]][a-Z_]+' |\
-    grep -v "main" |\
+    grep -Ev "main|parse_args|run" |\
     sort
 }
 
-function main {
-  if [[ "$#" -gt 0 ]]; then
-    if [[ "$1" != "main" ]]; then
-      "$@"
-    fi
-  else
-    refresh_gcert
-    if ! is_gcloud_host; then
+DO_MASTER_SESSION=1
+DO_MOUNT_REMOTE_FOLDERS=1
+DO_CLIPBOARD_DAEMON=1
+DO_CLOUD_GCERT=1
+COMMAND=
+function parse_args {
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --skip-master-session)
+        DO_MASTER_SESSION=
+        shift
+        ;;
+      --skip-remote-folders)
+        DO_MOUNT_REMOTE_FOLDERS=
+        shift
+        ;;
+      --skip-clipboard-daemon)
+        DO_CLIPBOARD_DAEMON=
+        shift
+        ;;
+      --skip-cloud-gcert)
+        DO_CLOUD_GCERT=
+        shift
+        ;;
+      *)
+        if [[ "${COMMAND}" ]]; then
+          echo "ERROR: Unknown parameter: $1" >&2
+          exit 1
+        fi
+        COMMAND="$1"
+        shift
+        ;;
+    esac
+  done
+}
+
+function run {
+  if [[ "${COMMAND}" ]]; then
+    "${COMMAND}"
+    return $?
+  fi
+
+  refresh_gcert
+  if ! is_gcloud_host; then
+    if [[ "${DO_MASTER_SESSION}" ]]; then
+      # We do not need to restart the master session by default because it will be restarted for us automatically.
       restart_master_session
+    fi
+
+    if [[ "${DO_CLOUD_GCERT}" ]]; then
+      cloud_gcert
+    fi
+
+    if [[ "${DO_MOUNT_REMOTE_FOLDERS}" ]]; then
       mount_remote_gcloud_folders
+    fi
+
+    # NOTE: Always restart the clipboard daemon last, since it may kill the master session if the previous clipboard
+    # tunnel owner is the same computer this script runs on.
+    if [[ "${DO_CLIPBOARD_DAEMON}" ]]; then
       if ! is_clipboard_daemon_running; then
         echo "Clipboard Daemon is not running yet, starting it in the background."
         "${CLIPBOARD_DAEMON_BIN}" &>/dev/null &
       fi
       sleep "0.125s"
       if is_clipboard_daemon_running; then
+        # NOTE: This seems to kill the SSH master session strangely.
         restart_reverse_tunnel
       else
         echo "We were unable to start the clipboard daemon, therefore we won't open the reverse tunnel for clipboard capturing." >&2
       fi
-      # refresh gcert on the cloud host
-      cloud_gcert
     fi
   fi
+}
+
+function main {
+  parse_args "$@"
+  run
 }
 
 if ! (return 0 2>/dev/null); then
