@@ -251,6 +251,24 @@
         (directory-files-recursively "~/notes/" "md$"))
   (setq org-agenda-files '("~/notes/" "~/gtd/")))
 
+(use-package org-notify
+  :ensure t
+  :config
+  (org-notify-add 'default
+                  '(:time "1h" :actions -notify)
+                  '(:time "15m" :actions -notify))
+  (org-notify-add 'important
+                  '(:time "4h" :actions -notify)
+                  '(:time "1h" :actions -notify)
+                  '(:time "15m" :actions -notify)
+                  '(:time "2m" :actions -notify :audible t)
+                  '(:time "-15m" :actions -notify))
+  (org-notify-add 'event
+                  '(:time "1d" :actions -notify)
+                  '(:time "1h" :actions -notify))
+  :init
+  (org-notify-start))
+
 ;(use-package centaur-tabs :ensure t
 ;  :hook (emacs-startup . centaur-tabs-mode)
 ;  :init
