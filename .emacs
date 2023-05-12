@@ -253,6 +253,7 @@
 
 (use-package org-notify
   :ensure t
+  :after (org)
   :config
   (org-notify-add 'default
                   '(:time "1h" :actions -notify)
@@ -266,7 +267,6 @@
   (org-notify-add 'event
                   '(:time "1d" :actions -notify)
                   '(:time "1h" :actions -notify))
-  :init
   (org-notify-start))
 
 ;(use-package centaur-tabs :ensure t
