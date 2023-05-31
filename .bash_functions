@@ -427,13 +427,12 @@ function wait-for-process() {
 }
 
 function fixup_ssh_auth_sock()  {
-  if [[ -n ${SSH_AUTH_SOCK} && ! -e ${SSH_AUTH_SOCK} ]]
-  then
-    local new_sock=$(echo /tmp/ssh-*/agent*)
-     if [[ -n ${new_sock} ]]
-     then
-       export SSH_AUTH_SOCK=${new_sock}
-     fi
+  if [[ -n ${SSH_AUTH_SOCK} && ! -e ${SSH_AUTH_SOCK} ]]; then
+    local new_sock=
+    new_sock=$(echo /tmp/ssh-*/agent*)
+    if [[ -n ${new_sock} ]]; then
+      export SSH_AUTH_SOCK=${new_sock}
+    fi
   fi
 }
 
