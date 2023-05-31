@@ -11,4 +11,10 @@ fi
 line_count=$(echo "${MESSAGE}" | wc -l)
 line_count=$((line_count+2))
 
-tmux display-popup -T "${TITLE}" -h ${line_count} -E "tput civis && echo '${MESSAGE}' && read -s"
+SCRIPT=$(cat<<EOF
+tput civis;
+echo ${MESSAGE};
+read -s
+EOF
+      )
+tmux display-popup -T "${TITLE}" -h ${line_count} -E "${SCRIPT}"
