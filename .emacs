@@ -438,6 +438,12 @@
         '((nil    . (telephone-line-misc-info-segment))
           (accent . (telephone-line-major-mode-segment))
           (evil   . (telephone-line-airline-position-segment))))
+  (set-face-attribute 'telephone-line-accent-active nil
+                      :background "grey11"
+                      :foreground "white")
+  (set-face-attribute 'telephone-line-accent-inactive nil
+                      :background "grey22"
+                      :foreground "white")
   (telephone-line-mode t))
 
 ;;(with-library auto-complete (global-auto-complete-mode))
@@ -523,8 +529,15 @@
  ;; If there is more than one, they won't work right.
  '(default ((t (:family "Azeret Mono"))))
  '(clang-include-fixer-highlight ((t (:background "white"))))
+ '(diff-added ((t (:inherit diff-changed :extend t :background "#338833"))))
+ '(diff-indicator-added ((t (:inherit diff-added :foreground "#055505"))))
+ '(diff-indicator-removed ((t (:inherit diff-removed :foreground "#880505"))))
+ '(diff-removed ((t (:inherit diff-changed :extend t :background "#aa4433"))))
+ '(helm-selection ((t (:extend t :background "#5f5fd7" :foreground "white"))))
+ '(persp-selected-face ((t (:foreground "#1e30ff" :weight bold))))
  '(undo-tree-visualizer-active-branch-face ((t (:foreground "color-231" :weight bold))))
  '(undo-tree-visualizer-default-face ((t (:foreground "brightwhite"))))
+ '(warning ((t (:foreground "brightyellow" :underline t))))
  '(whitespace-line ((t (:background "color-238")))))
 (put 'upcase-region 'disabled nil)
 (put 'downcase-region 'disabled nil)
