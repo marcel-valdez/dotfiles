@@ -51,6 +51,11 @@ function mount_remote_gcloud_folders {
       local remote_folder="/usr/local/google/home/${USER}/${folder}"
       echo "Mounting ${GCLOUD_HOST}:${remote_folder} on ${HOME}/${folder}"
       sshpass -p "$(get_secret)" sshfs -o reconnect "${USER}@${GCLOUD_HOST}:${remote_folder}" "${HOME}/${folder}"
+      if [[ $? -ne 0 ]]; then
+        echo "Unable to mount folder ${HOME}/${folder}. Unmounting and remounting once." >&2
+        umount "${HOME}/${folder}"
+        sshpass -p "$(get_secret)" sshfs -o reconnect "${USER}@${GCLOUD_HOST}:${remote_folder}" "${HOME}/${folder}"
+      fi
     fi
     # attempt to list directory contents in order to force reconnect of the SSHFS mount
     ls "${HOME}/${folder}" &>/dev/null
