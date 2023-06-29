@@ -160,17 +160,22 @@ function exit_remote_reverse_tunnel {
     echo "Closing the reverse tunnel port ${REVERSE_TUNNEL_PORT} directly on the cloud host ${GCLOUD_HOST}"
     cloud_ssh_cmd "/usr/local/google/home/${USER}/scripts/close_port.sh" "${REVERSE_TUNNEL_PORT}"
   fi
+
+  if is_reverse_tunnel_setup; then
+    echo "We were unable to close the pre-existing reverse tunnel to the cloud instance ${GCLOUD_HOST} at port ${REVERSE_TUNNEL_PORT}" >&2
+    return 1
+  fi
+
+  return 0
 }
 
 function restart_reverse_tunnel {
-  exit_remote_reverse_tunnel
-  if ! is_reverse_tunnel_setup; then
-    echo "Setting up reverse tunnel to host ${GCLOUD_HOST} at port ${REVERSE_TUNNEL_PORT}"
+  if exit_remote_reverse_tunnel; then
     setup_reverse_tunnel
-  else
-    echo "We were unable to close the pre-existing reverse tunnel to the cloud instance ${GCLOUD_HOST} at port ${REVERSE_TUNNEL_PORT}" >&2
-    echo "Therefore we can't re-create a new one for this host." >&2
+    return 0
   fi
+
+  return 1
 }
 
 function start_master_session {
@@ -253,6 +258,15 @@ function run {
   fi
 
   if ! is_gcloud_host; then
+    # NOTE: Always exit the clipboard daemon first, since it may kill any existing master session if the
+    # previous clipboard tunnel owner is the same computer this script runs on.
+    if [[ "${DO_CLIPBOARD_DAEMON}" ]]; then
+      if ! exit_remote_reverse_tunnel; then
+        echo "Cancelling creation of clipboard daemon & reverse tunnel." >&2
+        DO_CLIPBOARD_DAEMON=
+      fi
+    fi
+
     if [[ "${DO_MASTER_SESSION}" ]]; then
       # We do not need to restart the master session by default because it will be restarted for us automatically.
       restart_master_session
@@ -276,7 +290,7 @@ function run {
       sleep "0.125s"
       if is_clipboard_daemon_running; then
         # NOTE: This seems to kill the SSH master session strangely.
-        restart_reverse_tunnel
+        setup_reverse_tunnel
       else
         echo "We were unable to start the clipboard daemon, therefore we won't open the reverse tunnel for clipboard capturing." >&2
       fi
