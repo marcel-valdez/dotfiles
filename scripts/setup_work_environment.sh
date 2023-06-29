@@ -84,6 +84,18 @@ function cloud_gcert {
   remote_ssh_cmd "${GCLOUD_HOST}" gcert
 }
 
+function retry_cmd {
+  local cmd="$@"
+  local retries=3
+  local exit_status=1
+  while [[ ${retries} -gt 0 ]] && [[ ${exit_status} -ne 0 ]]; do
+    "${cmd[@]}"
+    exit_status=$?
+    retries=$((retries-1))
+  done
+  return ${exit_status}
+}
+
 function refresh_gcert {
   local environment="$1"
   local check_gcert=check_gcert_ssh
@@ -99,7 +111,8 @@ function refresh_gcert {
 
   if ! "${check_gcert}" -quiet=true; then
     echo "Refreshing ${gcert_msg}, as it is invalid now."
-    "${do_refresh_gcert}"
+    retry_cmd "${do_refresh_gcert}"
+    return $?
   else
     local retries=3
     local remaining_hrs=
@@ -110,7 +123,8 @@ function refresh_gcert {
 
     if [[ "${remaining_hrs}" -lt 8 ]]; then
       echo "Less than 8 hr remaining (${remaining_hrs} hr left) in ${gcert_msg}. Refreshing now."
-      "${do_refresh_gcert}"
+      retry_cmd "${do_refresh_gcert}"
+      return $?
     fi
   fi
 }
@@ -233,7 +247,11 @@ function run {
     return $?
   fi
 
-  refresh_gcert
+  if ! refresh_gcert; then
+    echo "Failed to refresh gcert. Unable to continue." >&2
+    exit 1
+  fi
+
   if ! is_gcloud_host; then
     if [[ "${DO_MASTER_SESSION}" ]]; then
       # We do not need to restart the master session by default because it will be restarted for us automatically.
