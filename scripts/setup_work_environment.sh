@@ -142,6 +142,7 @@ function setup_reverse_tunnel {
   # otherwise here we'd specify:
   # ssh -f -N -R ${REVERSE_TUNNEL_PORT}:localhost:${REVERSE_TUNNEL_PORT} ${USER}@${GCLOUD_HOST}
   # See: go/effective-ssh
+  __debug "Setting up reverse tunnel."
   sshpass -p "$(get_secret)" ssh -f -N gcloud_tunnel
 }
 
@@ -170,6 +171,7 @@ function exit_remote_reverse_tunnel {
 }
 
 function restart_reverse_tunnel {
+  __debug "Restarting reverse tunnel"
   if exit_remote_reverse_tunnel; then
     setup_reverse_tunnel
     return 0
@@ -206,18 +208,40 @@ function restart_master_session {
 function list_commands {
   grep -E '^[[:space:]]*([[:alnum:]_]+[[:space:]]*\(\)|function[[:space:]]+[[:alnum:]_]+)' "${SCRIPT}" |\
     grep -Eo '[[:space:]][a-Z_]+' |\
-    grep -Ev "main|parse_args|run" |\
+    grep -Ev "main|parse_args|run|usage" |\
     sort
+}
+
+# TODO: If parameters are needed for the individual commands, then use the double dash to give the user the option of specifying the required parameters. i.e.:
+# setup_work_environment.sh command_name -- param1 param2 param3
+SCRIPT="$(basename $0)"
+function usage() {
+  cat <<EOF
+${SCRIPT} [--help|-h] [--skip-master-session] [--skip-remote-folders] [--skip-clipboard-daemon] [--skip-cloud-gcert] <COMMANDS...>
+
+--help: Show this message.
+--skip-master-session: Skips any master session related setup/teardown.
+--skip-remote-folders: Skips any remote folder mounting setup/teardown.
+--skip-clipboard-daemon: Skips any setup/teardown of the clipboard daemon.
+--skip-gloud-gcert: Skips calling gcert on the cloud machine.
+COMMANDS: Space separated commands to execute, when this is set none of the other options are used.
+Available commands:
+$(list_commands)
+EOF
 }
 
 DO_MASTER_SESSION=1
 DO_MOUNT_REMOTE_FOLDERS=1
 DO_CLIPBOARD_DAEMON=1
 DO_CLOUD_GCERT=1
-COMMAND=
+COMMANDS=()
 function parse_args {
   while [[ $# -gt 0 ]]; do
     case "$1" in
+      --help|-h)
+        usage
+        exit 0
+        ;;
       --skip-master-session)
         DO_MASTER_SESSION=
         shift
@@ -235,11 +259,18 @@ function parse_args {
         shift
         ;;
       *)
-        if [[ "${COMMAND}" ]]; then
-          echo "ERROR: Unknown parameter: $1" >&2
+        local found=
+        for cmd in $(list_commands); do
+          if [[ "${cmd}" == "$1" ]]; then
+            found=1
+          fi
+        done
+
+        if [[ -z "${found}" ]]; then
+          echo "ERROR: Unknown command or parameter: $1" >&2
           exit 1
         fi
-        COMMAND="$1"
+        COMMANDS+=("$1")
         shift
         ;;
     esac
@@ -247,8 +278,9 @@ function parse_args {
 }
 
 function run {
-  if [[ "${COMMAND}" ]]; then
-    "${COMMAND}"
+  local _command="$1"
+  if [[ "${_command}" ]]; then
+    "${_command}"
     return $?
   fi
 
@@ -300,7 +332,9 @@ function run {
 
 function main {
   parse_args "$@"
-  run
+  for cmd in "${COMMANDS[@]}"; do
+    run "${cmd}"
+  done
 }
 
 if ! (return 0 2>/dev/null); then
