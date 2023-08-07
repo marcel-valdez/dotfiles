@@ -47,8 +47,9 @@
 ;; loads packages only available at the office
 ;; uses the 'google package by default.
 (with-library at-office)
-(with-library helm-xref)
-(with-library flycheck
+(use-package flycheck
+  :ensure t
+  :config
   (global-flycheck-mode)
   (setq flycheck-pylintrc nil))
 
@@ -82,7 +83,9 @@
     (with-library xclip (xclip-mode 1)))
 ;; if running in a separate X window
 (if (display-graphic-p)
-    (with-library multi-term
+    (use-package multi-term
+      :ensure t
+      :config
       ;; start an emacs server so editors use an emacs buffer
       (setq-local server-name (concat "server" (getenv "DISPLAY")))
       (server-start)
@@ -290,7 +293,9 @@
   :init
   (persp-mode))
 
-(with-library helm-config
+(use-package helm
+  :ensure t
+  :config
   (helm-mode 1)
   (helm-autoresize-mode)
   (global-set-key (kbd "C-x C-f") 'helm-find-files)
@@ -300,6 +305,9 @@
   (set-face-attribute 'helm-selection nil
 ;;                      :background "purple"
                       :foreground "white"))
+(use-package helm-xref
+  :ensure t)
+
 ;; puts all backup files in the .emacs.d/backup directory, rather than on the
 ;; same folder as the file being edited
 (setq backup-directory-alist '(("." . "~/.emacs.d/backup/"))
@@ -449,8 +457,13 @@
                       :foreground "white")
   (telephone-line-mode t))
 
-;;(with-library auto-complete (global-auto-complete-mode))
-(with-library undo-tree
+;;(use-package auto-complete
+;;     :ensure t
+;;     :config (global-auto-complete-mode))
+
+(use-package undo-tree
+  :ensure t
+  :config
   ;; remap undo-redo using undo-tree
   (global-undo-tree-mode)
   (global-unset-key (kbd "M-z"))
@@ -460,7 +473,9 @@
   (global-set-key (kbd "M-Z")
                   (lambda () (interactive) (undo-tree-redo))))
 
-(with-library multiple-cursors
+(use-package multiple-cursors
+  :ensure t
+  :config
   ;; extended mode to mark instances, multiple M-3 simply add forward
   (global-set-key (kbd "M-3") 'mc/mark-more-like-this-extended)
   ;; mark instances backwards of whatever is marked in the region
