@@ -332,9 +332,15 @@ function run {
 
 function main {
   parse_args "$@"
-  for cmd in "${COMMANDS[@]}"; do
-    run "${cmd}"
-  done
+  if [[ ${#COMMANDS[@]} -gt 0 ]]; then
+    for cmd in "${COMMANDS[@]}"; do
+      if ! run "${cmd}"; then
+        exit 1
+      fi
+    done
+  else
+    run
+  fi
 }
 
 if ! (return 0 2>/dev/null); then
