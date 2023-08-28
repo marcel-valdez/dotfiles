@@ -18,6 +18,7 @@
 !.xbindkeysrc.scm
 !.quotes.conkyrc
 !.wezterm.lua
+!.fzf.bash
 !lib/
 
 # include the bin folder
