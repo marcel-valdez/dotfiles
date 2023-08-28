@@ -234,6 +234,14 @@ if [ "$(expr substr $(uname) 1 5)" == "Linux" ]; then
   fi
 fi
 
+if ! pgrep -af '.*emacs.*--daemon=tty-server.*' &>/dev/null; then
+  if type at &>/dev/null; then
+    echo "emacs --daemon=tty-server" | at NOW
+  else
+    (emacs --daemon=tty-server &)
+  fi
+fi
+
 # This loads nvm
 log_debug "Loading NVM"
 [ -s "${NVM_DIR}/nvm.sh" ] && source "${NVM_DIR}/nvm.sh"

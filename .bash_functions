@@ -374,11 +374,17 @@ function emacs() {
 }
 
 function emacs-client() {
-  local editor_cmd=(/usr/bin/emacsclient --create-frame --tty --socket-name=default)
-  EDITOR="'""${editor_cmd[@]}""'" "${editor_cmd[@]}" "$@" || \
-    (emacs --bg-daemon=default && \
-       EDITOR="'""${editor_cmd[@]}""'" "${editor_cmd[@]}" "$@")
-
+  local editor_cmd=(/usr/bin/emacsclient --create-frame --tty --socket-name=tty-server)
+  if ! EDITOR="'""${editor_cmd[@]}""'" "${editor_cmd[@]}" "$@"; then
+    if type at &>/dev/null; then
+      echo "emacs --daemon=tty-server" | at NOW
+    else
+      (emacs --bg-daemon=tty-server &)
+    fi
+    # Give the server 125ms to start listening for connections.
+    sleep 0.125
+    EDITOR="'""${editor_cmd[@]}""'" "${editor_cmd[@]}" "$@"
+  fi
 }
 
 # force myself to use emacs, not nano
@@ -489,7 +495,46 @@ function chrono-start {
 }
 
 function chrono-end {
-  local chrono_end=$(timestamp)
+  local chrono_end=
+  chrono_end=$(timestamp)
   local chrono_duration_sec=$((chrono_end-__CHRONO_START))
   echo "${chrono_duration_sec}"
+}
+
+
+function fzf-cmd {
+    local fzf_cmd=('fzf')
+    if [[ "${TMUX}" ]]; then
+        fzf_cmd=('fzf-tmux' '-p' '-h' '90%' '-w' '90%')
+    fi
+
+    "${fzf_cmd[@]}" "$@"
+}
+
+function fzf-find {
+    rg --color=always --line-number --no-heading --smart-case "${*:-}" |
+        fzf-cmd --ansi \
+                --color "hl:-1:underline,hl+:-1:underline:reverse" \
+                --delimiter : \
+                --preview 'batcat --color=always {1} --highlight-line {2}' \
+                --preview-window 'up,60%,border-bottom,+{2}+3/3,~3' \
+                --bind 'enter:become(echo {1})'
+}
+
+function fzf-edit {
+    rg --color=always --line-number --no-heading --smart-case "${*:-}" |
+        fzf --ansi \
+            --color "hl:-1:underline,hl+:-1:underline:reverse" \
+            --delimiter : \
+            --preview 'batcat --color=always {1} --highlight-line {2}' \
+            --preview-window 'up,60%,border-bottom,+{2}+3/3,~3' \
+            --bind 'enter:become(emacsclient --socket-name=tty-server --tty --create-frame {1} +{2})'
+}
+
+function fzf-preview {
+    fzf-cmd --ansi \
+            --color "hl:-1:underline,hl+:-1:underline:reverse" \
+            --delimiter : \
+            --preview 'batcat --color=always {1} --highlight-line {2}' \
+            --preview-window 'up,60%,border-bottom,+{2}+3/3,~3'
 }

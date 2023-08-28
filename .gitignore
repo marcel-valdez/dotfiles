@@ -23,6 +23,7 @@
 !.xsessionrc
 !.quotes
 !.quotes.conkyrc
+!.fzf.bash
 
 # In order to unignore a set of files under a directory:
 # 1. unignore the directory

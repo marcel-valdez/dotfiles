@@ -294,6 +294,9 @@
   :init
   (persp-mode))
 
+(use-package fzf
+  :ensure t)
+
 (use-package helm
   :ensure t
   :config
