@@ -530,20 +530,20 @@ function fzf-find {
   fi
   rg --color=always --line-number --no-heading --smart-case "${options[@]}" |
   fzf-cmd --ansi \
-      --color "hl:-1:underline,hl+:-1:underline:reverse" \
-      --delimiter : \
-      --preview 'batcat --theme=gruvbox-dark --color=always {1} --highlight-line {2}' \
-      --preview-window 'up,60%,border-bottom,+{2}+3/3,~3'
+    --color "hl:-1:underline,hl+:-1:underline:reverse" \
+    --delimiter : \
+    --preview 'batcat --theme=gruvbox-dark --color=always {1} --highlight-line {2}' \
+    --preview-window 'up,60%,border-bottom,+{2}+3/3,~3'
 }
 
 function fzf-edit {
     rg --color=always --line-number --no-heading --smart-case "${*:-}" |
-        fzf --ansi \
-            --color "hl:-1:underline,hl+:-1:underline:reverse" \
-            --delimiter : \
-            --preview 'batcat --color=always {1} --highlight-line {2}' \
-            --preview-window 'up,60%,border-bottom,+{2}+3/3,~3' \
-            --bind 'enter:become(emacsclient --socket-name=tty-server --tty --create-frame {1} +{2})'
+      fzf --ansi \
+        --color "hl:-1:underline,hl+:-1:underline:reverse" \
+        --delimiter : \
+        --preview 'batcat --color=always {1} --highlight-line {2}' \
+        --preview-window 'up,60%,border-bottom,+{2}+3/3,~3' \
+        --bind 'enter:become(emacsclient --socket-name=tty-server --tty --create-frame {1} +{2})'
 }
 
 function fzf-edit-deep {
@@ -575,11 +575,11 @@ function fzf-edit-deep {
 }
 
 function fzf-preview {
-    fzf-cmd --ansi --query '' \
-            --color "hl:-1:underline,hl+:-1:underline:reverse" \
-            --delimiter : \
-            --preview 'batcat --color=always {1}' \
-            --preview-window 'up,60%,border-bottom,+{2}+3/3,~3'
+  fzf-cmd --ansi --query '' \
+    --color "hl:-1:underline,hl+:-1:underline:reverse" \
+    --delimiter : \
+    --preview 'batcat --color=always {1}' \
+    --preview-window 'up,60%,border-bottom,+{2}+3/3,~3'
 }
 
 function fzf-kill {
@@ -590,9 +590,9 @@ function fzf-kill {
   fi
   (date; ps -ef) |
   fzf-cmd --bind='ctrl-r:reload(date; ps -ef)' \
-      --header=$'Press CTRL-R to reload\n\n' --header-lines=2 \
-      --preview='echo {}' --preview-window=down,3,wrap \
-      --height=80% | awk '{print $2}' | xargs kill "${kill_args[@]}"
+    --header=$'Press CTRL-R to reload\n\n' --header-lines=2 \
+    --preview='echo {}' --preview-window=down,3,wrap \
+    --height=80% | awk '{print $2}' | xargs kill "${kill_args[@]}"
 }
 
 function f {
