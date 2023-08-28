@@ -12,7 +12,6 @@ fi
 # ------------
 [[ -f "/home/marcelvaldez/.fzf/shell/key-bindings.bash" ]] && source "/home/marcelvaldez/.fzf/shell/key-bindings.bash"
 
-
 export FZF_DEFAULT_OPTS='-m '"
 --bind 'ctrl-y:execute-silent(echo -n {} | xclip -sel clip)+abort'
 "
@@ -20,7 +19,6 @@ export FZF_DEFAULT_OPTS='-m '"
 if [[ -n "${TMUX}" ]]; then
     export FZF_DEFAULT_OPTS="${FZF_DEFAULT_OPTS}"' --height 80%'
 fi
-
 
 export FZF_CTRL_R_OPTS="-m
   --preview 'echo {}' --preview-window up:3:hidden:wrap
