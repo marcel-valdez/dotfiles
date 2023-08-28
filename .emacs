@@ -88,7 +88,8 @@
       :config
       ;; start an emacs server so editors use an emacs buffer
       (setq-local server-name (concat "server" (getenv "DISPLAY")))
-      (server-start)
+      (if (not (daemonp))
+          (server-start))
       ;; start multi-term custom configurations
       (global-unset-key (kbd "C-t"))
       (add-to-list 'term-unbind-key-list "C-t")
