@@ -353,9 +353,52 @@ function cpu-get-perf-mode {
 }
 
 function cpu-set-high-perf-mode {
-    echo "performance" | sudo tee /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor
+    for _cpu in {0..7}; do
+        sudo cpufreq-set --governor "performance" --cpu "${_cpu}"
+    done
+    # echo "performance" | sudo tee /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor
 }
 
 function cpu-set-save-perf-mode {
-    echo "powersave" | sudo tee /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor
+    for _cpu in {0..7}; do
+        sudo cpufreq-set --governor "powersave" --cpu "${_cpu}"
+    done
+    #echo "powersave" | sudo tee /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor
+}
+
+function fzf-cmd {
+    local fzf_cmd=('fzf')
+    if [[ "${TMUX}" ]]; then
+        fzf_cmd=('fzf-tmux' '-p' '-h' '90%' '-w' '90%')
+    fi
+
+    "${fzf_cmd[@]}" "$@"
+}
+
+function fzf-find {
+    rg --color=always --line-number --no-heading --smart-case "${*:-}" |
+        fzf-cmd --ansi \
+                --color "hl:-1:underline,hl+:-1:underline:reverse" \
+                --delimiter : \
+                --preview 'batcat --color=always {1} --highlight-line {2}' \
+                --preview-window 'up,60%,border-bottom,+{2}+3/3,~3' \
+                --bind 'enter:become(echo {1})'
+}
+
+function fzf-edit {
+    rg --color=always --line-number --no-heading --smart-case "${*:-}" |
+        fzf --ansi \
+            --color "hl:-1:underline,hl+:-1:underline:reverse" \
+            --delimiter : \
+            --preview 'batcat --color=always {1} --highlight-line {2}' \
+            --preview-window 'up,60%,border-bottom,+{2}+3/3,~3' \
+            --bind 'enter:become(emacsclient --socket-name=tty-server --tty --create-frame {1} +{2})'
+}
+
+function fzf-preview {
+    fzf-cmd --ansi \
+            --color "hl:-1:underline,hl+:-1:underline:reverse" \
+            --delimiter : \
+            --preview 'batcat --color=always {1} --highlight-line {2}' \
+            --preview-window 'up,60%,border-bottom,+{2}+3/3,~3'
 }
