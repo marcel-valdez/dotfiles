@@ -575,10 +575,10 @@ function fzf-edit-deep {
 }
 
 function fzf-preview {
-    fzf-cmd --ansi \
+    fzf-cmd --ansi --query '' \
             --color "hl:-1:underline,hl+:-1:underline:reverse" \
             --delimiter : \
-            --preview 'batcat --color=always {1} --highlight-line {2}' \
+            --preview 'batcat --color=always {1}' \
             --preview-window 'up,60%,border-bottom,+{2}+3/3,~3'
 }
 
