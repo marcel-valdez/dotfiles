@@ -501,24 +501,39 @@ function chrono-end {
   echo "${chrono_duration_sec}"
 }
 
-
 function fzf-cmd {
-    local fzf_cmd=('fzf')
-    if [[ "${TMUX}" ]]; then
-        fzf_cmd=('fzf-tmux' '-p' '-h' '90%' '-w' '90%')
-    fi
+  if ! type -p fzf &>/dev/null; then
+    echo "fzf-find: fzf not available, can't proceed." >&2
+    echo 'sudo apt install fzf' >&2
+  fi
 
-    "${fzf_cmd[@]}" "$@"
+  local fzf_cmd=('fzf')
+  if [[ "${TMUX}" ]]; then
+    fzf_cmd=('fzf-tmux' '-p' '--height' '80%')
+  fi
+
+  "${fzf_cmd[@]}" "$@"
 }
 
 function fzf-find {
-    rg --color=always --line-number --no-heading --smart-case "${*:-}" |
-        fzf-cmd --ansi \
-                --color "hl:-1:underline,hl+:-1:underline:reverse" \
-                --delimiter : \
-                --preview 'batcat --color=always {1} --highlight-line {2}' \
-                --preview-window 'up,60%,border-bottom,+{2}+3/3,~3' \
-                --bind 'enter:become(echo {1})'
+  if ! type -p rg &>/dev/null; then
+    echo "fzf-find: rg not available, can't proceed." >&2
+    echo 'sudo apt install ripgrep' >&2
+  fi
+
+  # 1. Search for text in files using Ripgrep
+  # 2. Interactively restart Ripgrep with reload action
+
+  local options=("$@")
+  if [[ "$#" -eq 0 ]]; then
+    options=('.*')
+  fi
+  rg --color=always --line-number --no-heading --smart-case "${options[@]}" |
+  fzf-cmd --ansi \
+      --color "hl:-1:underline,hl+:-1:underline:reverse" \
+      --delimiter : \
+      --preview 'batcat --theme=gruvbox-dark --color=always {1} --highlight-line {2}' \
+      --preview-window 'up,60%,border-bottom,+{2}+3/3,~3'
 }
 
 function fzf-edit {
@@ -531,10 +546,113 @@ function fzf-edit {
             --bind 'enter:become(emacsclient --socket-name=tty-server --tty --create-frame {1} +{2})'
 }
 
+function fzf-edit-deep {
+  if ! type -p rg &>/dev/null; then
+    echo "fzf-find: rg not available, can't proceed." >&2
+    echo 'sudo apt install ripgrep' >&2
+  fi
+
+  if ! type -p batcat &>/dev/null; then
+    echo "fzf-find: batcat not available, can't proceed." >&2
+    echo 'sudo apt install bat' >&2
+  fi
+
+  RG_PREFIX="rg --column --line-number --no-heading --color=always --smart-case "
+  FILESET=("$@")
+  if [[ "$#" -eq 0 ]]; then
+    FILESET=(".")
+  fi
+  : | fzf-cmd --ansi --disabled --query "" \
+    --bind "start:reload:$RG_PREFIX {q} ${FILESET[*]}" \
+    --bind "change:reload:sleep 0.1; $RG_PREFIX {q} ${FILESET[*]} || true" \
+    --bind "alt-enter:unbind(change,alt-enter)+change-prompt(2. fzf> )+enable-search+clear-query" \
+    --color "hl:-1:underline,hl+:-1:underline:reverse" \
+    --prompt '1. ripgrep> ' \
+    --delimiter : \
+    --preview 'batcat --color=always {1} --highlight-line {2}' \
+    --preview-window 'up,60%,border-bottom,+{2}+3/3,~3' \
+    --bind 'enter:become(/usr/bin/emacsclient --create-frame --tty {1} +{2})'
+}
+
 function fzf-preview {
     fzf-cmd --ansi \
             --color "hl:-1:underline,hl+:-1:underline:reverse" \
             --delimiter : \
             --preview 'batcat --color=always {1} --highlight-line {2}' \
             --preview-window 'up,60%,border-bottom,+{2}+3/3,~3'
+}
+
+function fzf-kill {
+  # pipes ps -ef output to fzf and kills the process with with signal -9
+  local kill_args=("$@")
+  if [[ $# -eq 0 ]]; then
+    kill_args=('-9')
+  fi
+  (date; ps -ef) |
+  fzf-cmd --bind='ctrl-r:reload(date; ps -ef)' \
+      --header=$'Press CTRL-R to reload\n\n' --header-lines=2 \
+      --preview='echo {}' --preview-window=down,3,wrap \
+      --height=80% | awk '{print $2}' | xargs kill "${kill_args[@]}"
+}
+
+function f {
+    # if no arguments passed, just lauch fzf
+    if [ $# -eq 0 ]
+    then
+        fzf-cmd | sort
+        return 0
+    fi
+
+    # Store the program
+    program="$1"
+
+    # Remove first argument off the list
+    shift
+
+    # Store any option flags
+    options=("$@")
+
+    # Store the arguments from fzf
+    arguments=($(IFS='
+' fzf-cmd --multi))
+
+    # If no arguments passed (e.g. if Esc pressed), return to terminal
+    if [ "${#arguments[@]}" -eq 0 ]; then
+        return 1
+    fi
+
+    # Sanitise the command by putting single quotes around each argument, also
+    # first put an extra single quote next to any pre-existing single quotes in
+    # the raw argument. Put them all on one line.
+    clean_arguments=()
+    for arg in "${arguments[@]}"; do
+      clean_arguments+=($(echo "$arg" | IFS='' sed "s/'/''/g; s/.*/'&'/g; s/\n//g"))
+    done
+    # space is the default
+    IFS=" "
+
+    # If the program is on the GUI list, add a '&'
+    if [[ "${program}" =~ ^(nautilus|zathura|evince|vlc|eog|kolourpaint)$ ]]; then
+      clean_arguments+=("&")
+    fi
+
+    # Write the shell's active history to ~/.bash_history.
+    history -w
+
+    # Add the command with the sanitised arguments to .bash_history
+    echo "${program}" "${options[@]}" "${clean_arguments[@]}" >> ~/.bash_history
+
+    # Reload the ~/.bash_history into the shell's active history
+    history -r
+
+    # execute the last command in history
+    "${program}" "${options[@]}" "${clean_arguments[@]}"
+}
+
+function fzf-cs-cd {
+  local cd_file=
+  cd_file="$(fzf-cs | cut -d':' -f1)"
+  local directory=
+  directory="$(dirname "${cd_file}")"
+  cd "${directory}" || return 1
 }
