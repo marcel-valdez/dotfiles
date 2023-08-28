@@ -76,6 +76,19 @@
     (unless (frame-focus-state)
       (garbage-collect))))
 
+(if window-system
+    (progn
+      ;; These are all undesirable wasted space.
+      (tool-bar-mode -1)
+      (scroll-bar-mode -1)
+      (load-theme 'modus-vivendi t)
+      (global-display-line-numbers-mode t)
+      ;; emacs control the cursor type in GUI mode.
+      (setq-default cursor-type '(bar . 3))
+      ;; We're actually able to control the font in GUI mode
+      ;;  '(default ((t (:family "Azeret Mono" :foundry "NONE" :slant normal :weight normal :height 105 :width normal))))
+      (set-face-attribute 'default nil :family "Azeret Mono" :height 105)))
+
 ;;; re-binds certain keys when inside a TMUX session
 (if (display-graphic-p)
     ;; if emacs is run as a GUI window
@@ -84,7 +97,8 @@
       :config
       (with-library multi-term
         ;; start an emacs server so editors use an emacs buffer
-        (server-start)
+        (if (not (daemonp))
+            (server-start))
         ;; start multi-term custom configurations
         (global-unset-key (kbd "C-t"))
         (add-to-list 'term-unbind-key-list "C-t")
@@ -108,6 +122,11 @@
       :config
       (with-library helm-dash
         (setq helm-dash-browser-func 'eww)))))
+
+(use-package fzf
+  :ensure t
+  :config
+  (setq fzf/executable (concat (getenv "HOME") "/modules/fzf/bin/fzf")))
 
 (use-package lua-mode
   :ensure t)
@@ -283,7 +302,6 @@
         (directory-files-recursively "~/notes/" "md$"))
   (setq org-agenda-files '("~/notes/" "~/gtd/")))
 
-
 (use-package markdown-mode
   :ensure t
   :config
@@ -313,7 +331,7 @@
     (global-whitespace-mode)
     (setq show-trailing-whitespace t)
     (setq whitespace-style '(tab-mark trailing lines-tail face))
-    (defun set-prog-column-limit () (setq-local whitespace-line-column 80))
+    (defun set-prog-column-limit () (setq-local whitespace-line-column 100))
     (add-hook 'prog-mode-hook 'set-prog-column-limit)
     (defun set-text-column-limit () (setq-local whitespace-line-column 100))
     (add-hook 'text-mode-hook 'set-text-column-limit)))
@@ -414,7 +432,6 @@
 (use-package helm
   :ensure t
   :config
-  (with-library helm-config
     (helm-mode 1)
     (global-set-key (kbd "C-x C-f") 'helm-find-files)
     (global-set-key (kbd "M-s o") 'helm-occur)
@@ -422,7 +439,7 @@
     (global-set-key (kbd "C-x C-b") 'helm-buffers-list)
     (set-face-attribute 'helm-selection nil
                         :background "gray1"
-                        :foreground "cornflowerblue")))
+                        :foreground "cornflowerblue"))
 
 (use-package imenu-list
   :ensure t)
@@ -572,8 +589,13 @@
  ;; If you edit it by hand, you could mess it up, so be careful.
  ;; Your init file should contain only one such instance.
  ;; If there is more than one, they won't work right.
+ '(blink-cursor-mode nil)
+ '(column-number-mode t)
+ '(display-time-mode t)
  '(elpy-formatter 'black)
  '(elpy-rpc-virtualenv-path 'current)
+ '(global-display-line-numbers-mode t)
+ '(menu-bar-mode nil)
  '(package-selected-packages
    (quote
     (javascript-mode omnisharp csharp-mode erc-status-sidebar markdown-mode flyspell-correct flycheck helm-descbinds helm-dash company-ctags ggtags helm-gtags telephone-line use-ttf use-package use-package-ensure-system-package zeal-at-point flycheck-checkbashisms graphviz-dot-mode flyspell-correct-helm helm-flycheck better-defaults jedi elpy company xclip helm git helm-grepint helm-helm-commands helm-ispell helm-ls-git helm-proc helm-pydoc helm-rubygems-org helm-themes helm-wordnet helm-xref hgignore-mode undo-tree rotate rjsx-mode multiple-cursors multi-term markdownfmt markdown-toc markdown-preview-mode helm-git gtags flycheck-tip flycheck-package cycle-resize auto-complete)))
@@ -587,10 +609,10 @@
  '(ac-candidate-face ((t (:inherit popup-face))))
  '(bg:erc-color-face2 ((t (:background "blue1"))))
  '(company-preview-common ((t (:inherit (company-tooltip-selection company-tooltip)))))
- '(company-scrollbar-bg ((t (:background "cyan"))))
- '(company-scrollbar-fg ((t (:background "brightcyan"))))
  '(company-tooltip ((t (:background "black" :foreground "gray46"))))
  '(company-tooltip-common ((t (:foreground "brightwhite" :weight extra-bold))))
+ '(company-tooltip-scrollbar-thumb ((t (:background "brightcyan"))))
+ '(company-tooltip-scrollbar-track ((t (:background "cyan"))))
  '(company-tooltip-selection ((t (:background "brightblack"))))
  '(completions-common-part ((t (:foreground "dodgerblue1"))))
  '(custom-comment-tag ((t (:foreground "deepskyblue1"))))

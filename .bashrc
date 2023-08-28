@@ -192,7 +192,7 @@ if [[ "$(uname)" =~ "Linux" ]]; then
   if [[ -z "${TMUX}" ]] && [[ ! "${TERM}" =~ "eterm" ]] && \
        [[ ! "${TERM_PROGRAM}" = "vscode" ]]; then
     # initialize environment if running for the first time
-    [ is_first_time_starting_tmux ] && initialize_environment
+    is_first_time_starting_tmux && initialize_environment
     # this will make the terminal attach to an existing tmux session or create one
     tmux_attach_session
   else
@@ -204,6 +204,10 @@ if [[ "$(uname)" =~ "Linux" ]]; then
     fi
     # put commands here that should execute with every opened pane
   fi
+fi
+
+if ! pgrep -af '.*emacs.*--daemon=tty-server.*' &>/dev/null; then
+    echo "emacs --daemon=tty-server" | at NOW
 fi
 
 if [[ -z "${MONO_PATH}" ]]; then

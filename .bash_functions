@@ -91,9 +91,9 @@ function emacs() {
 }
 
 function emacs-client() {
-  local editor='emacsclient --create-frame --tty --socket-name=default'
+  local editor='emacsclient --create-frame --tty --socket-name=tty-server'
   EDITOR="${editor}" "${editor}" "$@" || \
-    (emacs --bg-daemon=default && "${editor}" "$@")
+    (emacs --bg-daemon=tty-server && sleep 0.1 && "${editor}" "$@")
 }
 
 function nano() {
