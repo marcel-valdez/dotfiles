@@ -273,8 +273,6 @@ export socks_proxy=''
 # Enable fuzzy auto-completion for Bash:
 if [[ -f /usr/share/doc/fzf/examples/completion.bash ]]; then
   source /usr/share/doc/fzf/examples/completion.bash
-elif [[ -f "${HOME}/lib/fzf-completions.bash" ]]; then
-  source "${HOME}/lib/fzf-completions.bash"
 fi
 
 [[ -f "${HOME}/.fzf.bash" ]] && source "${HOME}/.fzf.bash"
