@@ -2,6 +2,7 @@
 # see /usr/share/doc/bash/examples/startup-files (in the package bash-doc)
 # for examples
 
+export EMACS_TTY_SERVER="tty-server"
 # If not running interactively, don't do anything
 case $- in
   *i*) ;;
@@ -206,7 +207,7 @@ if [ "$(expr substr $(uname) 1 5)" == "Linux" ]; then
     export EDITOR="emacs-client"
     export GIT_EDITOR=$EDITOR
   else
-    export EDITOR="emacs --no-window-system"
+    export EDITOR="emacsclient --socket-name=${EMACS_TTY_SERVER} --tty"
     export GIT_EDITOR=$EDITOR
   fi
   # if the terminal has not been initialized yet
@@ -234,11 +235,11 @@ if [ "$(expr substr $(uname) 1 5)" == "Linux" ]; then
   fi
 fi
 
-if ! pgrep -af '.*emacs.*--daemon=tty-server.*' &>/dev/null; then
+if ! pgrep -af '.*emacs.*'"--daemon=${EMACS_TTY_SERVER}"'.*' &>/dev/null; then
   if type at &>/dev/null; then
-    echo "emacs --daemon=tty-server" | at NOW
+    echo "emacs --daemon=${EMACS_TTY_SERVER}" | at NOW
   else
-    (emacs --daemon=tty-server &)
+    (emacs --daemon=${EMACS_TTY_SERVER} &)
   fi
 fi
 

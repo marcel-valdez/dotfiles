@@ -374,12 +374,12 @@ function emacs() {
 }
 
 function emacs-client() {
-  local editor_cmd=(/usr/bin/emacsclient --create-frame --tty --socket-name=tty-server)
+  local editor_cmd=(/usr/bin/emacsclient --create-frame --tty --socket-name=${EMACS_TTY_SERVER})
   if ! EDITOR="'""${editor_cmd[@]}""'" "${editor_cmd[@]}" "$@"; then
     if type at &>/dev/null; then
-      echo "emacs --daemon=tty-server" | at NOW
+      echo "emacs --daemon=${EMACS_TTY_SERVER}" | at NOW
     else
-      (emacs --bg-daemon=tty-server &)
+      (emacs --bg-daemon=${EMACS_TTY_SERVER} &)
     fi
     # Give the server 125ms to start listening for connections.
     sleep 0.125
@@ -543,7 +543,7 @@ function fzf-edit {
         --delimiter : \
         --preview 'batcat --color=always {1} --highlight-line {2}' \
         --preview-window 'up,60%,border-bottom,+{2}+3/3,~3' \
-        --bind 'enter:become(emacsclient --socket-name=tty-server --tty --create-frame {1} +{2})'
+        --bind 'enter:become(emacsclient --socket-name='"${EMACS_TTY_SERVER}"' --tty --create-frame {1} +{2})'
 }
 
 function fzf-edit-deep {
@@ -571,7 +571,7 @@ function fzf-edit-deep {
     --delimiter : \
     --preview 'batcat --color=always {1} --highlight-line {2}' \
     --preview-window 'up,60%,border-bottom,+{2}+3/3,~3' \
-    --bind 'enter:become(/usr/bin/emacsclient --create-frame --tty {1} +{2})'
+    --bind 'enter:become(/usr/bin/emacsclient --socket-name='"${EMACS_TTY_SERVER}"' --create-frame --tty {1} +{2})'
 }
 
 function fzf-preview {
