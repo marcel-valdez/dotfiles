@@ -35,9 +35,10 @@ export FZF_CTRL_R_OPTS="-m
   --bind 'ctrl-/:toggle-preview'
   --bind 'ctrl-y:execute-silent(echo -n {2..} | xclip -sel clip)+abort'
   --color header:italic
-  --header 'Press CTRL-Y to copy command into clipboard'"
+  --header 'CTRL-Y:Copy to clipboard, CTRL-/:Toggle preview'"
 
 export FZF_ALT_C_OPTS="--preview 'tree -C {}'
 --preview-window hidden
 --bind 'ctrl-/:toggle-preview'
+--header 'CTRL-/: Toggle preview'
 "
