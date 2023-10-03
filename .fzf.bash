@@ -27,7 +27,7 @@ export FZF_DEFAULT_OPTS='-m '"
 "
 
 if [[ -n "${TMUX}" ]]; then
-    export FZF_DEFAULT_OPTS="${FZF_DEFAULT_OPTS}"' --height 80%'
+    export FZF_DEFAULT_OPTS="${FZF_DEFAULT_OPTS}"
 fi
 
 export FZF_CTRL_R_OPTS="-m

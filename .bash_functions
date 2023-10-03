@@ -509,7 +509,7 @@ function fzf-cmd {
 
   local fzf_cmd=('fzf')
   if [[ "${TMUX}" ]]; then
-    fzf_cmd=('fzf-tmux' '-p' '--height' '80%')
+    fzf_cmd=('fzf-tmux' '-p' '-h' '90%' '-w' '90%')
   fi
 
   "${fzf_cmd[@]}" "$@"
@@ -578,8 +578,8 @@ function fzf-preview {
   fzf-cmd --ansi --query '' \
     --color "hl:-1:underline,hl+:-1:underline:reverse" \
     --delimiter : \
-    --preview 'batcat --color=always {1}' \
-    --preview-window 'up,60%,border-bottom,+{2}+3/3,~3'
+    --preview 'batcat --color=always {1} --highlight-line {2}' \
+    --preview-window 'up,66%,border-bottom,+{2}+3/3,~3'
 }
 
 function fzf-kill {
