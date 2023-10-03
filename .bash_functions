@@ -532,7 +532,7 @@ function fzf-find {
   fzf-cmd --ansi \
     --color "hl:-1:underline,hl+:-1:underline:reverse" \
     --delimiter : \
-    --preview 'batcat --theme=gruvbox-dark --color=always {1} --highlight-line {2}' \
+    --preview 'batcat --color=always {1} --highlight-line {2}' \
     --preview-window 'up,60%,border-bottom,+{2}+3/3,~3'
 }
 

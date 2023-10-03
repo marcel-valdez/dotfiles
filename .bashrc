@@ -277,3 +277,4 @@ if [[ -f /usr/share/doc/fzf/examples/completion.bash ]]; then
 fi
 
 [[ -f "${HOME}/.fzf.bash" ]] && source "${HOME}/.fzf.bash"
+export BAT_CONFIG_PATH="${HOME}/.bat.conf"
