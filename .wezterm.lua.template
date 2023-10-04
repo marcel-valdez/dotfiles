@@ -8,7 +8,7 @@ scheme.background = "#121212"
 local copy_mode = nil
 if wezterm.gui then
    copy_mode = wezterm.gui.default_key_tables().copy_mode
-   table.insert(copy_mode, { key = 'f', mods = 'CTRL', action = wezterm.action.CopyMode 'EditPattern' })
+   table.insert(copy_mode, { key = 'f', mods = 'CTRL|SHIFT', action = wezterm.action.CopyMode 'EditPattern' })
    table.insert(copy_mode, { key = 'Tab', mods = 'NONE', action = wezterm.action.CopyMode 'AcceptPattern' })
    table.insert(copy_mode, { key = 'r', mods = 'CTRL', action = wezterm.action.CopyMode 'CycleMatchType' })
    table.insert(copy_mode, { key = 'e', mods = 'CTRL', action = wezterm.action.CopyMode 'MoveToEndOfLineContent' })
