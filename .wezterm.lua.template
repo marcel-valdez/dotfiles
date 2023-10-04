@@ -1,0 +1,74 @@
+local wezterm = require 'wezterm';
+
+local scheme_name = "Hybrid" -- Hybrid, JetBrains Darcula, Tomorrow Night, Molokai, Sundried, Japanesque, NightLion v2, FirefoxDev, Wryan, Monokai Remastered, Hardcore, Teerb, Wombat, Operator Mono Dark, OneHalfDark, Ripped Casts, lovelace
+local scheme = wezterm.get_builtin_color_schemes()[scheme_name]
+scheme.background = "#121212"
+
+
+local copy_mode = nil
+if wezterm.gui then
+   copy_mode = wezterm.gui.default_key_tables().copy_mode
+   table.insert(copy_mode, { key = 'f', mods = 'CTRL', action = wezterm.action.CopyMode 'EditPattern' })
+   table.insert(copy_mode, { key = 'Tab', mods = 'NONE', action = wezterm.action.CopyMode 'AcceptPattern' })
+   table.insert(copy_mode, { key = 'r', mods = 'CTRL', action = wezterm.action.CopyMode 'CycleMatchType' })
+   table.insert(copy_mode, { key = 'e', mods = 'CTRL', action = wezterm.action.CopyMode 'MoveToEndOfLineContent' })
+   table.insert(copy_mode, { key = 'a', mods = 'CTRL', action = wezterm.action.CopyMode 'MoveToStartOfLineContent' })
+   table.insert(copy_mode, { key = 'f', mods = 'ALT', action = wezterm.action.CopyMode 'MoveForwardWord' })
+   table.insert(copy_mode, { key = 'b', mods = 'ALT', action = wezterm.action.CopyMode 'MoveBackwardWord' })
+   table.insert(copy_mode, { key = 'n', mods = 'CTRL|ALT', action = wezterm.action.CopyMode 'MoveForwardSemanticZone' })
+   table.insert(copy_mode, { key = 'p', mods = 'CTRL|ALT', action = wezterm.action.CopyMode 'MoveBackwardSemanticZone' })
+   table.insert(copy_mode, { key = 'n', mods = 'CTRL', action = wezterm.action.CopyMode 'MoveDown' })
+   table.insert(copy_mode, { key = 'p', mods = 'CTRL', action = wezterm.action.CopyMode 'MoveUp' })
+   table.insert(copy_mode, { key = 's', mods = 'CTRL', action = wezterm.action.CopyMode 'NextMatch' })
+   table.insert(copy_mode, { key = 's', mods = 'CTRL|SHIFT', action = wezterm.action.CopyMode 'PriorMatch' })
+   table.insert(copy_mode, { key = 'Space', mods = 'CTRL', action = wezterm.action.CopyMode { SetSelectionMode = 'Cell' } })
+   table.insert(copy_mode, { key = 'w', mods = 'CTRL', action = wezterm.action.Multiple {
+                                wezterm.action { CopyTo="ClipboardAndPrimarySelection" },
+                                wezterm.action.CopyMode 'Close',
+   }})
+end
+
+return {
+   color_schemes = {
+      [scheme_name] = scheme
+   },
+   color_scheme = scheme_name,
+   enable_tab_bar = false,
+   window_decorations = "NONE",
+   font = wezterm.font_with_fallback({
+         {
+            family="Azeret Mono",
+            weight="Regular",
+            stretch="Normal",
+            italic=false,
+            harfbuzz_features={"calt=0", "liga=0"}
+         },
+         { family="Source Code Pro" },
+         {
+            family="Noto Sans Mono",
+            weight="Regular",
+            stretch="Normal",
+            italic=false
+         },
+         { family="Consolas" },
+         { family="Terminus" }
+   }),
+   adjust_window_size_when_changing_font_size = false,
+   disable_default_key_bindings = true,
+   keys = {
+      { key="2", mods="CTRL", action = wezterm.action{ SendString="\x00" } },
+      { key="PageDown", mods="SHIFT|CTRL", action = wezterm.action { ActivateTabRelative=1 } },
+      { key="PageUp", mods="SHIFT|CTRL", action = wezterm.action { ActivateTabRelative=-1 } },
+      { key="c", mods="SHIFT|CTRL", action=wezterm.action { CopyTo="Clipboard" } },
+      { key="v", mods="SHIFT|CTRL", action=wezterm.action { PasteFrom="Clipboard" } },
+      { key="r", mods="SHIFT|SUPER", action = "ReloadConfiguration" },
+      { key = "-", mods="CTRL", action = "DecreaseFontSize" },
+      { key = "=", mods="CTRL", action = "IncreaseFontSize" },
+      { key = "w", mods="SUPER", action = wezterm.action { CloseCurrentTab={ confirm = true } } },
+      { key = "t", mods="SUPER", action = wezterm.action { SpawnTab="CurrentPaneDomain" } },
+      { key="x", mods="SHIFT|CTRL", action = "ActivateCopyMode" }
+   },
+   key_tables = {
+      copy_mode = copy_mode,
+   }
+}
