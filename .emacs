@@ -274,7 +274,7 @@
   (org-notify-add 'event
                   '(:time "1d" :actions -notify)
                   '(:time "1h" :actions -notify))
-  (org-notify-start))
+  (if (display-graphic-p) (org-notify-start)))
 
 ;(use-package centaur-tabs :ensure t
 ;  :hook (emacs-startup . centaur-tabs-mode)
@@ -555,6 +555,7 @@
  '(diff-indicator-added ((t (:inherit diff-added :foreground "#055505"))))
  '(diff-indicator-removed ((t (:inherit diff-removed :foreground "#880505"))))
  '(diff-removed ((t (:inherit diff-changed :extend t :background "#aa4433"))))
+ '(font-lock-comment-face ((t (:foreground "#405f40"))))
  '(helm-selection ((t (:extend t :background "#5f5fd7" :foreground "white"))))
  '(persp-selected-face ((t (:foreground "#1e30ff" :weight bold))))
  '(undo-tree-visualizer-active-branch-face ((t (:foreground "color-231" :weight bold))))
