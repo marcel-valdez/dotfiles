@@ -541,7 +541,7 @@ function fzf-edit {
       fzf --ansi \
         --color "hl:-1:underline,hl+:-1:underline:reverse" \
         --delimiter : \
-        --preview 'batcat --color=always {1} --highlight-line {2}' \
+        --preview 'batcat --color=always {1} --highlight-line {2} --line-range {2}:-5 --line-range {2}:+5' \
         --preview-window 'up,60%,border-bottom,+{2}+3/3,~3' \
         --bind 'enter:become(emacsclient --socket-name='"${EMACS_TTY_SERVER}"' --tty --create-frame {1} +{2})'
 }
