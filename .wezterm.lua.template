@@ -4,6 +4,7 @@ local scheme_name = "Hybrid" -- Hybrid, JetBrains Darcula, Tomorrow Night, Molok
 local scheme = wezterm.get_builtin_color_schemes()[scheme_name]
 scheme.background = "#121212"
 
+
 local copy_mode = nil
 if wezterm.gui then
    copy_mode = wezterm.gui.default_key_tables().copy_mode
@@ -28,16 +29,25 @@ if wezterm.gui then
 end
 
 return {
+   term = 'wezterm',
    color_schemes = {
       [scheme_name] = scheme
    },
-   color_scheme = scheme_name,
-   enable_tab_bar = false,
-   disable_default_key_bindings = true,
-   window_decorations = "NONE",
    audible_bell = "Disabled",
-   -- weight: Thin, ExtraLight, Light, Regular, Medium, SemiBold, Bold, ExtraBold
-   -- stretch: Normal, SemiCondensed, Condensed, ExtraCondensed
+   color_scheme = scheme_name,
+   use_fancy_tab_bar = true,
+   enable_tab_bar = true,
+   hide_tab_bar_if_only_one_tab = true,
+   window_frame = {
+      border_left_width = 0,
+      border_right_width = 0,
+      border_bottom_height = 0,
+      border_top_height = 0
+   },
+   window_padding = {
+      left = 2, right = 0, top = 0, bottom = 0
+   },
+   window_decorations = "NONE",
    font = wezterm.font_with_fallback({
          {
             family="Azeret Mono",
@@ -57,6 +67,7 @@ return {
          { family="Terminus" }
    }),
    adjust_window_size_when_changing_font_size = false,
+   disable_default_key_bindings = true,
    keys = {
       { key="2", mods="CTRL", action = wezterm.action{ SendString="\x00" } },
       { key="PageDown", mods="SHIFT|CTRL", action = wezterm.action { ActivateTabRelative=1 } },
