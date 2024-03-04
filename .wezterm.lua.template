@@ -28,6 +28,66 @@ if wezterm.gui then
    }})
 end
 
+-- The filled in variant of the < symbol
+local SOLID_LEFT_ARROW = wezterm.nerdfonts.pl_right_hard_divider
+-- The filled in variant of the > symbol
+local SOLID_RIGHT_ARROW = wezterm.nerdfonts.pl_left_hard_divider
+
+function get_tab_bar_style(tab, tabs, panes, config, hover, max_width)
+   local title = ''
+   if tab.tab_title and #tab.tab_title > 0 then
+      title = tab.tab_title
+   else
+      title = tab.active_pane.title
+   end
+
+   tab_style = {}
+   if tab.is_active then
+      if tab.tab_index > 0 then
+         table.insert(tab_style, { Background = { Color = '#000000' } })
+         table.insert(tab_style, { Foreground = { Color = '#ffffff' } })
+         table.insert(tab_style, { Text = SOLID_RIGHT_ARROW })
+      end
+      table.insert(tab_style, 'ResetAttributes')
+      table.insert(tab_style, { Attribute = { Intensity = 'Bold' } })
+      table.insert(tab_style, { Attribute = { Underline = 'Single' } })
+      table.insert(tab_style, { Text = title })
+      table.insert(tab_style, 'ResetAttributes')
+      if tab.tab_index < #tabs - 1 then
+         table.insert(tab_style, { Background = { Color = '#ffffff' } })
+         table.insert(tab_style, { Foreground = { Color = '#000000' } })
+         table.insert(tab_style, { Text = SOLID_RIGHT_ARROW })
+      else
+         table.insert(tab_style, { Background = { Color = '#333333' } })
+         table.insert(tab_style, { Foreground = { Color = '#000000' } })
+         table.insert(tab_style, { Text = SOLID_RIGHT_ARROW })
+      end
+   else
+      if tab.tab_index > 0 then
+         table.insert(tab_style, { Background = { Color = '#333333' } })
+         table.insert(tab_style, { Foreground = { Color = '#ffffff' } })
+         table.insert(tab_style, { Text = SOLID_RIGHT_ARROW })
+      end
+      table.insert(tab_style, 'ResetAttributes')
+      table.insert(tab_style, { Foreground = { Color = '#888888' } })
+      table.insert(tab_style, { Text = title })
+      if tab.tab_index < #tabs - 1 then
+         table.insert(tab_style, { Background = { Color = '#ffffff' } })
+         table.insert(tab_style, { Foreground = { Color = '#333333' } })
+         table.insert(tab_style, { Text = SOLID_RIGHT_ARROW })
+      else
+         table.insert(tab_style, { Text = ' ' })
+      end
+   end
+
+   return tab_style
+end
+
+wezterm.on(
+   'format-tab-title',
+   get_tab_bar_style
+)
+
 return {
    term = 'wezterm',
    color_schemes = {
@@ -35,7 +95,7 @@ return {
    },
    audible_bell = "Disabled",
    color_scheme = scheme_name,
-   use_fancy_tab_bar = true,
+   use_fancy_tab_bar = false,
    enable_tab_bar = true,
    hide_tab_bar_if_only_one_tab = true,
    window_frame = {
