@@ -89,6 +89,10 @@ wezterm.on(
 )
 
 return {
+   -- Note that this may cause issues when SSH-ing into computers that are not
+   -- under my control, since they won't have the wezterm terminfo installed.
+   -- An alternative is to use xterm-256color but install the wezterm terminfo
+   -- on computers I control.
    term = 'wezterm',
    color_schemes = {
       [scheme_name] = scheme
@@ -108,6 +112,8 @@ return {
       left = 2, right = 0, top = 0, bottom = 0
    },
    window_decorations = "NONE",
+   -- weight: Thin, ExtraLight, Light, Regular, Medium, SemiBold, Bold, ExtraBold
+   -- stretch: Normal, SemiCondensed, Condensed, ExtraCondensed
    font = wezterm.font_with_fallback({
          {
             family="Azeret Mono",
