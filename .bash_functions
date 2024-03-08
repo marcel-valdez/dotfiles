@@ -656,3 +656,43 @@ function fzf-cs-cd {
   directory="$(dirname "${cd_file}")"
   cd "${directory}" || return 1
 }
+
+function hg_lines_changed {
+  local diffstats_local=
+  local diffstats_commit=
+  local added_local=
+  local added_commit=0
+  local deleted_local=
+  local deleted_commit=0
+  # The head commit is authored by this user
+  if [[ "${USER}@google.com" == "$(hg log -r . -T '{user}')" ]]; then
+    # The head commit is not submitted
+    if [[ -z "$(hg log -r . -T '{submittedcls}')" ]]; then
+      diffstats_commit="$(hg log -r . -T '{diffstat}')"
+      added_commit=$(echo "${diffstats_commit}" | cut -d'+' -f2 | cut -d'/' -f1)
+      deleted_commit=$(echo "${diffstats_commit}" | cut -d'-' -f2)
+    fi
+  fi
+
+  # Format:
+  # files_modified: +lines_added/-lines_deleted
+  diffstats_local="$(hg status -T '{diffstat}')"
+  added_local=$(echo "${diffstats_local}" | cut -d'+' -f2 | cut -d'/' -f1)
+  deleted_local=$(echo "${diffstats_local}" | cut -d'-' -f2)
+
+  modified_total=$((added_local+added_commit+deleted_local+deleted_commit))
+
+  if [[ ${modified_total} -lt 49 ]]; then
+    printf "\033[0;32m${modified_total}\033[0m"
+  elif [[ ${modified_total} -lt 250 ]]; then
+    printf "\033[1;32m${modified_total}\033[0m"
+  elif [[ ${modified_total} -lt 500 ]]; then
+    printf "\033[0;33m${modified_total}\033[0m"
+  elif [[ ${modified_total} -lt 1000 ]]; then
+    printf "\033[1;33m${modified_total}\033[0m"
+  elif [[ ${modified_total} -lt 1500 ]]; then
+    printf "\033[0;31m${modified_total}\033[0m"
+  else
+    printf "\033[1;31m${modified_total}\033[0m"
+  fi
+}
