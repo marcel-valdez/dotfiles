@@ -146,22 +146,27 @@ function setup_reverse_tunnel {
   sshpass -p "$(get_secret)" ssh -f -N gcloud_tunnel
 }
 
+KILLED_MASTER_SESSION=
 function exit_remote_reverse_tunnel {
   if is_laptop_host; then
-    if office_ssh_cmd ssh gcloud_tunnel -O check &>/dev/null; then
-      echo "Shutting down reverse tunnel for ${OFFICE_HOST}"
-      office_ssh_cmd ssh gcloud_tunnel -O exit
+    if office_ssh_cmd ssh gcloud -O check &>/dev/null; then
+      echo "Shutting down SSH master session for ${OFFICE_HOST}"
+      office_ssh_cmd ssh gcloud -O exit
     fi
   else
     # We have no way of issuing a command on the laptop because we can't SSH
     # into it, therefore instead we tell the cloud instance to close the reverse
     # tunnel port. Do note that this may end up killing the SSH session that
     # opened the reverse tunnel.
-    # TODO: We need to conditionally do this. Only restart if the previous owner is not this workstation.
-    echo "Closing the reverse tunnel port ${REVERSE_TUNNEL_PORT} directly on the cloud host ${GCLOUD_HOST}"
-    cloud_ssh_cmd "/usr/local/google/home/${USER}/scripts/close_port.sh" "${REVERSE_TUNNEL_PORT}"
+    # If the gcloud process isn't running (meaning another process is connected).
+    if ! ssh gcloud -O check &>/dev/null; then
+      echo "Closing the master session directly on the cloud host ${GCLOUD_HOST}"
+      cloud_ssh_cmd "/usr/local/google/home/${USER}/scripts/close_port.sh" "${REVERSE_TUNNEL_PORT}"
+    fi
   fi
 
+  # Give the previous command 100 ms to run.
+  sleep "0.1"
   if is_reverse_tunnel_setup; then
     echo "We were unable to close the pre-existing reverse tunnel to the cloud instance ${GCLOUD_HOST} at port ${REVERSE_TUNNEL_PORT}" >&2
     return 1
@@ -172,6 +177,10 @@ function exit_remote_reverse_tunnel {
 
 function restart_reverse_tunnel {
   __debug "Restarting reverse tunnel"
+  # NOTE: It is possible that issuing data on gcloud into the 3333 port
+  # makes sure the port 3333 gets 'unstuck' when it refuses to die.
+  # Essentially: `echo "data" >/dev/tcp/127.0.0.1/3333` would fail and
+  # thereby release 3333 on gcloud.
   if exit_remote_reverse_tunnel; then
     setup_reverse_tunnel
     return 0
@@ -194,14 +203,18 @@ function is_master_session_active {
 
 function restart_master_session {
   # Stop the master session if it already exists
-  if is_master_session_active &>/dev/null; then
-     echo "Stopping the previous master SSH session."
-     kill_master_session
+  # but not if it was already killed in the script.
+  if [[ -z "${KILLED_MASTER_SESSION}" ]] && is_master_session_active &>/dev/null; then
+    echo "Stopping the previous master SSH session."
+    KILLED_MASTER_SESSION=1
+    kill_master_session
   fi
   # Initiate an SSH session in order to start the Master SSH Session
   # assumes there is a master session configuration.
-  echo "Starting a new master SSH session."
-  start_master_session
+  if ! is_master_session_active &>/dev/null; then
+    echo "Starting a new master SSH session."
+    start_master_session
+  fi
 }
 
 
@@ -320,12 +333,12 @@ function run {
         "${CLIPBOARD_DAEMON_BIN}" &>/dev/null &
       fi
       sleep "0.125s"
-      if is_clipboard_daemon_running; then
-        # NOTE: This seems to kill the SSH master session strangely.
-        setup_reverse_tunnel
-      else
-        echo "We were unable to start the clipboard daemon, therefore we won't open the reverse tunnel for clipboard capturing." >&2
-      fi
+      #if is_clipboard_daemon_running; then
+      #  # NOTE: This seems to kill the SSH master session strangely.
+      #  setup_reverse_tunnel
+      #else
+      #  echo "We were unable to start the clipboard daemon, therefore we won't open the reverse tunnel for clipboard capturing." >&2
+      #fi
     fi
   fi
 }
