@@ -159,7 +159,10 @@
                      (quote ((agenda time-up priority-down tag-up))))
                     (org-deadline-warning-days 1)))
            ;; See: https://orgmode.org/manual/Matching-tags-and-properties.html
-           (tags "+TODO={DOING\\|TODO}+PRIORITY=\"0\"-STYLE=\"habit\"")
+           (tags "+TODO={DOING\\|TODO\\|WAITING}-STYLE=\"habit\"+TODAY")
+           (tags "+TODO={DOING\\|TODO\\|WAITING}-STYLE=\"habit\"+WEEK-TODAY")
+           (tags "+TODO={DOING\\|TODO}-STYLE=\"habit\"+MONTH-WEEK-TODAY")
+           (tags "+TODO={DOING\\|TODO}+PRIORITY=\"0\"-STYLE=\"habit\"-TODAY-WEEK-MONTH")
            (tags "+TODO={DOING\\|TODO}-PRIORITY=\"0\"-PRIORITY=\"2\"-STYLE=\"habit\"")
            (tags "+TODO=\"WAITING\"+PRIORITY=\"0\"-STYLE=\"habit\"")
            (tags "+TODO=\"WAITING\"-PRIORITY=\"0\"-PRIORITY=\"2\"-STYLE=\"habit\"")
