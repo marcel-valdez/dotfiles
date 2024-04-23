@@ -446,16 +446,17 @@
   (require 'telephone-line)
   (require 'telephone-line-config)
   (setq telephone-line-lhs
-        '((nil   . (telephone-line-evil-tag-segment))
-          (accent . (telephone-line-vc-segment
-                     telephone-line-erc-modified-channels-segment
-                     telephone-line-process-segment))
-          (evil    . (telephone-line-minor-mode-segment
-                      telephone-line-buffer-segment))))
+        '((nil   . (telephone-line-evil-tag-segment telephone-line-vc-segment))
+          (accent . (telephone-line-buffer-segment))
+          (evil  . (telephone-line-airline-position-segment))
+          (accent . (telephone-line-evil-tag-segment))
+          (evil . (telephone-line-major-mode-segment
+                   telephone-line-misc-info-segment))))
   (setq telephone-line-rhs
-        '((nil    . (telephone-line-misc-info-segment))
-          (accent . (telephone-line-major-mode-segment))
-          (evil   . (telephone-line-airline-position-segment))))
+        '((nil    . (telephone-line-evil-tag-segment))
+          (accent . (telephone-line-minor-mode-segment))
+          (evil   . (telephone-line-process-segment
+                     telephone-line-erc-modified-channels-segment))))
   (set-face-attribute 'telephone-line-accent-active nil
                       :background "grey11"
                       :foreground "white")
