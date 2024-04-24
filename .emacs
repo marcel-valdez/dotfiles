@@ -446,18 +446,41 @@
   :config
   (require 'telephone-line)
   (require 'telephone-line-config)
+  ;; Utilities
+  (defun replace-prefix-in-filepath (filepath old-prefix new-prefix)
+  "Replaces the old prefix with the new prefix in the filepath."
+  (replace-regexp-in-string (regexp-quote old-prefix) new-prefix filepath))
+
+  ;; This will return "/u/l/g/h/johnny/file.txt"
+  ;; Content Definition
+  ;; For more values to show see:
+  ;; https://www.gnu.org/software/emacs/manual/html_node/elisp/Mode-Line-Variables.html
+  (telephone-line-defsegment* telephone-line-buffer-segment ()
+  `(""
+    mode-line-modified
+    mode-line-frame-identification
+    ,(telephone-line-raw mode-line-buffer-identification t)))
+  (telephone-line-defsegment telephone-line-file-name-absolute-path-segment ()
+    (replace-regexp-in-string
+     (regexp-quote "/usr/local/google/home/marcelvaldez/") "~/"
+     (replace-regexp-in-string
+      (regexp-quote "/google/src/cloud/") "/g/s/c/"
+      (replace-regexp-in-string (regexp-quote "/google/src/cloud/marcelvaldez/") "//" buffer-file-name))))
+  ;; Content Order
   (setq telephone-line-lhs
-        '((nil   . (telephone-line-evil-tag-segment telephone-line-vc-segment))
-          (accent . (telephone-line-buffer-segment))
-          (evil  . (telephone-line-airline-position-segment))
-          (accent . (telephone-line-evil-tag-segment))
-          (evil . (telephone-line-major-mode-segment
-                   telephone-line-misc-info-segment))))
+        '((accent   . (telephone-line-airline-position-segment))
+          (nil . (telephone-line-file-name-absolute-path-segment))
+          (accent  . (telephone-line-major-mode-segment))
+          (evil . (telephone-line-vc-segment))))
   (setq telephone-line-rhs
-        '((nil    . (telephone-line-evil-tag-segment))
-          (accent . (telephone-line-minor-mode-segment))
+        '((nil    . (telephone-line-simple-minor-mode-segment))
+          (accent . (telephone-line-misc-info-segment))
           (evil   . (telephone-line-process-segment
                      telephone-line-erc-modified-channels-segment))))
+
+  ;; Formatting
+  (setq telephone-line-evil-use-short-tag t)
+  (setq telephone-line-subseparator-faces '())
   (set-face-attribute 'telephone-line-accent-active nil
                       :background "grey11"
                       :foreground "white")
