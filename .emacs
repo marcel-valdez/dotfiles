@@ -261,23 +261,24 @@
         (directory-files-recursively "~/notes/" "md$"))
   (setq org-agenda-files '("~/notes/" "~/gtd/")))
 
-(use-package org-notify
-  :ensure t
-  :after (org)
-  :config
-  (org-notify-add 'default
-                  '(:time "1h" :actions -notify)
-                  '(:time "15m" :actions -notify))
-  (org-notify-add 'important
-                  '(:time "4h" :actions -notify)
-                  '(:time "1h" :actions -notify)
-                  '(:time "15m" :actions -notify)
-                  '(:time "2m" :actions -notify :audible t)
-                  '(:time "-15m" :actions -notify))
-  (org-notify-add 'event
-                  '(:time "1d" :actions -notify)
-                  '(:time "1h" :actions -notify))
-  (if (display-graphic-p) (org-notify-start)))
+;; This package seems to cause freeze and memory issues.
+;(use-package org-notify
+;  :ensure t
+;  :after (org)
+;  :config
+;  (org-notify-add 'default
+;                  '(:time "1h" :actions -notify)
+;                  '(:time "15m" :actions -notify))
+;  (org-notify-add 'important
+;                  '(:time "4h" :actions -notify)
+;                  '(:time "1h" :actions -notify)
+;                  '(:time "15m" :actions -notify)
+;                  '(:time "2m" :actions -notify :audible t)
+;                  '(:time "-15m" :actions -notify))
+;  (org-notify-add 'event
+;                  '(:time "1d" :actions -notify)
+;                  '(:time "1h" :actions -notify))
+;  (if (display-graphic-p) (org-notify-start)))
 
 ;(use-package centaur-tabs :ensure t
 ;  :hook (emacs-startup . centaur-tabs-mode)
@@ -559,8 +560,11 @@
  '(diff-indicator-added ((t (:inherit diff-added :foreground "#055505"))))
  '(diff-indicator-removed ((t (:inherit diff-removed :foreground "#880505"))))
  '(diff-removed ((t (:inherit diff-changed :extend t :background "#aa4433"))))
- '(font-lock-comment-face ((t (:foreground "#405f40"))))
  '(helm-selection ((t (:extend t :background "#5f5fd7" :foreground "white"))))
+ '(org-agenda-structure ((t (:inherit default :underline nil :slant normal :weight regular :height 1.25 :width normal :foundry "MS  " :family "Verdana"))))
+ '(org-level-1 ((t (:inherit outline-1 :extend nil :height 1.5))))
+ '(org-level-2 ((t (:inherit outline-2 :extend nil :height 1.25))))
+ '(org-level-3 ((t (:inherit outline-3 :extend nil :height 1.0))))
  '(persp-selected-face ((t (:foreground "#1e30ff" :weight bold))))
  '(undo-tree-visualizer-active-branch-face ((t (:foreground "color-231" :weight bold))))
  '(undo-tree-visualizer-default-face ((t (:foreground "brightwhite"))))
