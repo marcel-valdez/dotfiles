@@ -586,6 +586,7 @@
  '(persp-selected-face ((t (:foreground "#1e30ff" :weight bold))))
  '(undo-tree-visualizer-active-branch-face ((t (:foreground "color-231" :weight bold))))
  '(undo-tree-visualizer-default-face ((t (:foreground "brightwhite"))))
+ '(vertical-border ((t (:inherit mode-line-inactive :background "color-234" :foreground "color-234"))))
  '(warning ((t (:foreground "brightyellow" :underline t))))
  '(whitespace-line ((t (:background "color-238")))))
 (put 'upcase-region 'disabled nil)
