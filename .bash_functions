@@ -501,6 +501,32 @@ function chrono-end {
   echo "${chrono_duration_sec}"
 }
 
+function fzf-context {
+  local file="$1"
+  local context_lines="$2"
+  if [[ -z "${context_lines}" ]]; then
+    context_lines=10
+  fi
+  local tmpfile=
+  tmpfile="$(mktemp).sh"
+
+  local terminal_width=
+  terminal_width=$(stty -a | grep -Po '(?<=columns )\d+')
+  local preview_width=
+  preview_width=$((terminal_width / 2))
+
+  (cat<<EOF
+hilite=\$1;
+context=\$2;
+start=\$((hilite - context));
+if [[ \$start -lt 0 ]]; then start=0; fi;
+end=\$((hilite + context));
+batcat ${file} --highlight-line=\${hilite} --line-range=\${start}:\${end} --color=always --style=numbers --wrap=character --terminal-width=${preview_width} --paging=always
+EOF
+)>"${tmpfile}"
+  cat -n "${file}" | fzf --preview "bash ${tmpfile} {1} ${context_lines}"
+}
+
 function fzf-cmd {
   if ! type -p fzf &>/dev/null; then
     echo "fzf-find: fzf not available, can't proceed." >&2
