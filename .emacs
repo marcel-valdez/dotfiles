@@ -494,6 +494,7 @@
   :ensure t
   :config
   ;; remap undo-redo using undo-tree
+  (setq undo-tree-history-directory-alist '((".*" . "~/.emacs.d/backup/")))
   (global-undo-tree-mode)
   (global-unset-key (kbd "M-z"))
   (global-set-key (kbd "M-z")
