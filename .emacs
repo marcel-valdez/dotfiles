@@ -455,12 +455,15 @@
        mode-line-frame-identification))
    (telephone-line-defsegment telephone-line-file-name-absolute-path-segment ()
      (if buffer-file-name
+         (replace-regexp-in-string
+          (regexp-quote "/home/marcelvaldez/") "~/"
+          (replace-regexp-in-string
+           (regexp-quote "/usr/local/google/home/marcelvaldez/") "~/"
            (replace-regexp-in-string
-            (regexp-quote "/usr/local/google/home/marcelvaldez/") "~/"
-            (replace-regexp-in-string
-             (regexp-quote "/google/src/cloud/") "/g/s/c/"
-             (replace-regexp-in-string (regexp-quote "/google/src/cloud/marcelvaldez/") "//" buffer-file-name)))
-       (telephone-line-buffer-name-segment)))
+            (regexp-quote "/google/src/cloud/") "/g/s/c/"
+            (replace-regexp-in-string (regexp-quote "/google/src/cloud/marcelvaldez/") "//" buffer-file-name))))
+     (telephone-line-buffer-name-segment)))
+
   ;; Content Order
   (setq telephone-line-lhs
         '((accent   . (telephone-line-buffer-segment))
