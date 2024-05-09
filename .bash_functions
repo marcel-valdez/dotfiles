@@ -524,7 +524,7 @@ end=\$((hilite + context));
 batcat ${file} --highlight-line=\${hilite} --line-range=\${start}:\${end} --color=always --style=numbers --wrap=character --terminal-width=${preview_width} --paging=always
 EOF
 )>"${tmpfile}"
-  cat -n "${file}" | fzf --preview "bash ${tmpfile} {1} ${context_lines}"
+  cat -n "${file}" | fzf --preview "bash ${tmpfile} {1} ${context_lines}" --bind 'ctrl-/:toggle-preview'
 }
 
 function fzf-cmd {
