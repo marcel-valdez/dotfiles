@@ -76,7 +76,12 @@
 ;;      (global-unset-key (kbd "C-x C--"))
       ;;      (global-set-key (kbd "C-x C--") '(lambda () (interactive) (change-font-height -2)))
       (global-display-line-numbers-mode)
-      (scroll-bar-mode -1)))
+      (scroll-bar-mode -1))
+  (progn
+    (custom-set-faces
+     '(vertical-border
+       ((t
+         (:inherit mode-line-inactive :background "#1c1c1c" :foreground "#1c1c1c")))))))
 ;; If we are in TMUX within an X environment
 (if (and (getenv "TMUX") (getenv "DISPLAY"))
     ;; use xclip for copy-pasting
