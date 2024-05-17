@@ -3,22 +3,26 @@ HOST=127.0.0.1
 PORT=3333
 
 NUM=$(netstat -tlpn 2>/dev/null | grep -c " ${HOST}:${PORT} ")
-if [ ${NUM} -gt 0 ]; then
+if [ "${NUM}" -gt 0 ]; then
   exit
 fi
 
-while [ true ]; do
+while true; do
   displays=$(ls /tmp/.X11-unix/ | sed 's/X//g')
   readarray -t displays_array <<< ${displays}
   paste_buffer=$(nc -l "${HOST}" "${PORT}") # wait for next paste to clipboard
-  for display in ${displays_array[@]} # paste to all available displays
+  for display in "${displays_array[@]}" # paste to all available displays
   do
-    xclip -selection clipboard -display ":${display}" <<EOF
-${paste_buffer}
-EOF
-    if [[ $? -gt 0 ]]; then
-      echo "$(today) $(date '+%H:%M:%S'): Failed to copy contents to \
-remote SSH clipboard at display :${display}" &>> /tmp/clipboard-daemon.log
+    display_num="${display/:/}"
+    display_num="${display_num/.0/}"
+    if [[ "${display_num}" -le 100 ]]; then
+      # Ignore displays numbered higher than 100
+      echo -n "${paste_buffer}" | xclip -selection clipboard -display ":${display}"
+
+      if [[ $? -gt 0 ]]; then
+        echo "$(today) $(date '+%H:%M:%S'): Failed to copy contents to \
+          remote SSH clipboard at display :${display}" &>> /tmp/clipboard-daemon.log
+      fi
     fi
   done
   echo "$(today) $(date '+%H:%M:%S'): Copied remote SSH clipboard." &>> /tmp/clipboard-daemon.log
