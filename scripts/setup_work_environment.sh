@@ -67,7 +67,7 @@ function check_gcert_ssh {
 }
 
 function get_gcert_ssh_hours_remaining {
-  check_gcert_ssh | grep -oP "[0-9]+(?=h\s[0-9]+m)"
+  check_gcert_ssh "$@" | grep -oP "[0-9]+(?=h\s[0-9]+m)"
 }
 
 function check_cloud_gcert_loas {
@@ -76,12 +76,12 @@ function check_cloud_gcert_loas {
 }
 
 function get_cloud_gcert_loas_hours_remaining {
-  check_cloud_gcert_loas | grep -oP "[0-9]+(?=h\s[0-9]+m)"
+  check_cloud_gcert_loas "$@" | grep -oP "[0-9]+(?=h\s[0-9]+m)"
 }
 
 function cloud_gcert {
   # gcert doesn't play well with sshpass for some reason.
-  remote_ssh_cmd "${GCLOUD_HOST}" gcert
+  remote_ssh_cmd "${GCLOUD_HOST}" gcert "$@"
 }
 
 function retry_cmd {
@@ -225,12 +225,10 @@ function list_commands {
     sort
 }
 
-# TODO: If parameters are needed for the individual commands, then use the double dash to give the user the option of specifying the required parameters. i.e.:
-# setup_work_environment.sh command_name -- param1 param2 param3
 SCRIPT="$(basename $0)"
 function usage() {
   cat <<EOF
-${SCRIPT} [--help|-h] [--skip-master-session] [--skip-remote-folders] [--skip-clipboard-daemon] [--skip-cloud-gcert] <COMMANDS...>
+${SCRIPT} [--help|-h] [--skip-master-session] [--skip-remote-folders] [--skip-clipboard-daemon] [--skip-cloud-gcert] <COMMANDS...> -- <ARGS...>
 
 --help: Show this message.
 --skip-master-session: Skips any master session related setup/teardown.
@@ -238,6 +236,7 @@ ${SCRIPT} [--help|-h] [--skip-master-session] [--skip-remote-folders] [--skip-cl
 --skip-clipboard-daemon: Skips any setup/teardown of the clipboard daemon.
 --skip-gloud-gcert: Skips calling gcert on the cloud machine.
 COMMANDS: Space separated commands to execute, when this is set none of the other options are used.
+ARGS: Sapce separated arguments to pass to all COMMANDS (normally better to specify one command).
 Available commands:
 $(list_commands)
 EOF
@@ -248,7 +247,9 @@ DO_MOUNT_REMOTE_FOLDERS=1
 DO_CLIPBOARD_DAEMON=1
 DO_CLOUD_GCERT=1
 COMMANDS=()
+ARGS=()
 function parse_args {
+  local process_args=
   while [[ $# -gt 0 ]]; do
     case "$1" in
       --help|-h)
@@ -271,6 +272,11 @@ function parse_args {
         DO_CLOUD_GCERT=
         shift
         ;;
+      --)
+        process_args=1
+        shift
+        break
+        ;;
       *)
         local found=
         for cmd in $(list_commands); do
@@ -288,13 +294,25 @@ function parse_args {
         ;;
     esac
   done
+
+  if [[ ${process_args} -gt 0 ]]; then
+    while [[ $# -gt 0 ]]; do
+      ARGS+=("$1")
+      shift
+    done
+  fi
 }
 
 function run {
   local _command="$1"
   if [[ "${_command}" ]]; then
-    "${_command}"
-    return $?
+    if [[ "$2" == "--help" ]]; then
+      type "$1" | tail +2
+      return 127
+    else
+      "$@"
+      return $?
+    fi
   fi
 
   if ! refresh_gcert; then
@@ -347,7 +365,7 @@ function main {
   parse_args "$@"
   if [[ ${#COMMANDS[@]} -gt 0 ]]; then
     for cmd in "${COMMANDS[@]}"; do
-      if ! run "${cmd}"; then
+      if ! run "${cmd}" "${ARGS[@]}"; then
         exit 1
       fi
     done
