@@ -710,7 +710,7 @@ ctrl-space:filter / ctrl+o:open / ctrl-r:rg mode"
     --bind "ctrl-space:select-all+execute-silent(echo {+} > ${files_file}; echo -n '{q} > ' >> ${prompt_file})+transform-prompt(cat ${prompt_file})+clear-query" \
     --bind "ctrl-f:unbind(change,ctrl-f)+change-header(${fzf_header})+enable-search+rebind(ctrl-r)+transform-query(echo {q} > /tmp/rg-fzf-r; cat /tmp/rg-fzf-f)" \
     --bind "ctrl-r:unbind(ctrl-r)+change-header(${rg_header})+disable-search+reload(${RG_PREFIX} -e {q} || true)+rebind(change,ctrl-f)+transform-query(echo {q} > /tmp/rg-fzf-f; cat /tmp/rg-fzf-r)" \
-    --bind 'ctrl-o:become(echo bash -i -c "emacs-client {+}")' \
+    --bind 'ctrl-o:become(bash -i -c "emacs-client {+}")' \
     --prompt "$(cat "${prompt_file}")" \
     --header "${rg_header}"
 }
