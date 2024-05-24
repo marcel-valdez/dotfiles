@@ -3,6 +3,8 @@
 # for examples
 
 export EMACS_TTY_SERVER="tty-server"
+# enable 24-bit colors
+export COLORTERM=truecolor
 # If not running interactively, don't do anything
 case $- in
   *i*) ;;
