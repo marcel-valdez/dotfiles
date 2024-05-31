@@ -762,3 +762,10 @@ function hg_lines_changed {
     printf "\033[1;31m${modified_total}\033[0m"
   fi
 }
+
+function fzf-navigate {
+  find "$1" -type f | fzf --ansi --query ''\
+    --preview 'batcat --color=always {}' \
+    --bind 'ctrl-/:execute:tmux display-popup -E batcat --color=always {}' \
+    --header 'ctrl-/: popup batcat'
+}
