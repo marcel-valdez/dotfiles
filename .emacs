@@ -57,6 +57,8 @@
 (menu-bar-mode -1)
 ;; Enable the mouse when running inside xterm
 (xterm-mouse-mode t)
+;; Enable smart repeat key hotkeys.
+(repeat-mode)
 ;; Disable the audible bell
 (setq visible-bell t)
 (setq mouse-wheel-scroll-amount '(3 ((shift) . 3))) ;; 3 lines at a time
@@ -86,74 +88,81 @@
 (if (and (getenv "TMUX") (getenv "DISPLAY"))
     ;; use xclip for copy-pasting
     (with-library xclip (xclip-mode 1)))
+
+(progn
+  (defun custom/switch-to-next-tab ()
+    (interactive)
+    (tab-bar-switch-to-next-tab 1))
+  (defun custom/move-tab-right ()
+    (interactive)
+    (tab-bar-move-tab 1))
+  (defun custom/move-tab-left ()
+    (interactive)
+    (tab-bar-move-tab -1))
+  (defvar tab-bar-key-map (make-sparse-keymap)
+    "Keymap for tab-related actions.")
+  (define-key tab-bar-key-map (kbd "M-<right>") 'custom/switch-to-next-tab)
+  (define-key tab-bar-key-map (kbd "M-<left>") 'tab-bar-switch-to-prev-tab)
+  (define-key tab-bar-key-map (kbd "C-<right>") 'custom/move-tab-right)
+  (define-key tab-bar-key-map (kbd "C-<left>") 'custom/move-tab-left)
+  (define-key tab-bar-key-map (kbd "M-q") 'tab-bar-close-tab)
+  (define-key tab-bar-key-map (kbd "M-n") 'tab-bar-new-tab)
+  (define-key tab-bar-key-map (kbd "M-T") 'tab-bar-undo-close-tab)
+  (define-key tab-bar-key-map (kbd "M-<f2>") 'tab-bar-rename-tab)
+  (define-key tab-bar-key-map (kbd "M-1") (lambda () (interactive) (tab-bar-select-tab 1)))
+  (define-key tab-bar-key-map (kbd "M-2") (lambda () (interactive) (tab-bar-select-tab 2)))
+  (define-key tab-bar-key-map (kbd "M-3") (lambda () (interactive) (tab-bar-select-tab 3)))
+  (define-key tab-bar-key-map (kbd "M-4") (lambda () (interactive) (tab-bar-select-tab 4)))
+  (define-key tab-bar-key-map (kbd "M-5") (lambda () (interactive) (tab-bar-select-tab 5)))
+  (define-key tab-bar-key-map (kbd "M-6") (lambda () (interactive) (tab-bar-select-tab 6)))
+  (define-key tab-bar-key-map (kbd "M-7") (lambda () (interactive) (tab-bar-select-tab 7)))
+  (define-key tab-bar-key-map (kbd "M-8") (lambda () (interactive) (tab-bar-select-tab 8)))
+  (define-key tab-bar-key-map (kbd "M-9") (lambda () (interactive) (tab-bar-select-tab -1)))
+  (define-key tab-bar-key-map (kbd "M-0") (lambda () (interactive) (tab-bar-select-tab -2)))
+
+  (put 'custom/switch-to-next-tab 'repeat-map 'tab-bar-key-map)
+  (put 'tab-bar-switch-to-prev-tab 'repeat-map 'tab-bar-key-map)
+  (put 'custom/move-tab-left 'repeat-map 'tab-bar-key-map)
+  (put 'custom/move-tab-right 'repeat-map 'tab-bar-key-map)
+  (put 'tab-bar-close-tab 'repeat-map 'tab-bar-key-map)
+  ;; This makes for a pretty bad user experience.
+  ;(put 'tab-bar-new-tab 'repeat-map 'tab-bar-key-map)
+  (put 'tab-bar-undo-close-tab 'repeat-map 'tab-bar-key-map)
+
+  (global-unset-key (kbd "M-t"))
+  (define-key global-map (kbd "M-t") (lambda () (interactive) (set-transient-map tab-bar-key-map))))
+
+
+
 ;; if running in a separate X window
 (if (display-graphic-p)
-    (use-package multi-term
-      :ensure t
-      :config
-      ;; start an emacs server so editors use an emacs buffer
-      (setq-local server-name (concat "server" (getenv "DISPLAY")))
-      (if (not (daemonp))
-          (server-start))
-      ;; start multi-term custom configurations
-      (global-unset-key (kbd "C-t"))
-      (add-to-list 'term-unbind-key-list "C-t")
-      (setq multi-term-program "/bin/bash")
-      ;; start new terminal
-      (global-set-key (kbd "C-t C-n")
-                      (lambda () (interactive) (multi-term)))
-      ;; switch to next terminal within same buffer
-      (global-set-key (kbd "C-t <C-tab>")
-                      (lambda () (interactive) (multi-term-next)))
-      ;; switch to previous terminal within same buffer
-      (global-set-key (kbd "C-t <C-iso-lefttab>")
-                      (lambda () (interactive) (multi-term-prev)))
-      ;; toggle showing/hiding the dedicated terminal window
-      (global-set-key (kbd "C-t C-d")
-                      (lambda () (interactive) (multi-term-dedicated-toggle))))
-  (with-library in-tmux
-    (defun custom/switch-to-next-tab ()
-      (interactive)
-      (tab-bar-switch-to-next-tab 1))
-    (defun custom/move-tab-right ()
-      (interactive)
-      (tab-bar-move-tab 1))
-    (defun custom/move-tab-left ()
-      (interactive)
-      (tab-bar-move-tab -1))
-    (defvar tab-bar-key-map (make-sparse-keymap)
-      "Keymap for tab-related actions.")
-    (define-key tab-bar-key-map (kbd "M-<right>") 'custom/switch-to-next-tab)
-    (define-key tab-bar-key-map (kbd "M-<left>") 'tab-bar-switch-to-prev-tab)
-    (define-key tab-bar-key-map (kbd "C-<right>") 'custom/move-tab-right)
-    (define-key tab-bar-key-map (kbd "C-<left>") 'custom/move-tab-left)
-    (define-key tab-bar-key-map (kbd "M-q") 'tab-bar-close-tab)
-    (define-key tab-bar-key-map (kbd "M-n") 'tab-bar-new-tab)
-    (define-key tab-bar-key-map (kbd "M-T") 'tab-bar-undo-close-tab)
-    (define-key tab-bar-key-map (kbd "M-<f2>") 'tab-bar-rename-tab)
-    (define-key tab-bar-key-map (kbd "M-1") (lambda () (interactive) (tab-bar-select-tab 1)))
-    (define-key tab-bar-key-map (kbd "M-2") (lambda () (interactive) (tab-bar-select-tab 2)))
-    (define-key tab-bar-key-map (kbd "M-3") (lambda () (interactive) (tab-bar-select-tab 3)))
-    (define-key tab-bar-key-map (kbd "M-4") (lambda () (interactive) (tab-bar-select-tab 4)))
-    (define-key tab-bar-key-map (kbd "M-5") (lambda () (interactive) (tab-bar-select-tab 5)))
-    (define-key tab-bar-key-map (kbd "M-6") (lambda () (interactive) (tab-bar-select-tab 6)))
-    (define-key tab-bar-key-map (kbd "M-7") (lambda () (interactive) (tab-bar-select-tab 7)))
-    (define-key tab-bar-key-map (kbd "M-8") (lambda () (interactive) (tab-bar-select-tab 8)))
-    (define-key tab-bar-key-map (kbd "M-9") (lambda () (interactive) (tab-bar-select-tab -1)))
-    (define-key tab-bar-key-map (kbd "M-0") (lambda () (interactive) (tab-bar-select-tab -2)))
+    (progn
+      (use-package multi-term
+        :ensure t
+        :config
+        ;; start an emacs server so editors use an emacs buffer
+        (setq-local server-name (concat "server" (getenv "DISPLAY")))
+        (if (not (daemonp))
+            (server-start))
+        ;; start multi-term custom configurations
+        (global-unset-key (kbd "C-t"))
+        (add-to-list 'term-unbind-key-list "C-t")
+        (setq multi-term-program "/bin/bash")
+        ;; start new terminal
+        (global-set-key (kbd "C-t C-n")
+                        (lambda () (interactive) (multi-term)))
+        ;; switch to next terminal within same buffer
+        (global-set-key (kbd "C-t <C-tab>")
+                        (lambda () (interactive) (multi-term-next)))
+        ;; switch to previous terminal within same buffer
+        (global-set-key (kbd "C-t <C-iso-lefttab>")
+                        (lambda () (interactive) (multi-term-prev)))
+        ;; toggle showing/hiding the dedicated terminal window
+        (global-set-key (kbd "C-t C-d")
+                        (lambda () (interactive) (multi-term-dedicated-toggle))))
 
-    (put 'custom/switch-to-next-tab 'repeat-map 'tab-bar-key-map)
-    (put 'tab-bar-switch-to-prev-tab 'repeat-map 'tab-bar-key-map)
-    (put 'custom/move-tab-left 'repeat-map 'tab-bar-key-map)
-    (put 'custom/move-tab-right 'repeat-map 'tab-bar-key-map)
-    (put 'tab-bar-close-tab 'repeat-map 'tab-bar-key-map)
-    ;; This makes for a pretty bad user experience.
-    ;(put 'tab-bar-new-tab 'repeat-map 'tab-bar-key-map)
-    (put 'tab-bar-undo-close-tab 'repeat-map 'tab-bar-key-map)
-
-    (global-unset-key (kbd "M-t"))
-    (define-key global-map (kbd "M-t") (lambda () (interactive) (set-transient-map tab-bar-key-map)))
-    (repeat-mode)))
+      )
+  (with-library in-tmux))
 
 (setq browse-url-browser-function 'browse-url-generic)
 (setq browse-url-generic-program "/usr/bin/google-chrome")
