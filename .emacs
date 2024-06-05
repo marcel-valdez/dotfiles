@@ -370,7 +370,29 @@
 ;;                      :background "purple"
                       :foreground "white"))
 (use-package helm-xref
-  :ensure t)
+  :ensure t
+  :config
+  (defun marcel/shorten-file-path (file-path)
+    (replace-regexp-in-string
+     (regexp-quote "/home/marcelvaldez/") "~/"
+     (replace-regexp-in-string
+      (regexp-quote "/usr/local/google/home/marcelvaldez/") "~/"
+      (replace-regexp-in-string
+       (regexp-quote "/google/src/cloud/") "/g/s/c/"
+       (replace-regexp-in-string (regexp-quote "/google/src/cloud/marcelvaldez/") "//" file-path)))))
+
+  (defun marcel/helm-xref-format-candidate-path (file line summary)
+    "Same as `helm-xref-format-candidate-full-path', but shorten specific file paths."
+    (concat
+     (propertize (marcel/shorten-file-path file) 'font-lock-face 'helm-xref-file-name)
+     (when (string= "integer" (type-of line))
+       (concat
+        ":"
+        (propertize (int-to-string line)
+                    'font-lock-face 'helm-xref-line-number)))
+     ":"
+     summary))
+  (setq helm-xref-candidate-formatting-function 'marcel/helm-xref-format-candidate-path))
 
 ;; puts all backup files in the .emacs.d/backup directory, rather than on the
 ;; same folder as the file being edited
