@@ -764,8 +764,9 @@ function hg_lines_changed {
 }
 
 function fzf-navigate {
+  local _pwd="$(pwd)"
   find "$1" -type f | fzf --ansi --query ''\
     --preview 'batcat --color=always {}' \
-    --bind 'ctrl-/:execute:tmux display-popup -E batcat --color=always {}' \
+    --bind "ctrl-/:execute:tmux display-popup -w '80%' -h '80%' -d '${_pwd}' -T '{}' -E batcat --color=always {}" \
     --header 'ctrl-/: popup batcat'
 }
