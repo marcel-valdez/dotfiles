@@ -574,12 +574,12 @@ function fzf-edit {
 
 function fzf-edit-deep {
   if ! type -p rg &>/dev/null; then
-    echo "fzf-find: rg not available, can't proceed." >&2
+    echo "fzf-edit-deep: rg not available, can't proceed." >&2
     echo 'sudo apt install ripgrep' >&2
   fi
 
   if ! type -p batcat &>/dev/null; then
-    echo "fzf-find: batcat not available, can't proceed." >&2
+    echo "fzf-edit-deep: batcat not available, can't proceed." >&2
     echo 'sudo apt install bat' >&2
   fi
 
@@ -588,10 +588,13 @@ function fzf-edit-deep {
   if [[ "$#" -eq 0 ]]; then
     FILESET=(".")
   fi
-  : | fzf-cmd --ansi --disabled --query "" \
+  : | fzf --ansi --disabled --query "" \
     --bind "start:reload:$RG_PREFIX {q} ${FILESET[*]}" \
     --bind "change:reload:sleep 0.1; $RG_PREFIX {q} ${FILESET[*]} || true" \
-    --bind "alt-enter:unbind(change,alt-enter)+change-prompt(2. fzf> )+enable-search+clear-query" \
+    --header=$'ctrl-f:fzf-mode, ctrl-space:select-all'\
+    --bind "ctrl-f:rebind(ctrl-r)+unbind(change,ctrl-f)+change-prompt(2. fzf> )+change-header(ctrl-r:ripgrep-mode, ctrl-space:select-all)+enable-search+clear-query" \
+    --bind "ctrl-r:rebind(change,ctrl-f)+unbind(ctrl-r)+change-prompt(1. ripgrep> )+change-header(ctrl-f:fzf-mode, ctrl-space:select-all)+disable-search+clear-query" \
+    --bind  "ctrl-space:select-all" \
     --color "hl:-1:underline,hl+:-1:underline:reverse" \
     --prompt '1. ripgrep> ' \
     --delimiter : \
@@ -677,41 +680,53 @@ function f {
 
 function fif {
   local files_file=
+  local intermediate_files_file=
   local prompt_file=
+  local initial_query=()
+  __debug "fif: Start."
+  # TODO: Support piped input instead of list of files
   prompt_file=$(mktemp)
+  intermediate_files_file=$(mktemp)
   files_file=$(mktemp)
   while read -r filename; do
-    echo "${filename}" >> "${files_file}"
+    if [[ -d "${filename}" ]]; then
+      find "${filename}" -type f >> "${intermediate_files_file}"
+    else
+      echo "${filename}" >> "${intermediate_files_file}"
+    fi
   done
-  RG_PREFIX="rg-file --files-with-matches --line-buffered --file-list-path ${files_file}"
-  INITIAL_QUERY=()
+  __debug "fif: Step 1."
+  cat "${intermediate_files_file}" | sort | uniq > "${files_file}"
   if [[ "$1" ]]; then
-    INITIAL_QUERY+=("-e" "$1")
+    initial_query+=("-e" "$1")
     echo -n "$1> " > "${prompt_file}"
   else
-    INITIAL_QUERY+=("-e" '')
+    initial_query+=("-e" '')
     echo -n '> ' > "${prompt_file}"
   fi
 
-  local rg_header="[RG MODE]
-ctrl-space:filter / ctrl+o:open / ctrl-f:fzf mode"
-  local fzf_header="[FZF MODE]
-ctrl-space:filter / ctrl+o:open / ctrl-r:rg mode"
-#  echo "${RG_PREFIX} ${INITIAL_QUERY[@]} ${RG_SUFFIX}"
-#  return 1
-  FZF_DEFAULT_COMMAND="${RG_PREFIX} ${INITIAL_QUERY[@]}" \
+  local rg_prefix="rg-file --files-with-matches --line-buffered --file-list-path ${files_file}"
+  local rg_header="[RG MODE] ${files_file}
+ctrl-space:filter / ctrl+o:open / ctrl+/: popup batcat / ctrl-f:fzf mode"
+  local fzf_header="[FZF MODE] ${files_file}
+ctrl-space:filter / ctrl+o:open / ctrl+/: popup batcat / ctrl-r:rg mode"
+  local _pwd="$(pwd)"
+
+  __debug "fif: Step 2."
+  FZF_DEFAULT_COMMAND="${rg_prefix} ${initial_query[@]}" \
     fzf \
     --sort \
     --multi \
     --preview '[[ ! -z {} ]] && rg --pretty --context 5 {q} {}' \
-    --ansi --phony --query "${INITIAL_QUERY[1]}" \
+    --ansi --phony --query "${initial_query[1]}" \
     --bind "start:reload:cat ${files_file}" \
-    --bind "change:reload:sleep 0.25 && ${RG_PREFIX} -e {q} || true" \
-    --bind "ctrl-space:select-all+execute-silent(echo {+} > ${files_file}; echo -n '{q} > ' >> ${prompt_file})+transform-prompt(cat ${prompt_file})+clear-query" \
+    --bind "change:reload:sleep 0.25 && ${rg_prefix} -e {q} || true" \
+    --bind "ctrl-space:select-all+execute(echo {+} | sed -E 's|[ ]+|\n|g' > ${files_file}; echo -n \"{q} > \" >> ${prompt_file})+transform-prompt(cat ${prompt_file})+clear-query+reload(cat ${files_file})" \
     --bind "ctrl-f:unbind(change,ctrl-f)+change-header(${fzf_header})+enable-search+rebind(ctrl-r)+transform-query(echo {q} > /tmp/rg-fzf-r; cat /tmp/rg-fzf-f)" \
-    --bind "ctrl-r:unbind(ctrl-r)+change-header(${rg_header})+disable-search+reload(${RG_PREFIX} -e {q} || true)+rebind(change,ctrl-f)+transform-query(echo {q} > /tmp/rg-fzf-f; cat /tmp/rg-fzf-r)" \
+    --bind "ctrl-r:unbind(ctrl-r)+change-header(${rg_header})+disable-search+reload(${rg_prefix} -e {q} || true)+rebind(change,ctrl-f)+transform-query(echo {q} > /tmp/rg-fzf-f; cat /tmp/rg-fzf-r)" \
     --bind 'ctrl-o:become(bash -i -c "emacs-client {+}")' \
     --prompt "$(cat "${prompt_file}")" \
+    --bind "ctrl-/:execute:tmux display-popup -w '80%' -h '80%' -d '${_pwd}' -T '{}' -E batcat --style='numbers,changes' --color=always {}" \
     --header "${rg_header}"
 }
 
@@ -767,6 +782,6 @@ function fzf-navigate {
   local _pwd="$(pwd)"
   find "$1" -type f | fzf --ansi --query ''\
     --preview 'batcat --color=always {}' \
-    --bind "ctrl-/:execute:tmux display-popup -w '80%' -h '80%' -d '${_pwd}' -T '{}' -E batcat --color=always {}" \
+    --bind "ctrl-/:execute:tmux display-popup -w '80%' -h '80%' -d '${_pwd}' -T '{}' -E batcat --style='numbers,changes' --color=always {}" \
     --header 'ctrl-/: popup batcat'
 }
