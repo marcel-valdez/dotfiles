@@ -679,39 +679,85 @@ function f {
 }
 
 function fif {
-  local files_file=
-  local intermediate_files_file=
-  local prompt_file=
-  local initial_query=()
-  __debug "fif: Start."
-  # TODO: Support piped input instead of list of files
-  prompt_file=$(mktemp)
-  intermediate_files_file=$(mktemp)
-  files_file=$(mktemp)
-  while read -r filename; do
-    if [[ -d "${filename}" ]]; then
-      find "${filename}" -type f >> "${intermediate_files_file}"
-    else
-      echo "${filename}" >> "${intermediate_files_file}"
-    fi
-  done
-  __debug "fif: Step 1."
-  cat "${intermediate_files_file}" | sort | uniq > "${files_file}"
-  if [[ "$1" ]]; then
-    initial_query+=("-e" "$1")
-    echo -n "$1> " > "${prompt_file}"
-  else
-    initial_query+=("-e" '')
-    echo -n '> ' > "${prompt_file}"
+  __debug "fif: Checks."
+  if ! type rg &>/dev/null; then
+    echo "Ripgrep required. sudo apt install ripgrep" >&2
+    return 1
   fi
 
-  local rg_prefix="rg-file --files-with-matches --line-buffered --file-list-path ${files_file}"
-  local rg_header="[RG MODE] ${files_file}
-ctrl-space:filter / ctrl+o:open / ctrl+/: popup batcat / ctrl-f:fzf mode"
-  local fzf_header="[FZF MODE] ${files_file}
-ctrl-space:filter / ctrl+o:open / ctrl+/: popup batcat / ctrl-r:rg mode"
-  local _pwd="$(pwd)"
+  if ! type fzf &>/dev/null; then
+    echo "Fzf required. sudo apt install fzf" >&2
+    return 1
+  fi
 
+  if ! type sponge &>/dev/null; then
+    echo "Sponge required. sudo apt install moreutils" >&2
+    return 1
+  fi
+
+  __debug "fif: Start."
+  local results_file=
+  local results_file_history=
+  local prompt_file=
+  local prompt_file_history=
+  local initial_query=()
+  local _pwd=
+  local prompt_ln="/tmp/fif-prompt"
+  local results_ln="/tmp/fif-files"
+  local ctrl_space_execute=
+
+  prompt_file=$(mktemp)
+  prompt_file_history=$(mktemp)
+  results_file=$(mktemp)
+  results_file_history=$(mktemp)
+
+  echo "${prompt_file}" > "${prompt_file_history}"
+  ln -sf "${prompt_file}" "${prompt_ln}"
+  echo "${results_file}" > "${results_file_history}"
+  ln -sf "${results_file}" "${results_ln}"
+
+  while read -r filename; do
+    if [[ -d "${filename}" ]]; then
+      find "${filename}" -type f >> "${results_ln}"
+    else
+      echo "${filename}" >> "${results_ln}"
+    fi
+  done
+
+  __debug "fif: Step 1."
+  sort < "${results_ln}" | uniq | sponge "${results_ln}"
+  if [[ "$1" ]]; then
+    initial_query+=("-e" "$1")
+    echo -n "$1> " > "${prompt_ln}"
+  else
+    initial_query+=("-e" '')
+    echo -n '> ' > "${prompt_ln}"
+  fi
+
+  local rg_prefix="rg-file --files-with-matches --line-buffered --file-list-path ${results_ln}"
+  local rg_header="[RG MODE] ctrl-space:filter / ctrl-delete:undo-filter
+ctrl+o:open / ctrl+/: popup batcat / ctrl-f:fzf mode ${results_file_history}"
+  local fzf_header="[FZF MODE] ctrl-space:filter / ctrl-delete:undo-filter
+ctrl+o:open / ctrl+/: popup batcat / ctrl-r:rg mode ${results_file_history}"
+  _pwd="$(pwd)"
+
+  ctrl_space_execute=$(cat<<EOF
+mktemp >> ${results_file_history};
+mktemp >> ${prompt_file_history};
+bash -c 'cp ${prompt_ln} \$(tail -1 ${prompt_file_history})';
+bash -c 'ln -sf \$(tail -1 ${results_file_history}) ${results_ln}';
+bash -c 'ln -sf \$(tail -1 ${prompt_file_history}) ${prompt_ln}';
+echo {+} | sed -E 's|[ ]+|\n|g' > ${results_ln};
+echo -n "{q} > " >> ${prompt_ln}
+EOF
+                    )
+  ctrl_delete_execute=$(cat<<EOF
+head -n -1 ${results_file_history} | sponge ${results_file_history};
+head -n -1 ${prompt_file_history} | sponge ${prompt_file_history};
+bash -c 'ln -sf \$(tail -1 ${results_file_history}) ${results_ln}';
+bash -c 'ln -sf \$(tail -1 ${prompt_file_history}) ${prompt_ln}';
+EOF
+                     )
   __debug "fif: Step 2."
   FZF_DEFAULT_COMMAND="${rg_prefix} ${initial_query[@]}" \
     fzf \
@@ -719,13 +765,14 @@ ctrl-space:filter / ctrl+o:open / ctrl+/: popup batcat / ctrl-r:rg mode"
     --multi \
     --preview '[[ ! -z {} ]] && rg --pretty --context 5 {q} {}' \
     --ansi --phony --query "${initial_query[1]}" \
-    --bind "start:reload:cat ${files_file}" \
+    --bind "start:reload:cat ${results_ln}" \
     --bind "change:reload:sleep 0.25 && ${rg_prefix} -e {q} || true" \
-    --bind "ctrl-space:select-all+execute(echo {+} | sed -E 's|[ ]+|\n|g' > ${files_file}; echo -n \"{q} > \" >> ${prompt_file})+transform-prompt(cat ${prompt_file})+clear-query+reload(cat ${files_file})" \
-    --bind "ctrl-f:unbind(change,ctrl-f)+change-header(${fzf_header})+enable-search+rebind(ctrl-r)+transform-query(echo {q} > /tmp/rg-fzf-r; cat /tmp/rg-fzf-f)" \
-    --bind "ctrl-r:unbind(ctrl-r)+change-header(${rg_header})+disable-search+reload(${rg_prefix} -e {q} || true)+rebind(change,ctrl-f)+transform-query(echo {q} > /tmp/rg-fzf-f; cat /tmp/rg-fzf-r)" \
+    --bind "ctrl-space:select-all+execute(${ctrl_space_execute})+transform-prompt(cat ${prompt_ln})+clear-query+reload(cat ${results_ln})" \
+    --bind "ctrl-delete:deselect-all+execute(${ctrl_delete_execute})+transform-prompt(cat ${prompt_ln})+clear-query+reload(cat ${results_ln})" \
+    --bind "ctrl-f:unbind(change,ctrl-f)+change-header(${fzf_header})+enable-search+rebind(ctrl-r)+transform-query(echo {q} > /tmp/rg-fzf-r; cat /tmp/rg-fzf-f)+change-preview(batcat --style='numbers,changes' --color=always {})" \
+    --bind "ctrl-r:unbind(ctrl-r)+change-header(${rg_header})+disable-search+reload(${rg_prefix} -e {q} || true)+rebind(change,ctrl-f)+transform-query(echo {q} > /tmp/rg-fzf-f; cat /tmp/rg-fzf-r)+change-preview([[ ! -z {} ]] && rg --pretty --context 5 {q} {})" \
     --bind 'ctrl-o:become(bash -i -c "emacs-client {+}")' \
-    --prompt "$(cat "${prompt_file}")" \
+    --prompt "$(cat "${prompt_ln}")" \
     --bind "ctrl-/:execute:tmux display-popup -w '80%' -h '80%' -d '${_pwd}' -T '{}' -E batcat --style='numbers,changes' --color=always {}" \
     --header "${rg_header}"
 }
