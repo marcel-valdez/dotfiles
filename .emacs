@@ -89,6 +89,7 @@
     ;; use xclip for copy-pasting
     (with-library xclip (xclip-mode 1)))
 
+;; customize tab-bar-mode hotkeys
 (progn
   (defun custom/switch-to-next-tab ()
     (interactive)
@@ -131,6 +132,23 @@
 
   (global-unset-key (kbd "M-t"))
   (define-key global-map (kbd "M-t") (lambda () (interactive) (set-transient-map tab-bar-key-map))))
+
+(defun custom/tab-bar-appearance ()
+  ;; Customizes tab-bar-mode's appearance.
+  (set-face-attribute 'tab-bar nil
+                      :inherit 'variable-pitch
+                      :background "#1c1c1c"
+                      :foreground "#111111")
+  (set-face-attribute 'tab-bar-tab-inactive nil
+                      :inherit 'tab-bar
+                      :background "#505050"
+                      :underline nil)
+  (set-face-attribute 'tab-bar-tab nil
+                      :inherit 'tab-bar
+                      :weight 'bold
+                      :background "#2e3436"
+                      :foreground "f0f0e8"))
+(add-hook 'tab-bar-mode-hook 'custom/tab-bar-appearance)
 
 
 
