@@ -84,10 +84,14 @@
      '(vertical-border
        ((t
          (:inherit mode-line-inactive :background "#1c1c1c" :foreground "#1c1c1c")))))))
+
 ;; If we are in TMUX within an X environment
 (if (and (getenv "TMUX") (getenv "DISPLAY"))
     ;; use xclip for copy-pasting
-    (with-library xclip (xclip-mode 1)))
+    (use-package xclip
+      :ensure t
+      :config
+      (with-library xclip (xclip-mode 1))))
 
 ;; customize tab-bar-mode hotkeys
 (progn
