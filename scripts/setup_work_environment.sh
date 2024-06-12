@@ -7,6 +7,7 @@ GCLOUD_FOLDERS=("notes" "gtd")
 GCLOUD_HOST="${USER}.c.googlers.com"
 OFFICE_HOST="${USER}.mtv.corp.google.com"
 LAPTOP_HOST="${USER}-glaptop"
+CHROMEOS_HOST="${USER}28"
 REVERSE_TUNNEL_PORT=3333
 CLIPBOARD_DAEMON_BIN="${HOME}/bin/clipboard-daemon.sh"
 
@@ -20,7 +21,7 @@ function is_office_host {
 }
 
 function is_laptop_host {
-  [[ "${HOSTNAME}" == "${LAPTOP_HOST}" ]]
+  [[ "${HOSTNAME}" == "${LAPTOP_HOST}" ]] || [[ "${HOSTNAME}" == "${CHROMEOS_HOST}" ]]
 }
 
 function remote_ssh_cmd() {
