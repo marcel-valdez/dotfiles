@@ -738,9 +738,9 @@ function fif {
 
   local rg_prefix="rg-file --files-with-matches --line-buffered --file-list-path ${results_ln}"
   local rg_header="[RG MODE] ctrl-space:filter / ctrl-delete:undo-filter
-ctrl+o:open / ctrl+/: popup batcat / ctrl-f:fzf mode ${results_file_history}"
+ctrl+o:open / ctrl+/: popup batcat / ctrl-f:fzf mode"
   local fzf_header="[FZF MODE] ctrl-space:filter / ctrl-delete:undo-filter
-ctrl+o:open / ctrl+/: popup batcat / ctrl-r:rg mode ${results_file_history}"
+ctrl+o:open / ctrl+/: popup batcat / ctrl-r:rg mode"
   _pwd="$(pwd)"
 
   ctrl_space_execute=$(cat<<EOF
