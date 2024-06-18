@@ -707,6 +707,7 @@ function fif {
   local rg_query_file="/tmp/rg-fzf-r.${RANDOM}"
   local fzf_query_file="/tmp/rg-fzf-f.${RANDOM}"
   local ctrl_space_execute=
+  local ctrl_delete_execute=
 
   prompt_file=$(mktemp)
   prompt_file_history=$(mktemp)
