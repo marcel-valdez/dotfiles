@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 
 TITLE="$1"
-MESSAGE="$2"
+shift
+MESSAGE="$*"
 
 if [[ -z "${MESSAGE}" ]]; then
   MESSAGE="${TITLE}"
@@ -17,4 +18,4 @@ echo ${MESSAGE};
 read -s
 EOF
       )
-tmux display-popup -T "${TITLE}" -h ${line_count} -E "${SCRIPT}"
+tmux display-popup -T "${TITLE}" -h "${line_count}" -E "${SCRIPT}"
