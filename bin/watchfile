@@ -100,9 +100,9 @@ fi
 
 
 ::log "Watching directory: ${directory}"
-params=(-e close_write,moved_to,modify -m "${directory}")
-if [[ ${recursive} -eq 1 ]]; then
-    params+=(-r)
+params=("-e" "close_write,moved_to,modify" "-m" "${directory}")
+if [[ "${recursive}" -eq 1 ]]; then
+    params+=("-r")
 fi
 
 last_run=0
@@ -121,6 +121,8 @@ function throttle_cmd {
     ::debug "Command was throttled"
   fi
 }
+
+::debug inotifywait "${params[@]}"
 
 inotifywait "${params[@]}" |
     while read -r directory events filename; do
