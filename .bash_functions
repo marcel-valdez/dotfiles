@@ -772,11 +772,11 @@ EOF
     --bind "change:reload:sleep 0.25 && ${rg_prefix} -e {q} || true" \
     --bind "ctrl-space:select-all+execute(${ctrl_space_execute})+transform-prompt(cat ${prompt_ln})+clear-query+reload(cat ${results_ln})" \
     --bind "ctrl-delete:deselect-all+execute(${ctrl_delete_execute})+transform-prompt(cat ${prompt_ln})+clear-query+reload(cat ${results_ln})" \
-    --bind "ctrl-f:unbind(change,ctrl-f)+change-header(${fzf_header})+enable-search+rebind(ctrl-r)+transform-query(echo {q} > ${rg_query_file}; cat ${fzf_query_file})+change-preview(batcat --style='numbers,changes' --color=always {})" \
+    --bind "ctrl-f:unbind(change,ctrl-f)+change-header(${fzf_header})+enable-search+rebind(ctrl-r)+transform-query(echo {q} > ${rg_query_file}; cat ${fzf_query_file})+change-preview(batcat --paging=never --style='numbers,changes' --color=always {})" \
     --bind "ctrl-r:unbind(ctrl-r)+change-header(${rg_header})+disable-search+reload(${rg_prefix} -e {q} || true)+rebind(change,ctrl-f)+transform-query(echo {q} > ${fzf_query_file}; cat ${rg_query_file})+change-preview([[ ! -z {} ]] && rg --pretty --context 5 {q} {})" \
     --bind 'ctrl-o:become(bash -i -c "emacs-client {+}")' \
     --prompt "$(cat "${prompt_ln}")" \
-    --bind "ctrl-/:execute:tmux display-popup -w '80%' -h '80%' -d '${_pwd}' -T '{}' -E batcat --style='numbers,changes' --color=always {}" \
+    --bind "ctrl-/:execute:tmux display-popup -w '80%' -h '80%' -d '${_pwd}' -T '{}' -E batcat --paging=always --style='numbers,changes' --color=always {}" \
     --header "${rg_header}"
 }
 
@@ -832,6 +832,6 @@ function fzf-navigate {
   local _pwd="$(pwd)"
   find "$1" -type f | fzf --ansi --query ''\
     --preview 'batcat --color=always {}' \
-    --bind "ctrl-/:execute:tmux display-popup -w '80%' -h '80%' -d '${_pwd}' -T '{}' -E batcat --style='numbers,changes' --color=always {}" \
+    --bind "ctrl-/:execute:tmux display-popup -w '80%' -h '80%' -d '${_pwd}' -T '{}' -E batcat paging=always --style='numbers,changes' --color=always {}" \
     --header 'ctrl-/: popup batcat'
 }
