@@ -835,3 +835,8 @@ function fzf-navigate {
     --bind "ctrl-/:execute:tmux display-popup -w '80%' -h '80%' -d '${_pwd}' -T '{}' -E batcat paging=always --style='numbers,changes' --color=always {}" \
     --header 'ctrl-/: popup batcat'
 }
+
+function tmux-send-to-bash-panes {
+  # Sends keys to all panes whose foreground command is bash.
+  tmux list-panes -a -F "#{pane_id} #{pane_current_command}" | grep bash$ | cut -d' ' -f1 | xargs -Ipaneid tmux send-keys -t'paneid' "$@"
+}
