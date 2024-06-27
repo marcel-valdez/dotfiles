@@ -201,6 +201,8 @@
 ;; don't auto-load/auto-save previously stored desktop
 (desktop-save-mode 0)
 ;; end: desktop package configuration
+;; Enable showing the namespace / function the cursor is at.
+(which-function-mode)
 
 (use-package org
   :config
@@ -369,6 +371,7 @@
 ;  )
 
 (use-package perspective
+  :disabled t
   ;:bind
   ;("C-x C-b" . persp-list-buffers)         ; or use a nicer switcher, see below
   :custom
@@ -384,6 +387,7 @@
   :config
   (helm-mode 1)
   (helm-autoresize-mode)
+  (setq helm-move-to-line-cycle-in-source nil)
   (global-set-key (kbd "C-x C-f") 'helm-find-files)
   (global-set-key (kbd "M-s o") 'helm-occur)
   (global-set-key (kbd "M-x") 'helm-M-x)
@@ -571,11 +575,13 @@
           (accent (telephone-line-airline-position-segment))
           (nil . (telephone-line-file-name-absolute-path-segment))
           (accent . ())
-          (nil . (telephone-line-major-mode-segment))
-          (accent  . (telephone-line-vc-segment))))
-  (setq telephone-line-rhs
-        '((accent    . (telephone-line-simple-minor-mode-segment))
           (nil . (telephone-line-misc-info-segment))
+          (accent . ())
+          (nil . (telephone-line-major-mode-segment))
+          (accent  . ())))
+  (setq telephone-line-rhs
+        '((accent    . (telephone-line-vc-segment))
+          (nil . (telephone-line-simple-minor-mode-segment))
           (accent   . (telephone-line-process-segment))))
 
   ;; Formatting
