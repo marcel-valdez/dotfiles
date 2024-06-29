@@ -445,6 +445,7 @@
 (global-unset-key (kbd "M-k"))
 (global-set-key (kbd "M-k") (lambda () (interactive) (other-window 1)))
 (global-set-key (kbd "M-W") 'copy-to-remote-clipboard)
+(global-set-key (kbd "C-x M-w") 'copy-to-tmux)
 
 ;; Wezterm Fixes: Ctrl+Alt+i (complete-symbol) registers as ESC <C-tab>
 (global-set-key (kbd "ESC <C-tab>") 'complete-symbol)

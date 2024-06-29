@@ -37,6 +37,22 @@ variable copy-to-remote-clipboard-exe-str"
         (eq return-code 0)
         (display-message-or-buffer "Copied to remote clipboard"))))
 
+(defvar copy-to-tmux-exe-str)
+
+(setq copy-to-tmux-exe-str "~/scripts/copy-to-tmux-paste-buffer.sh")
+
+(defun copy-to-tmux(&optional beg end)
+  "Send contents of region bounded by BEG and END to the tmux paste buffer.
+The command used to copy to the tmux clipboard is the script defined by the
+variable copy-to-tmux-exe-str"
+
+  (interactive "r")
+  (let ((return-code
+        (shell-command-on-region beg end copy-to-tmux-exe-str nil nil "*Errors*" t)))
+    (if
+        (eq return-code 0)
+        (display-message-or-buffer "Copied to tmux paste buffer"))))
+
 
 (defun show-file-name ()
   "Show the full path file name in the minibuffer."
