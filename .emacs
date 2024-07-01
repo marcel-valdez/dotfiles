@@ -392,9 +392,15 @@
   (global-set-key (kbd "M-s o") 'helm-occur)
   (global-set-key (kbd "M-x") 'helm-M-x)
   (global-set-key (kbd "C-x C-b") 'helm-buffers-list)
+  (set-face-attribute 'helm-buffer-directory nil :background "LightGray" :foreground "indianred")
+  (set-face-attribute 'helm-ff-directory nil :background "lavender" :foreground "indianred")
+  (set-face-attribute 'helm-ff-dotted-directory nil :background "DimGray" :foreground "white")
+  (set-face-attribute 'helm-ff-invalid-symlink nil :background "red" :foreground "gainsboro")
+  (set-face-attribute 'helm-ff-prefix nil :background "yellow" :foreground "darkolivegreen")
   (set-face-attribute 'helm-selection nil
-;;                      :background "purple"
-                      :foreground "white"))
+                      :background "#2c2c2c"
+                      :distant-foreground "#eeeeec"))
+
 (use-package helm-xref
   :ensure t
   :config
@@ -438,6 +444,12 @@
 (setq whitespace-line-column 80)
 ;; only highlight tab chars and trailing whitespace
 (setq whitespace-style '(tab-mark trailing lines-tail face))
+;; highlight the current line
+(global-hl-line-mode 1)
+(set-face-background 'hl-line "#2c2c2c")
+(set-face-foreground 'highlight nil)
+
+
 
 ;; switch between windows quickly
 (global-unset-key (kbd "M-j"))
@@ -691,7 +703,6 @@
  '(diff-indicator-added ((t (:inherit diff-added :foreground "#055505"))))
  '(diff-indicator-removed ((t (:inherit diff-removed :foreground "#880505"))))
  '(diff-removed ((t (:inherit diff-changed :extend t :background "#aa4433"))))
- '(helm-selection ((t (:extend t :background "#5f5fd7" :foreground "white"))))
  '(org-agenda-structure ((t (:inherit default :underline nil :slant normal :weight regular :height 1.25 :width normal :foundry "MS  " :family "Verdana"))))
  '(org-level-1 ((t (:inherit outline-1 :extend nil :height 1.5))))
  '(org-level-2 ((t (:inherit outline-2 :extend nil :height 1.25))))
