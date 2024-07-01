@@ -566,19 +566,31 @@
   ;; Content Definition
   ;; For more values to show see:
   ;; https://www.gnu.org/software/emacs/manual/html_node/elisp/Mode-Line-Variables.html
+  (defun limit-file-path-segments (path)
+    (let ((rootless-path (replace-regexp-in-string "^//" "/" path)))
+      (let ((segments (split-string rootless-path "/")))
+        (if (<= (length segments) 5)
+            path
+          (concat "../" (string-join (last segments 4) "/"))))))
+
    (telephone-line-defsegment* telephone-line-buffer-segment ()
      `(""
        mode-line-modified
        mode-line-frame-identification))
    (telephone-line-defsegment telephone-line-file-name-absolute-path-segment ()
      (if buffer-file-name
-         (replace-regexp-in-string
-          (regexp-quote "/home/marcelvaldez/") "~/"
+         (limit-file-path-segments
           (replace-regexp-in-string
-           (regexp-quote "/usr/local/google/home/marcelvaldez/") "~/"
+           (regexp-quote "/home/marcelvaldez/") "~/"
            (replace-regexp-in-string
-            (regexp-quote "/google/src/cloud/") "/g/s/c/"
-            (replace-regexp-in-string (regexp-quote "/google/src/cloud/marcelvaldez/") "//" buffer-file-name))))
+            (regexp-quote "/usr/local/google/home/marcelvaldez/") "~/"
+            (replace-regexp-in-string
+             (regexp-quote "/google/src/cloud/") "/g/s/c/"
+             (replace-regexp-in-string
+              "/google/src/cloud/marcelvaldez/\\([^/]+\\)/google3/\\(.*\\)" "//\\2"
+              (replace-regexp-in-string
+               "/google/src/\\(head\\|[0-9]+\\)/depot/google3/\\(.*\\)" "//\\2 @\\1"
+               buffer-file-name))))))
      (telephone-line-buffer-name-segment)))
 
   ;; Content Order
