@@ -1,4 +1,4 @@
-;;; marcel-core-macros.el --- Summary
+;;; marcel-core-macros.el --- Summary  -*- lexical-binding: t; -*-
 ;;; This file contains completely package independent core macros for my .emacs config
 
 ;;; Commentary:
