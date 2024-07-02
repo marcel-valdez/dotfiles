@@ -3,6 +3,7 @@ local wezterm = require 'wezterm';
 local scheme_name = "Hybrid" -- Hybrid, JetBrains Darcula, Tomorrow Night, Molokai, Sundried, Japanesque, NightLion v2, FirefoxDev, Wryan, Monokai Remastered, Hardcore, Teerb, Wombat, Operator Mono Dark, OneHalfDark, Ripped Casts, lovelace
 local scheme = wezterm.get_builtin_color_schemes()[scheme_name]
 scheme.background = "#121212"
+scheme.visual_bell = "#211919"
 
 
 local copy_mode = nil
@@ -145,7 +146,9 @@ return {
       { key = "=", mods="CTRL", action = "IncreaseFontSize" },
       { key = "w", mods="SUPER", action = wezterm.action { CloseCurrentTab={ confirm = true } } },
       { key = "t", mods="SUPER", action = wezterm.action { SpawnTab="CurrentPaneDomain" } },
-      { key="x", mods="SHIFT|CTRL", action = "ActivateCopyMode" }
+      { key="x", mods="SHIFT|CTRL", action = "ActivateCopyMode" },
+      { key="PageDown", mods="SUPER|CTRL", action = wezterm.action.MoveTabRelative(1) },
+      { key="PageUp", mods="SUPER|CTRL", action = wezterm.action.MoveTabRelative(-1) },
    },
    key_tables = {
       copy_mode = copy_mode,
