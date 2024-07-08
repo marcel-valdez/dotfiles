@@ -448,6 +448,7 @@
 (global-hl-line-mode 1)
 (set-face-background 'hl-line "#2c2c2c")
 (set-face-foreground 'highlight nil)
+(set-face-foreground 'success "darkseagreen")
 
 
 
