@@ -159,7 +159,18 @@ return {
         {key = "t", mods = "SUPER", action = wezterm.action {SpawnTab = "CurrentPaneDomain"}},
         {key = "x", mods = "SHIFT|CTRL", action = "ActivateCopyMode"},
         {key = "PageDown", mods = "SUPER|CTRL", action = wezterm.action.MoveTabRelative(1)},
-        {key = "PageUp", mods = "SUPER|CTRL", action = wezterm.action.MoveTabRelative(-1)}
+        {key = "PageUp", mods = "SUPER|CTRL", action = wezterm.action.MoveTabRelative(-1)},
+        {
+            key = "F2", mods = "SUPER", action = wezterm.action.PromptInputLine {
+                description = "Enter new tab name",
+                action = wezterm.action_callback(function(window, pane, line)
+                        if line then
+                            window:active_tab():set_title(line)
+                        end
+                    end
+                ),
+            }
+        },
     },
     key_tables = {
         copy_mode = copy_mode
