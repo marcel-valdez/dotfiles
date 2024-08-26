@@ -239,7 +239,8 @@
                      (quote ((agenda time-up priority-down tag-up))))
                     (org-deadline-warning-days 1)))
            ;; See: https://orgmode.org/manual/Matching-tags-and-properties.html
-           (tags "+TODO={DOING\\|TODO\\|WAITING}-STYLE=\"habit\"+TODAY")
+           (tags "+TODO={DOING}-STYLE=\"habit\"+TODAY")
+           (tags "+TODO={TODO\\|WAITING}-STYLE=\"habit\"+TODAY")
            (tags "+TODO={DOING\\|TODO\\|WAITING}-STYLE=\"habit\"+WEEK-TODAY")
            (tags "+TODO={DOING\\|TODO}-STYLE=\"habit\"+MONTH-WEEK-TODAY")
            (tags "+TODO={DOING\\|TODO}+PRIORITY=\"0\"-STYLE=\"habit\"-TODAY-WEEK-MONTH")
@@ -266,7 +267,8 @@
                      (quote ((agenda time-up priority-down tag-up))))
                     (org-deadline-warning-days 1)))
            ;; See: https://orgmode.org/manual/Matching-tags-and-properties.html
-           (tags "+TODO={DOING\\|TODO\\|WAITING}-STYLE=\"habit\"+TODAY")
+           (tags "+TODO={DOING}-STYLE=\"habit\"+TODAY")
+           (tags "+TODO={TODO\\|WAITING}-STYLE=\"habit\"+TODAY")
            (tags "+TODO={DOING\\|TODO\\|WAITING}-STYLE=\"habit\"+WEEK-TODAY")
            (tags "+TODO={DOING\\|TODO}-STYLE=\"habit\"+QUARTER-WEEK-TODAY")
            (tags "+TODO={DOING\\|TODO}+PRIORITY=\"0\"-STYLE=\"habit\"-TODAY-WEEK-QUARTER")
