@@ -399,6 +399,7 @@
   (set-face-attribute 'helm-ff-dotted-directory nil :background "DimGray" :foreground "white")
   (set-face-attribute 'helm-ff-invalid-symlink nil :background "red" :foreground "gainsboro")
   (set-face-attribute 'helm-ff-prefix nil :background "yellow" :foreground "darkolivegreen")
+  (set-face-attribute 'helm-visible-mark nil :background "darkseagreen" :foreground "steelblue")
   (set-face-attribute 'helm-selection nil
                       :background "#2c2c2c"
                       :distant-foreground "#eeeeec"))
@@ -552,6 +553,15 @@
   (if (not at-office-is-work-laptop)
       (progn
         (add-hook 'python-mode-hook 'company-mode))))
+
+(use-package eglot
+  :ensure t
+  :config
+  (defun eglot/toggle-inlay-hints ()
+    (interactive)
+    (eglot-inlay-hints-mode (if eglot-inlay-hints-mode -1 1)))
+
+  (define-key eglot-mode-map (kbd "<f12>") 'eglot/toggle-inlay-hints))
 
 ;; configure bash shellcheck
 (use-package flymake-shellcheck
