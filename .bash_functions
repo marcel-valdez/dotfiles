@@ -709,6 +709,9 @@ function fif {
   local ctrl_space_execute=
   local ctrl_delete_execute=
 
+  local term_width=$(tput cols)
+  local half_term_width=$((term_width / 2))
+  local preview_title_width=$((half_term_width - 10))
   prompt_file=$(mktemp)
   prompt_file_history=$(mktemp)
   results_file=$(mktemp)
@@ -768,8 +771,10 @@ EOF
     --multi \
     --preview '[[ ! -z {} ]] && rg --pretty --context 5 {q} {}' \
     --ansi --phony --query "${initial_query[1]}" \
-    --bind "start:reload:cat ${results_ln}" \
-    --bind "change:reload:sleep 0.25 && ${rg_prefix} -e {q} || true" \
+    --bind "start:reload(cat ${results_ln})" \
+    --bind "focus:transform-preview-label(echo {} | tail -c ${preview_title_width})" \
+    --bind "result:transform-preview-label(echo {} | tail -c ${preview_title_width})" \
+    --bind "change:reload(sleep 0.25 && ${rg_prefix} -e {q} | sort || true)" \
     --bind "ctrl-space:select-all+execute(${ctrl_space_execute})+transform-prompt(cat ${prompt_ln})+clear-query+reload(cat ${results_ln})" \
     --bind "ctrl-delete:deselect-all+execute(${ctrl_delete_execute})+transform-prompt(cat ${prompt_ln})+clear-query+reload(cat ${results_ln})" \
     --bind "ctrl-f:unbind(change,ctrl-f)+change-header(${fzf_header})+enable-search+rebind(ctrl-r)+transform-query(echo {q} > ${rg_query_file}; cat ${fzf_query_file})+change-preview(batcat --paging=never --style='numbers,changes' --color=always {})" \
