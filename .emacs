@@ -1,3 +1,4 @@
+
 ;;; .emacs --- Summary
 ;;; Commentary:
 ;;; This is a sensible configuration for my home computer
@@ -114,7 +115,20 @@
                         (lambda () (interactive) (multi-term-prev)))
         ;; toggle showing/hiding the dedicated terminal window
         (global-set-key (kbd "C-t C-d")
-                        (lambda () (interactive) (multi-term-dedicated-toggle)))))
+                        (lambda () (interactive) (multi-term-dedicated-toggle))))
+      (global-unset-key (kbd "C-<next>"))
+      (global-set-key (kbd "C-<next>") (lambda () (interactive) (tab-bar-switch-to-next-tab)))
+      (global-unset-key (kbd "C-S-<next>"))
+      (global-set-key (kbd "C-S-<next>") (lambda () (interactive) (tab-bar-move-tab 1)))
+
+      (global-unset-key (kbd "C-<prior>"))
+      (global-set-key (kbd "C-<prior>") (lambda () (interactive) (tab-bar-switch-to-prev-tab)))
+      (global-unset-key (kbd "C-S-<prior>"))
+      (global-set-key (kbd "C-S-<prior>") (lambda () (interactive) (tab-bar-move-tab-backward)))
+      (global-unset-key (kbd "M-t"))
+      (global-set-key (kbd "M-t") (lambda () (interactive) (tab-bar-new-tab)))
+      (global-unset-key (kbd "C-<f4>"))
+      (global-set-key (kbd "C-<f4>") (lambda () (interactive) (tab-bar-close-tab))))
   ;; if emacs is run as a terminal application
   (with-library in-tmux
     (use-package helm-dash
@@ -597,10 +611,9 @@
  '(global-display-line-numbers-mode t)
  '(menu-bar-mode nil)
  '(package-selected-packages
-   (quote
-    (javascript-mode omnisharp csharp-mode erc-status-sidebar markdown-mode flyspell-correct flycheck helm-descbinds helm-dash company-ctags ggtags helm-gtags telephone-line use-ttf use-package use-package-ensure-system-package zeal-at-point flycheck-checkbashisms graphviz-dot-mode flyspell-correct-helm helm-flycheck better-defaults jedi elpy company xclip helm git helm-grepint helm-helm-commands helm-ispell helm-ls-git helm-proc helm-pydoc helm-rubygems-org helm-themes helm-wordnet helm-xref hgignore-mode undo-tree rotate rjsx-mode multiple-cursors multi-term markdownfmt markdown-toc markdown-preview-mode helm-git gtags flycheck-tip flycheck-package cycle-resize auto-complete)))
- '(safe-local-variable-values (quote ((xref-etags-mode . t))))
- '(show-paren-mode t))
+   '(dap-mode eglot-java fzf flymake-shellcheck el-get company-jedi web-beautify company-lua lua-mode js-auto-format-mode pylint javascript-mode omnisharp csharp-mode erc-status-sidebar markdown-mode flyspell-correct flycheck helm-descbinds helm-dash company-ctags ggtags helm-gtags telephone-line use-ttf use-package use-package-ensure-system-package zeal-at-point flycheck-checkbashisms graphviz-dot-mode flyspell-correct-helm helm-flycheck better-defaults company xclip helm git helm-grepint helm-helm-commands helm-ispell helm-ls-git helm-proc helm-pydoc helm-rubygems-org helm-themes helm-wordnet helm-xref hgignore-mode undo-tree rotate rjsx-mode multiple-cursors multi-term markdownfmt markdown-toc markdown-preview-mode helm-git gtags flycheck-tip flycheck-package cycle-resize auto-complete))
+ '(safe-local-variable-values '((xref-etags-mode . t)))
+ '(tool-bar-mode nil))
 (custom-set-faces
  ;; custom-set-faces was added by Custom.
  ;; If you edit it by hand, you could mess it up, so be careful.
