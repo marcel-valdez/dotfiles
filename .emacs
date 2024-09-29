@@ -65,6 +65,7 @@
 (put 'upcase-region 'disabled nil)      ; Enable upcase-region
 (set-default-coding-systems 'utf-8)     ; Default to utf-8 encoding
 (menu-bar-mode -1)                      ; Disable the top menu bar
+(repeat-mode t)                         ; Enable repeat keymaps
 
 (with-library cl-generic)
 ;; (with-library better-defaults)
@@ -433,6 +434,9 @@
     (add-hook 'prog-mode-hook 'set-prog-column-limit)
     (defun set-text-column-limit () (setq-local whitespace-line-column 100))
     (add-hook 'text-mode-hook 'set-text-column-limit)))
+
+(use-package format-all
+  :ensure t)
 
 ;; set indentation configuration
 (defun set-custom-indent ()
