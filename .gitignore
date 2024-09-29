@@ -34,7 +34,30 @@ bin/dex
 !.emacs.d/
 !.emacs.d/lisp/
 !.emacs.d/lisp/*
+.emacs.d/lisp/at-office.el
+!.emacs.d/lisp/external
+!.emacs.d/lisp/external/*
+.emacs.d/lisp/external/helm/
+!.emacs.d/lisp/themes
+!.emacs.d/lisp/themes/*
 
+
+# In order to unignore a specific file under a directory:
+# 1. unignore the directory
+!.vnc/
+# 2. unignore the specific file
+!.vnc/xstartup
+!.vnc/config
+
+!.nano/
+!.nano/*
+.nano/search_history
+
+!.fluxbox/
+!.fluxbox/keys
+!.fluxbox/startup
+
+!.pomodororc
 # Ignore nano backup files
 *~
 bin/mail-notify-data
@@ -50,3 +73,23 @@ bin/mail-notify-data
 
 recipes/*
 recipes/**/*
+
+# Common backup/generated files
+.*~
+**/.*~
+*~
+**/*~
+*.swp
+**/*.swp
+*.pyc
+**/*.pyc
+*.lock
+**/*.lock
+*.bak
+**/*.bak
+*.tmp
+**/*.tmp
+*.log
+**/*.log
+.*#
+*#

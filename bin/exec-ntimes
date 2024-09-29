@@ -1,0 +1,15 @@
+#!/usr/bin/env bash
+
+TIMES="$1"
+shift
+CMD="$@"
+
+for i in $(seq ${TIMES}); do
+  ${CMD}
+  if ! [ $? -eq 0 ]; then
+    echo "Failed when executing ${i}th iteration"
+    exit 1
+  fi
+done
+
+echo "PASSED ${TIMES} times"

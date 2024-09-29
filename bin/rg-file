@@ -1,0 +1,19 @@
+#!/usr/bin/env bash
+
+args=()
+file_list_path=
+while [[ $# -gt 0 ]]; do
+  arg="$1"
+  case "${arg}" in
+    --file-list-path)
+      file_list_path="$2"
+      shift
+      ;;
+    *)
+      args+=("${arg}")
+      ;;
+  esac
+  shift
+done
+
+rg "${args[@]}" $(cat "${file_list_path}")

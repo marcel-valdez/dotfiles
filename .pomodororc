@@ -1,0 +1,113 @@
+#!/usr/bin/env bash
+
+STORAGE="${HOME}/.pomodoro.d"
+SOUND="off"
+NOTIFICATION_SOUND=
+POMODORO_TIME=45
+SHORT_BREAK_TIME=10
+LONG_BREAK_TIME=55
+CYCLES_BETWEEN_LONG_BREAKS=3
+
+
+function now() {
+    date "+%H:%M:%S"
+}
+
+function log() {
+  echo "$(now) $@" >>/tmp/${USER}.pomodoro.log
+}
+
+function pause() {
+  NOTIFICATION_SOUND="${HOME}/res/pause_pomodoro.mp3"
+  # custom code to run when the pomodoro is paused
+  "${HOME}/bin/do-not-disturb" disable
+}
+
+function resume() {
+  # custom code to run when the pomodoro is resumed
+  if [[ "$1" == "pomodoro" ]]; then
+    NOTIFICATION_SOUND="${HOME}/res/bell_hop.mp3"
+    "${HOME}/bin/do-not-disturb" enable
+  fi
+}
+
+function shortbreak_start() {
+  # custom code to run when the pomodoro short break starts
+  "${HOME}/bin/do-not-disturb" disable
+}
+
+function shortbreak_end() {
+  # custom code to run when the pomodoro short break starts
+  # "${HOME}/bin/do-not-disturb" enable
+  echo &>/dev/null  # NOOP
+}
+
+function longbreak_start() {
+  # custom code to run when the pomodoro short break starts
+  "${HOME}/bin/do-not-disturb" disable
+}
+
+function longbreak_end() {
+  # custom code to run when the pomodoro short break starts
+  # "${HOME}/bin/do-not-disturb" disable
+  echo &>/dev/null  # NOOP
+}
+
+function pomodoro_start() {
+  NOTIFICATION_SOUND="${HOME}/res/start_pomodoro.mp3"
+  "${HOME}/bin/do-not-disturb" enable
+}
+
+function pomodoro_end() {
+  NOTIFICATION_SOUND="${HOME}/res/pomodoro_done.mp3"
+  "${HOME}/bin/do-not-disturb" disable
+}
+
+function run_command() {
+  local fn_name="$1"
+  if type -t "${fn_name}" &>/dev/null; then
+    "$@"
+  else
+    log "No handler for event: ${fn_name}"
+  fi
+
+#  if [[ "${NOTIFICATION_SOUND}" ]]; then
+#    play -q "${NOTIFICATION_SOUND}" &
+#    disown $!
+#  fi
+}
+
+function run_pomodoro_raw() {
+  "${HOME}/modules/pomodoro/pomodoro.sh" "$@"
+}
+
+function run_pomodoro() {
+  run_pomodoro_raw \
+    --storage "${STORAGE}" \
+    --sound "${SOUND}" \
+    --pomodoro_time "${POMODORO_TIME}" \
+    --short_break_time "${SHORT_BREAK_TIME}" \
+    --long_break_time "${LONG_BREAK_TIME}" \
+    --cycles_between_long_breaks "${CYCLES_BETWEEN_LONG_BREAKS}" \
+    --custom_cmd "${HOME}/.pomodororc"
+}
+
+# First time we're trying to run pomodoro or we're re-rendering
+if [[ $# -eq 0 ]]; then
+  run_pomodoro
+  exit $?
+else
+  case "$1" in
+    # An event was triggered by pomodoro
+    --command|-c)
+      log "Running command: $2"
+      shift
+      run_command "$@"
+      ;;
+    # User clicked on the pomodoro icon
+    *)
+      run_pomodoro_raw "$@"
+      exit $?
+      ;;
+  esac
+fi

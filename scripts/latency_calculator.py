@@ -1,4 +1,4 @@
-#!/usr/bin/env python3.8
+#!/usr/bin/env python3
 
 """Given a stdin input of data it will calculate the mean of the
 streaming lines and print any value that is 3 standard deviations

@@ -1,0 +1,18 @@
+#!/usr/bin/env bash
+
+function now() {
+  date "+%H:%M:%S"
+}
+
+function today() {
+  ~/bin/today
+}
+
+# this file is the second one to execute in the X startup process,
+# and is probably executed once there is a windowing environment
+# available
+echo "$(today) $(now) Executed .xsessionrc during initialization" >> ~/.xstartup.log
+
+if [[ -f "${HOME}/.xsession" ]]; then
+  source "${HOME}/.xsession"
+fi

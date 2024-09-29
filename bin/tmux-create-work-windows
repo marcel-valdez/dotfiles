@@ -1,0 +1,8 @@
+#!/usr/bin/env bash
+
+# the * means 'current' window
+tmux rename-window -t '*' NOTES
+tmux new-window -n EXEC
+tmux new-window -n CODE
+tmux new-window -n ANALYSIS
+tmux find-window -N NOTES

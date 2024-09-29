@@ -1,0 +1,24 @@
+#!/usr/bin/env bash
+
+type=$1
+
+if [ "$type" = "" ]; then
+  type="M"
+  field="3"
+fi
+
+regx="^ $type"
+if [ "$type" = "??" ]; then
+  regx="^??"
+  field="2"
+fi
+
+if [ "$type" = "--help" ]; then
+  echo "Lists non-staged modified files with only their file path"
+  echo "Usage:"
+  echo "git-status-only-files [filter]"
+  echo "filter: M (modified), D (deleted), ?? (untracked)"
+  exit 0;
+fi
+
+git status --porcelain | grep "$regx" | cut -d' ' -f$field

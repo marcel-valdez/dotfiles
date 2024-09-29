@@ -1,0 +1,34 @@
+#!/bin/bash
+
+function notify-exit() {
+  last_user_cmd=`history 2 | head -1`
+  notify "$last_user_cmd failed when executing: <$*>"
+  exit 1;
+}
+
+function exec-cmd() {
+  eval "$*";
+  if [ $? -eq 1 ]; then
+    notify-exit "$*";
+  fi
+}
+
+function in_git_repo()
+{
+  git rev-parse > /dev/null 2>&1 && echo "true";
+  return 0;
+};
+
+function git_top_level()
+{
+  _top_level="$(git rev-parse --show-toplevel)";
+  echo $_top_level;
+  return 0;
+};
+
+function git_pending_changes()
+{
+  _pending_changes="$(git status --porcelain)";
+  echo $_pending_changes;
+  return 0;
+};

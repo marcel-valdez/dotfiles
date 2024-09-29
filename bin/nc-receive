@@ -1,0 +1,27 @@
+#!/usr/bin/env bash
+
+function usage() {
+  >&2 echo "nc-receive [filename]"
+  >&2 echo "filename [optional]: the file to put the output in"
+}
+
+if [ "$1" == "--help" ]; then
+  usage
+  exit 1
+fi
+
+if [ "$1" == "" ]; then
+  nc -l -p 13579
+else
+  filepath="$1"
+  nc -l -p 13579 > "/tmp/$USER.nc-receive.$filepath.enc"
+
+  pass_phrase=$(get-pass-phrase)
+  if ! [ $? -eq 0 ]; then
+    decrypt "/tmp/$USER.nc-receive.$filepath"
+  else
+    decrypt "/tmp/$USER.nc-receive.$filepath" "$pass_phrase"
+  fi
+
+  mv "/tmp/$USER.nc-receive.$filepath" "./$filepath"
+fi

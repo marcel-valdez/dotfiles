@@ -1,0 +1,19 @@
+#!/usr/bin/env bash
+
+function now() {
+  date "+%H:%M:%S"
+}
+
+function today() {
+  ~/bin/today
+}
+
+# this file is the first one to execute, and probably before there is
+# a windowing environment available
+echo "$(today) $(now) Executed .xprofile during initialization" >> ~/.xstartup.log
+# it seems that .xsessionrc is actually executed by the environment
+# so we should not execute it ourselves here, instead we should execute
+# .xinitrc
+if [ -f "${HOME}/.xinitrc" ]; then
+  source "${HOME}/.xinitrc"
+fi

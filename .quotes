@@ -1,0 +1,195 @@
+
+.. your goal should always be to know just enough to get work done,
+no matter how cool the whole of google3 may be.
+    -- Ben Collins-Sussman, Noogler Advice, 140th Google Engineering Newsletter
+%
+When it comes to understanding and researching new areas of technology,
+these [successful] engineers very carefully monitor themselves when reading
+and create limits on their rabbit-hole depth-level.
+    -- Ben Collins-Sussman, Noogler Advice, 140th Google Engineering Newsletter
+%
+.. try to predict how much information you actually need to get your work done.
+As you read docs and code, watch yourself. If you start to go too deep into a
+topic — you should cut yourself off.
+    -- Ben Collins-Sussman, Noogler Advice, 140th Google Engineering Newsletter
+%
+You see I'm not an expert like these guys. I'm an idiot and that's great,
+because I'm such an idiot, that I get learn a ton of things every day.
+    -- SirActionSlacks
+%
+When you have software problems A and B, the complexity of solving A and B at
+the same time is C(A) * C(B), but if you solve them separately then the
+complexity is C(A) + C(B). Always split your problems into the smallest units
+possible, it will make your life an order of magnitud less difficult.
+    -- Marcel Valdez, Lessons Learned
+%
+Always bear in mind that your own resolution to succeed is more important than
+any other thing.
+    -- Abraham Lincoln
+%
+Leave nothing for tomorrow which can be done today.
+    -- Abraham Lincoln
+%
+Extraordinary results require extraordinary action.
+    -- Grant Cardone, The 10X rule
+%
+I have no respect for a man who is not wiser today than he was yesterday.
+    -- Abraham Lincoln
+%
+Great men are ordinary men with extraordinary determination.
+    -- Abraham Lincoln
+%
+The largest army can be defeated, but a determined man can never be defeated.
+    -- Abraham Lincoln
+%
+One dollar earned is better than ten thousand dollars found.
+    -- Abraham Lincoln
+%
+Impossibility can only be found in the dictionary of a fool.
+    -- Abraham Lincoln
+%
+People are just as happy as they make up their mind to be.
+    -- Abraham Lincoln
+%
+If I had ten hours to cut down a tree, I would spend the first six hours
+sharpening my axe.
+    -- Abraham Lincoln
+%
+Failing to prepare, is preparing to fail.
+    -- Napoleon Bonaparte
+%
+Success is moving from failure to failure without losing enthusiasm.
+    -- Abraham Lincoln
+%
+In the end, Impact is the effect that wouldn’t have happened if you hadn’t done
+what you did.
+    -- Anonymous L5-7 Googler on SETI ladder
+%
+Skill = Talent x Effort in improvement
+Success = Skill x Effort in execution
+    -- "Grit", Angela Duckworth
+%
+The first step in solving a problem
+is to recognize that it does exist.
+    -- Zig Ziglar
+%
+If you go looking for a friend, you’re going to find they’re scarce. If you go
+out to be a friend, you’ll find them everywhere.
+    -- Zig Ziglar
+%
+People often say motivation doesn’t last. Neither does bathing—that’s why we
+recommend it daily.
+    -- Zig Ziglar
+%
+It is through science that we prove, but through intuition that we discover.
+    -- Henri Poincare
+%
+Thought is only a flash between two long nights, but this flash is everything.
+    -- Henri Poincare
+%
+The mind uses its faculty for creativity only when experience forces it to do
+so.
+    -- Henri Poincare
+%
+If nature were not beautiful, it would not be worth knowing, and if nature were
+not worth knowing, life would not be worth living.
+    -- Henri Poincare
+%
+Science is built up of facts, as a house is with stones. But a collection of
+facts is no more a science than a heap of stones is a house.
+    -- Henri Poincare
+%
+Geometry is not true, it is advantageous.
+    -- Henri Poincare
+%
+It is the harmony of the diverse parts, their symmetry, their happy balance; in
+a word it is all that introduces order, all that gives unity, that permits us to
+see clearly and to comprehend at once both the ensemble and the details.
+    -- Henri Poincare
+%
+A scientist worthy of his name, about all a mathematician, experiences in his
+work the same impression as an artist; his pleasure is as great and of the same
+nature.
+    -- Henri Poincare
+%
+No one is free who has not obtained the empire of himself.
+    -- Pythagoras
+%
+In order to stay clean you must bathe daily and clean yourself up after getting
+dirty.
+In order to stay motivated, you must motivate yourself daily and specially
+when going through moments of hardship.
+    -- Marcel Valdez, Lessons Learned
+%
+Stay positive, think positive.
+    -- Everyone who overcame
+%
+At any point you should be willing to sacrifice what you are for what you will
+become.
+    -- Eric Thomas
+%
+The hero of the Odyssey is a great fighter, a wily schemer, a ready speaker, a
+man of stout heart and broad wisdom who knows that he must endure without too much
+complaining what the gods send; and he can both build and sail a boat, drive a
+furrow as straight as anyone, beat a young braggart at throwing the discus,
+challenge the Pheacian youth at boxing, wrestling or running; flay, skin, cut up
+and cook an ox, and be moved to tears by a song. He is in fact an excellent
+all-rounder; he has surpassing aretê.
+
+Aretê implies a respect for the wholeness or oneness of life, and a consequent
+dislike of specialization. It implies a contempt for efficiency—or rather a much
+higher idea of efficiency, an efficiency which exists not in one department of
+life but in life itself.
+    -- H. D. F. Kitto, The Greeks
+%
+There are many ways to achieve technical excellence, your way isn't the only way.
+Lead, don't dictate!
+    -- So you want to be a TL?
+%
+Every design decision has positive and negative attributes.
+
+  What you will find is that by making it easy to do the right thing (positive
+attribute), you will also be making it harder to do the wrong thing (negative
+attribute).
+
+  This is what we call Good Design.
+
+    -- Marcel Valdez, Lessons Learned
+%
+Anytime it is painful to do the right thing and easy to do the wrong thing, we
+should create infrastructure to alleviate the pain in doing the right thing.
+
+    -- Marcel Valdez, Lessons Learned
+%
+Aretê leads to duty to oneself to achieve excellence in all human endeavor.
+
+    -- Marcel Valdez, Standing on the shoulders of Giants
+%
+Help teams realize that Excellence is a transcendental core value and if we
+strive for it we will discover that we must continuously increase our
+Efficiency, and that the best way to do that is by remaining Disciplined,
+Respectful and having good Quality of Life.
+
+    -- My purpose statement
+%
+The scientist does not study nature because it is useful; he studies it because
+he delights in it, and he delights in it because it is beautiful.
+    -- Henri Poincare
+%
+If you think your performance is perfect and can't get any better, then that
+means one of two things: you've already peaked or you don't have any idea how to
+evaluate your own performance.
+
+On the other hand, if you find many flaws in your performance, then that means
+you have plenty room for improvement, and not only that, but you also know
+exactly what needs to be improved.
+    -- Andrew McGregor, paraphrased
+%
+Be a fearless learner. Bravely show your ignorance, so you can be enlightened.
+Bravely discover your errors, so you can correct them. Bravely charge into the
+discomfort of the unknown, so you can become better.
+
+The more errors we find in ourselves, the more opportunities we have to better
+ourselves. Be a fearless learner, my friend.
+
+   -- Me.

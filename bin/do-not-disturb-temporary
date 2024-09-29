@@ -1,0 +1,25 @@
+#!/usr/bin/env bash
+
+
+duration_minutes=$1
+
+if ! type at &>/dev/null; then
+  echo "command at not available. Install it: sudo apt install at" >&2
+  exit 1
+fi
+
+if ! type xfconf-query &>/dev/null; then
+  echo "xfconf-query not available. Install it: sudo apt install xfce4" >&2
+  exit 1
+fi
+
+if ! type xfce4-notifyd-config &>/dev/null; then
+  echo "xfce-notifyd-config not available. Install it: sudo apt install xfce4" >&2
+  exit 1
+fi
+
+/usr/bin/xfconf-query -c xfce4-notifyd -p /do-not-disturb -s true
+
+/usr/bin/at "now + ${duration_minutes} minutes" <<EOF
+/usr/bin/xfconf-query -c xfce4-notifyd -p /do-not-disturb -s false
+EOF

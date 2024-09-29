@@ -1,3 +1,24 @@
 #!/usr/bin/env bash
-script_dir="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
-python "$script_dir/continuous_file_executor.py" $1 $2 $3 $4 $5 $6 $7 $8 $9
+script_name="$(basename "${BASH_SOURCE[0]}")"
+script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+function usage() {
+  cat << END
+  This script executes a python file every time the file is changed
+
+  ${script_name} <file>
+  file: The file to listen for changes and execute
+
+  Example:
+  ${script_name} /tmp/script.py
+END
+}
+
+file=$1
+shift
+if [! -e "${file}" ]; then
+  echo "File ${file} does not exist, cannot listen to it"
+  exit 1
+fi
+
+python "$script_dir/continuous_file_executor.py" ${file}

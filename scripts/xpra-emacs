@@ -1,0 +1,32 @@
+#!/usr/bin/env bash
+
+APP_BIN="/usr/bin/google-emacs"
+APP_NAME=
+APP_NAME="$(basename "${APP_BIN}")"
+
+[[ -z "${XPRA_DISPLAY}" ]] && XPRA_DISPLAY=":100"
+
+if ! (xpra list | grep "${XPRA_DISPLAY}" &>/dev/null); then
+  echo "Xpra server not running yet on Display ${XPRA_DISPLAY}, starting it." >&2
+  "${HOME}/scripts/xpra-start"
+else
+  echo "Xpra server on Display ${XPRA_DISPLAY} already running." >&2
+fi
+
+if (xpra list-windows | grep "${XPRA_DISPLAY}.*${APP_NAME}" &>/dev/null); then
+  echo "${APP_NAME} already running on Xpra Display ${XPRA_DISPLAY}."
+  echo "Do you want to start a new ${APP_NAME} instance?"
+  select yn in "Yes" "No"; do
+    case "${yn}" in
+      Yes)
+        break
+        ;;
+      No)
+        exit
+        ;;
+    esac
+  done
+fi
+
+echo "Starting ${APP_NAME} on Xpra Display ${XPRA_DISPLAY}." >&2
+"${HOME}/scripts/xpra-run" "${APP_BIN}" "$@" &>"/tmp/xpra-${APP_NAME}-${USER}-${RANDOM}.log" &

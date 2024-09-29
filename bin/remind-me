@@ -1,0 +1,55 @@
+#!/usr/bin/env ruby
+
+require 'optparse'
+require 'optparse/time'
+
+options = {}
+
+OptionParser.new do |opts|
+  opts.banner = "remind-me [options]"
+
+  opts.on("-s", "--start TIME", "Time at which to trigger reminder (see: man at)") do |start_time|
+    options[:start_time] = start_time
+  end
+
+  opts.on("-m", "--message MSG", "Message for the reminder") do |message|
+    options[:message] = message
+  end
+
+  opts.on("-t", "--title [TITLE]", "Title for the reminder in task scheduler") do |title|
+    options[:title] = title
+  end
+
+  opts.on("-a", "--alarm", "Whether to make a beep sound with the reminder") do |alarm|
+    options[:alarm] = true
+  end
+end.parse!
+
+options[:title] = "task-#{Random.rand(10000)}" if options[:title].nil?
+
+if options[:message].nil?
+  puts "No message specified. Use the -h or --help options for more information."
+  exit(1)
+end
+
+if options[:start_time].nil?
+  puts "No start time specified. Use the -h or --help options for more information."
+  exit(1)
+end
+
+alarm_snd = ""
+if !options[:alarm].nil?
+  alarm_snd = "#{Dir.home}/bin/beep 5"
+end
+
+escaped_msg_cmd = %Q{"/usr/bin/notify-send '"'#{options[:title]}'"' '"'#{options[:message]}'"'; #{alarm_snd}"}
+task_cmd = %Q{echo #{escaped_msg_cmd} | /usr/bin/at #{options[:start_time]}}
+
+result = `#{task_cmd}`
+if $?.success?
+  STDOUT.puts result
+  exit(0)
+else
+  STDERR.puts result
+  exit(1)
+end

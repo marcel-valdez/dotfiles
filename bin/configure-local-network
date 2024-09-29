@@ -1,0 +1,10 @@
+#!/usr/bin/env bash
+
+iface=$1
+ip=$2
+network=${ip%.*}.0
+
+sudo ifconfig "${iface}" down
+sudo ifconfig "${iface}" "${ip}" netmask 255.255.255.0 up
+sudo route del -net "${network}" netmask 255.255.255.0 dev "${iface}"
+sudo route add -net "${network}" netmask 255.255.255.0 gw "${ip}" dev "${iface}"

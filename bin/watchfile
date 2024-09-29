@@ -107,9 +107,9 @@ fi
 
 
 ::log "Watching directory: ${directory}"
-params=(-e close_write,moved_to,modify -m "${directory}")
-if [[ ${recursive} -eq 1 ]]; then
-  params+=(-r)
+params=("-e" "close_write,moved_to,modify" "-m" "${directory}")
+if [[ "${recursive}" -eq 1 ]]; then
+    params+=("-r")
 fi
 
 last_run=0
@@ -130,6 +130,8 @@ Last run: ${last_run}. Current run: ${curr_millis}. \
 Ellapsed millis: ${elapsed_millis}."
   fi
 }
+
+::debug inotifywait "${params[@]}"
 
 inotifywait "${params[@]}" |
   while read -r directory events filename; do

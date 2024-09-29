@@ -34,16 +34,17 @@ while [ $# -gt 0 ]; do
   esac
 done
 
-if [ "$1" == "" ]; then
-  echo
+title=""
+message="$1"
+
+if [[ "${message}" == "" ]] && [[ "$#" -lt 2 ]]; then
+  echo ""
   echo "  ERROR: Missing message parameter"
-  echo
+  echo ""
   usage
   exit 1
 fi
 
-title=""
-message="$1"
 if [[ "$2" != "" ]]; then
   title="$1 "
   message="$2"
@@ -51,7 +52,7 @@ fi
 
 display_message="$(date '+%H:%M:%S') ${title}${message}"
 
-echo "${display_message}" >> /tmp/notify-tmux-${USER}.log
+echo "${display_message}" >> "/tmp/notify-tmux-${USER}.log"
 
 for i in $(seq 1 ${count})
 do

@@ -1,0 +1,19 @@
+#!/usr/bin/env bash
+
+if [ "$BIN_UTILS_PASS_PHRASE_FILE" == "" ]; then
+  >&2 echo "You have not defined your BIN_UTILS_PASS_PHRASE_FILE file"
+  exit 1
+fi
+
+if ! [ -f "$BIN_UTILS_PASS_PHRASE_FILE" ]; then
+  >&2 echo "The file $BIN_UTILS_PASS_PHRASE_FILE does not exist, it is supposed to contain a pass phrase for encryption"
+  exit 1
+fi
+
+pass_phrase=$(cat $BIN_UTILS_PASS_PHRASE_FILE)
+if [ "$pass_phrase" == "" ]; then
+  >&2 echo "The pass phrase file $BIN_UTILS_PASS_PHRASE_FILE is empty."
+  exit 1
+fi
+
+echo "$pass_phrase"

@@ -1,0 +1,41 @@
+#!/usr/bin/env ruby
+
+if ARGV.length == 0
+  puts "Usage:"
+  puts "combine-sentences <filename>"
+end
+
+filename = ARGV.first
+
+permutation_sub_arrays = []
+current_sub_array = []
+
+File.open(filename, "r") do |file|
+  file.each_line do |line|
+    stripped = line.strip
+    if stripped != ""
+      current_sub_array << line
+    else
+      permutation_sub_arrays << current_sub_array
+      current_sub_array = []
+    end
+  end
+end
+
+permutation_sub_arrays << current_sub_array
+
+def permutate(permutation_arrays, permutation_index, current_values, &block)
+  if permutation_arrays.length == permutation_index
+    yield(current_values)
+  else
+    permutation_arrays[permutation_index].each do |item|
+      current_values[permutation_index] = item
+      permutate(permutation_arrays, permutation_index+1, current_values, &block)
+    end
+  end
+end
+
+permutate(permutation_sub_arrays, 0, []) do |sentences|
+  sentences.each { |sentence| puts sentence }
+  puts ""
+end

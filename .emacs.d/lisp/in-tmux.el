@@ -1,6 +1,7 @@
-(provide 'in-tmux)
 
-;; remaps certain keys if we are inside a TMUX session
+;;; Commentary:
+;;; Remaps certain keys if we are inside a TMUX session
+;;; Code:
 (if (getenv "TMUX")
     (progn
       (let ((x 2) (tkey ""))
@@ -214,3 +215,6 @@
 (if (getenv "DISPLAY")
     (progn
       (xterm-mouse-mode)))
+
+(provide 'in-tmux)
+;;; in-tmux.el ends here

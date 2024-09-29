@@ -1,0 +1,15 @@
+#!/bin/bash
+
+cmd="$@"
+
+eval "${cmd}"
+
+res=$?
+"${HOME}/bin/beep" 3 &
+if [ ${res} -eq 0 ]; then
+  notify "PASSED" "${cmd}"
+else
+  notify "FAILED (${res})" "${cmd}"
+fi
+
+exit ${res}

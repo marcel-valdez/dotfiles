@@ -1,0 +1,19 @@
+#!/usr/bin/env bash
+
+echo '$HOME:' "$HOME"
+echo 'dirs:' "$(dirs)" '(dir stack)'
+echo '~+:' "get next dir in dir stack"
+echo '~-:' "get previous dir in dir stack"
+echo '${10} (10th arg):' "${10}"
+echo '$0:' "$0"
+echo '$$:' "$$" '(PID)'
+echo '$@:' "$@" '(all args as multiple words)'
+echo '$*:' "$*" '(all args as one word)'
+echo '$#:' "$#" '(number of args)'
+echo '$?:' "$?" '(status of last command)'
+echo '$!:' "$!" '(PID of most recent background process)'
+echo '$-:' "$-" '(current bash options)'
+echo '!!' "$(echo '!!' | bash)" '(previous command)'
+echo '!str' '(last command that starts with str)'
+echo '!str:s/x/y/' '(run last command that starts with str and replace x -> y [/g does not work])'
+bind -p 2>/dev/null | grep -Ev '(self-insert|do-lower|^#|digit-argument)' | sed 's|"||g' | sed 's|\\C|ctrl|g' | sed 's|\\e|alt-|g' | sed -E 's|([a-zA-Z0-9])ctrl|\1 ctrl|g' | grep -v 'alt-alt' | grep -v 'alt-\['| sed -E 's|sPACE|<space>|g' | sed -E 's|([a-zA-Z0-9])([^>:]):|\1 \2:|g' | sort

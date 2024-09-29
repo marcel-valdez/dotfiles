@@ -1,0 +1,42 @@
+#!/usr/bin/env ruby
+
+require 'timeout'
+require 'io/console'
+
+if ARGV.length == 0
+ puts "alert-on is a utility that receives piped input text and alerts when a"
+ puts "given pattern is found."
+ puts "Usage: cat my.log | alert-on (regular expression) [command on match]"
+ puts "If no command on match is specified, this utility will try to execute 'beep' on the shell."
+ puts "If a command is specified on match, this utility will call the command and send it"
+ puts "the line that matched the regular expression as its input."
+ exit(1)
+end
+
+def highlight(line)
+    result = "#########################################################################################################\n"
+    result += line + "\n"
+    result += "#########################################################################################################"
+    result
+end
+
+pattern=Regexp.new(ARGV.first)
+command = 'beep'
+command = ARGV[1] if ARGV.length > 1
+
+ARGF.each_line do |line|
+  puts' hiho'
+  if pattern.match line
+    puts highlight line
+    begin
+      exec "#{command} '#{line}'"
+    rescue
+    end
+    Timeout::timeout(3) do
+      STDIN.getch # wait for Enter key from user
+    end
+  else
+    puts line
+  end
+  puts' hihe'
+end

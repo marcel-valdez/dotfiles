@@ -1,42 +1,58 @@
 #!/usr/bin/env bash
 
+TYPES=(pdf doc html docx odt)
+SCRIPT="$(basename $0)"
+
 function usage() {
-  echo "markdown-to <[-t|--type] type> <input file> [output file]"
-  echo "type: one of pdf, html"
-  echo "input file: The markdown file to process"
-  echo "output file: The name of the output file to produce"
+  echo "${SCRIPT} converts a markdown formatted file to one of ${TYPES[@]}" >&2
+  echo "${SCRIPT} [-h|--help] [-o|--output|--to output_file] \
+<-f|--from|--file input_file> <-t|--type output_type>" >&2
+  echo "  --help: Displays this help message." >&2
+  echo "  output_file: The output file after conversion. Default is the name of\
+the input file with the extensions changed to the output type." >&2
+  echo "  input_file: The input markdown file to convert." >&2
+  echo "  output_type: The type of output format. One of ${TYPES[@]}" >&2
 }
 
-while [ $# -gt 0 ]; do
+while [[ $# -gt 0 ]]; do
   case $1 in
+    -o|--output|--to)
+      output_file=$2
+      shift
+      ;;
+    -f|--from|--file)
+      input_file=$2
+      shift
+      ;;
+    -h|--help)
+      usage
+      exit 0
+      ;;
     -t|--type)
-      type=$2
+      output_type=$2
       shift
       ;;
     *)
-      break
+      echo "Unknown parameter: $1" >&2
+      usage
+      exit 1
   esac
   shift
 done
 
-if [ -z "${type}" ]; then
-  echo "You must specify the output type"
-  usage
+input_dir=$(dirname "${input_file}")
+input_with_ext=$(basename "${input_file}")
+input_no_ext="${input_with_ext%.*}"
+input_ext="${input_with_ext##*.}"
+
+if [[ -z "${output_file}" ]] && [[ -z "${output_type}" ]]; then
+  echo "You must specify the output input WITH extension or the output type of the document." >&2
   exit 1
 fi
 
-input_file=$1
-output_file=$2
-[ -z ${output_file} ] && output_file="${input_file%.md}.${type}"
+[[ -z "${output_file}" ]] && output_file="${input_no_ext}.${output_type}"
+[[ -z "${output_type}" ]] && output_type="${output_file##*.}"
 
-input_file=$(readlink -f "${input_file}")
-output_file=$(readlink -f "${output_file}")
+[[ "${input_ext}" == "md" ]] && input_ext="markdown"
 
-case ${type} in
-  pdf)
-    pandoc --from=markdown --to=latex --output="${output_file}" "${input_file}"
-  ;;
-  html)
-    pandoc --from=markdown --to=html --output="${output_file}" "${input_file}"
-  ;;
-esac
+pandoc --from="${input_ext}" --to="${output_type}" --output="${output_file}" "${input_file}"

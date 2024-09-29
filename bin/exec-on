@@ -1,0 +1,77 @@
+#!/usr/bin/env ruby
+
+require 'shellwords'
+require 'timeout'
+require 'io/console'
+
+# TODO: Add capability to specify how many lines to skip
+#       Add capability to specify that only new lines should be read
+
+if ARGV.length == 0
+ puts "exec-on is a utility that receives piped input text and executes a"
+ puts "command when given pattern is matched."
+ puts "Usage: cat my.log | exec-on (regular expression) [red|yellow|green] [command on match]"
+ puts "If no command on match is specified, this utility will just highlight"
+ puts "matched text on the shell."
+ puts "If a command is specified on match, this utility will call the command"
+ puts "and send it the line that matched the regular expression as its single"
+ puts "input."
+ exit(1)
+end
+
+class String
+  def convert
+    self.encode("UTF-8", :invalid => :replace, :undef => :replace, :replace => "?")
+  end
+
+  def remove_non_utf8
+    convert[0..-2]
+  end
+end
+
+colors = [ "red", "yellow", "green" ]
+
+pattern=Regexp.new(ARGV.shift)
+color = "yellow"
+if not ARGV.first.nil? and colors.include? ARGV.first.downcase
+  color = ARGV.shift.downcase
+end
+
+command = nil
+command = ARGV.shift unless ARGV.first.nil?
+
+# Highlights the line with a black background and yellow foreground
+def highlight(line, color)
+  case color
+    when "yellow"
+      "\e[1;33;40m#{line}\e[0m"
+    when "red"
+       "\e[1;31;40m#{line}\e[0m"
+    when "green"
+       "\e[1;32;40m#{line}\e[0m"
+    when "blue"
+       "\e[1;34;40m#{line}\e[0m"
+    when "white"
+       "\e[1;37;40m#{line}\e[0m"
+    when "cyan"
+       "\e[1;36;40m#{line}\e[0m"
+    when "magenta"
+       "\e[1;35;40m#{line}\e[0m"
+  end
+end
+
+ARGF.each_line do |line|
+  line = line.remove_non_utf8
+  if pattern.match line
+    puts highlight(line, color)
+    unless command.nil?
+      begin
+        system "#{command} #{Shellwords.escape(line)}"
+      rescue
+      end
+    end
+    puts
+  else
+    puts line
+  end
+end

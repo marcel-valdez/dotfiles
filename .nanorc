@@ -22,7 +22,7 @@
 # set backup
 
 ## The directory to put unique backup files in.
-set backupdir "~/.nano_bak"
+set backupdir "$HOME/.nano_bak"
 
 ## Do backwards searches by default.
 # set backwards
@@ -35,14 +35,14 @@ set backupdir "~/.nano_bak"
 ## punctuation, optionally followed by closing brackets, can end
 ## sentences.
 ##
-# set brackets ""')>]}"
+set brackets ""')>]}"
 
 ## Do case sensitive searches by default.
 # set casesensitive
 
 ## Constantly display the cursor position in the statusbar.  Note that
 ## this overrides "quickblank".
-# set const
+set const
 
 ## Use cut to end of line by default.
 # set cut
@@ -60,7 +60,7 @@ set historylog
 ## searches.  They cannot contain blank characters.  The former set must
 ## come before the latter set, and both must be in the same order.
 ##
-# set matchbrackets "(<[{)>]}"
+set matchbrackets "(<[{)>]}"
 
 ## Use the blank line below the titlebar as extra editing space.
 # set morespace
@@ -108,7 +108,7 @@ set nowrap
 ## punctuation, optionally followed by closing brackets, can end
 ## sentences.
 ##
-# set punct "!.?"
+set punct "!.?%/"
 
 ## Do quick statusbar blanking.  Statusbar messages will disappear after
 ## 1 keystroke instead of 26.  Note that "const" overrides this.
@@ -168,7 +168,7 @@ set tabstospaces
 
 ## Detect word boundaries more accurately by treating punctuation
 ## characters as parts of words.
-# set wordbounds
+set wordbounds
 
 ## Enable the new (EXPERIMENTAL) generic undo code, not just for line cuts
 # set undo
@@ -232,13 +232,13 @@ bind M-, prevword all
 bind M-. nextword all
 
 unbind ^Space main
-bind ^Space mark all
+bind ^Space mark main
 
 unbind M-C main
-# bind M-C copytext main
+bind M-C copytext main
 
 unbind M-V main
-# bind M-V uncut main
+bind M-V uncut main
 
 unbind M-X main
 bind M-X cut main
@@ -246,8 +246,14 @@ bind M-X cut main
 unbind ^H main
 bind ^H help main
 
+bind M-3 findnext main
+bind M-# findprevious main
+
 unbind ^O all
 bind ^S writeout all
+
+unbind ^R main
+bind ^O insert main
 
 unbind M-M main
 bind M-M findbracket main
@@ -267,71 +273,104 @@ bind M-# findprevious main
 ## Set this if your backspace key sends delete most of the time (2.1.3+)
 # bind kdel backspace all
 
-
-## Nanorc files
-# include "/usr/share/nano/nanorc.nanorc"
-
-## C/C++
-# include "/usr/share/nano/c.nanorc"
-
-## Cascading Style Sheets
-# include "/usr/share/nano/css.nanorc"
-
-## Debian files
-# include "/usr/share/nano/debian.nanorc"
-
-## Gentoo files
-# include "/usr/share/nano/gentoo.nanorc"
-
-## HTML
-# include "/usr/share/nano/html.nanorc"
-
-## PHP
-# include "/usr/share/nano/php.nanorc"
-
-## TCL
-# include "/usr/share/nano/tcl.nanorc"
-
-## TeX
-# include "/usr/share/nano/tex.nanorc"
-
-## Quoted emails (under e.g. mutt)
-# include "/usr/share/nano/mutt.nanorc"
-
-## Patch files
-# include "/usr/share/nano/patch.nanorc"
-
-## Manpages
-# include "/usr/share/nano/man.nanorc"
-
-## Groff
-# include "/usr/share/nano/groff.nanorc"
-
-## Perl
-# include "/usr/share/nano/perl.nanorc"
-
-## Python
-#include "/usr/share/nano/python.nanorc"
-
-## Ruby
-#include "/usr/share/nano/ruby.nanorc"
-
-## Java
-#include "/usr/share/nano/java.nanorc"
-
-## AWK
-#include "/usr/share/nano/awk.nanorc"
-
-## Assembler
+## include "/path/to/syntax_file.nanorc"
 #include "/usr/share/nano/asm.nanorc"
-
-## Bourne shell scripts
-#include "/usr/share/nano/sh.nanorc"
-
-## POV-Ray
+#include "/usr/share/nano/awk.nanorc"
+#include "/usr/share/nano/c.nanorc"
+#include "/usr/share/nano/css.nanorc"
+#include "/usr/share/nano/debian.nanorc"
+#include "/usr/share/nano/gentoo.nanorc"
+#include "/usr/share/nano/groff.nanorc"
+#include "/usr/share/nano/html.nanorc"
+#include "/usr/share/nano/java.nanorc"
+#include "/usr/share/nano/man.nanorc"
+#include "/usr/share/nano/mutt.nanorc"
+#include "/usr/share/nano/nanorc.nanorc"
+#include "/usr/share/nano/patch.nanorc"
+#include "/usr/share/nano/perl.nanorc"
+#include "/usr/share/nano/php.nanorc"
 #include "/usr/share/nano/pov.nanorc"
-
-## XML-type files
+#include "/usr/share/nano/python.nanorc"
+#include "/usr/share/nano/ruby.nanorc"
+#include "/usr/share/nano/sh.nanorc"
+#include "/usr/share/nano/tcl.nanorc"
+#include "/usr/share/nano/tex.nanorc"
 #include "/usr/share/nano/xml.nanorc"
 
-include "~/.nano/syntax/ALL.nanorc"
+include "~/.nano/apacheconf.nanorc"
+include "~/.nano/arduino.nanorc"
+include "~/.nano/asciidoc.nanorc"
+include "~/.nano/asm.nanorc"
+include "~/.nano/awk.nanorc"
+include "~/.nano/cmake.nanorc"
+include "~/.nano/c.nanorc"
+include "~/.nano/coffeescript.nanorc"
+include "~/.nano/colortest.nanorc"
+include "~/.nano/conf.nanorc"
+include "~/.nano/csharp.nanorc"
+include "~/.nano/css.nanorc"
+include "~/.nano/cython.nanorc"
+include "~/.nano/Dockerfile.nanorc"
+include "~/.nano/dot.nanorc"
+include "~/.nano/email.nanorc"
+include "~/.nano/fish.nanorc"
+include "~/.nano/fortran.nanorc"
+include "~/.nano/gentoo.nanorc"
+include "~/.nano/gitcommit.nanorc"
+include "~/.nano/git.nanorc"
+include "~/.nano/glsl.nanorc"
+include "~/.nano/go.nanorc"
+include "~/.nano/groff.nanorc"
+include "~/.nano/haml.nanorc"
+include "~/.nano/haskell.nanorc"
+include "~/.nano/html.nanorc"
+include "~/.nano/ini.nanorc"
+include "~/.nano/inputrc.nanorc"
+include "~/.nano/java.nanorc"
+include "~/.nano/javascript.nanorc"
+include "~/.nano/js.nanorc"
+include "~/.nano/json.nanorc"
+include "~/.nano/keymap.nanorc"
+include "~/.nano/kickstart.nanorc"
+include "~/.nano/ledger.nanorc"
+include "~/.nano/lisp.nanorc"
+include "~/.nano/lua.nanorc"
+include "~/.nano/makefile.nanorc"
+include "~/.nano/man.nanorc"
+include "~/.nano/markdown.nanorc"
+include "~/.nano/mpdconf.nanorc"
+include "~/.nano/mutt.nanorc"
+include "~/.nano/nanorc.nanorc"
+include "~/.nano/nginx.nanorc"
+include "~/.nano/ocaml.nanorc"
+include "~/.nano/patch.nanorc"
+include "~/.nano/peg.nanorc"
+include "~/.nano/perl6.nanorc"
+include "~/.nano/perl.nanorc"
+include "~/.nano/php.nanorc"
+include "~/.nano/pkgbuild.nanorc"
+include "~/.nano/pkg-config.nanorc"
+include "~/.nano/po.nanorc"
+include "~/.nano/pov.nanorc"
+include "~/.nano/privoxy.nanorc"
+include "~/.nano/python.nanorc"
+include "~/.nano/reST.nanorc"
+include "~/.nano/rpmspec.nanorc"
+include "~/.nano/ruby.nanorc"
+include "~/.nano/rust.nanorc"
+include "~/.nano/scala.nanorc"
+include "~/.nano/sed.nanorc"
+include "~/.nano/sh.nanorc"
+include "~/.nano/sls.nanorc"
+include "~/.nano/sql.nanorc"
+include "~/.nano/swift.nanorc"
+include "~/.nano/systemd.nanorc"
+include "~/.nano/tcl.nanorc"
+include "~/.nano/tex.nanorc"
+include "~/.nano/vala.nanorc"
+include "~/.nano/vi.nanorc"
+include "~/.nano/xml.nanorc"
+include "~/.nano/xresources.nanorc"
+include "~/.nano/yaml.nanorc"
+include "~/.nano/yum.nanorc"
+include "~/.nano/zsh.nanorc"

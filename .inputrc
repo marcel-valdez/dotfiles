@@ -25,7 +25,7 @@ set bind-tty-special-chars off
 
 # do not bell on tab-completion
 # set bell-style none
-set bell-style visible
+# set bell-style visible
 
 # some defaults / modifications for the emacs mode
 $if mode=emacs
@@ -59,6 +59,12 @@ $if mode=emacs
 "\e\e[C": forward-word
 "\e\e[D": backward-word
 
+# region manipulation mappings
+# completely new and unset
+"\C-SPACE": set-mark
+# default for C-w is unix-word-rubout
+"\C-w": kill-region
+
 $if term=rxvt
 "\e[8~": end-of-line
 "\eOc": forward-word
@@ -74,6 +80,8 @@ $endif
 # "\e[F": end-of-line
 
 $endif
+"\ep":history-search-backward
+"\en":history-search-forward
 
 # This system's shell does not have the paste-from-clipboard
 # capability

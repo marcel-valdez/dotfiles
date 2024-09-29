@@ -1,0 +1,5 @@
+# !/usr/bin/bash
+
+backup_file="$1.bak"
+
+cp "$1" "$backup_file"

@@ -33,7 +33,11 @@ done
 
 if focused-window-is-program "terminal"; then
   eval "${_then}"
+  exit 0
 else
   eval "${_else}"
+  exit 0
 fi
+
+exit 1
 

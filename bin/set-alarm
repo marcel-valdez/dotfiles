@@ -1,23 +1,26 @@
 #!/usr/bin/env bash
 
-
 SCRIPT=$(basename "${BASH_SOURCE[0]}")
 function usage() {
-  echo "${SCRIPT} sets up an alarm later in time"
-  echo "${SCRIPT} [--number-of-beeps|-n <number of beeps>] <time-spec>"
+  echo "$SCRIPT sets up an alarm later in time"
+  echo "$SCRIPT [-number-of-beeps|-n <number of beeps>] [--message|-m <message>]  <time-spec>"
   echo "number-of-beeps: Number of times the computer should beep (and wake you up)"
 }
 
-beeps=10
-while [ $# -gt 0 ]
-do
+beeps=5
+while [ $# -gt 0 ]; do
   case "$1" in
     -n|--number-of-beeps)
       beeps=$2
       shift
       ;;
-    --help)
+    -m|--message)
+      message=$2
+      shift
+      ;;
+    -h|--help)
       usage
+      exit
       ;;
     *)
       break
@@ -27,12 +30,15 @@ do
 done
 
 
-read -d '' code <<EOF
- for i in \$(seq 1 ${beeps})
- do
-   ${HOME}/bin/beep
-   sleep 2
- done
-EOF
+title="set-alarm notification"
+if [ -z "${message}" ]; then
+  message="Alarm set off"
+fi
 
-echo "${code}" | at "$@"
+script=$(cat << EOF
+${HOME}/bin/beep ${beeps} &
+${HOME}/bin/notify "${title}" "${message}"
+EOF
+)
+
+echo "${script}" | at "$@"

@@ -2,6 +2,9 @@
 # see /usr/share/doc/bash/examples/startup-files (in the package bash-doc)
 # for examples
 
+export EMACS_TTY_SERVER="tty-server"
+# enable 24-bit colors
+export COLORTERM=truecolor
 # If not running interactively, don't do anything
 case $- in
     *i*) ;;
@@ -52,20 +55,23 @@ function initialize_environment() {
 
 # don't put duplicate lines or lines starting with space in the history.
 # See bash(1) for more options
-export HISTCONTROL=ignoreboth
+export HISTCONTROL=ignoreboth:erasedups
 
 # append to the history file, don't overwrite it
 shopt -s histappend
-
-# for setting history length see HISTSIZE and HISTFILESIZE in bash(1)
-export HISTSIZE=10000
-export HISTFILESIZE=50000
 
 # check the window size after each command and, if necessary,
 # update the values of LINES and COLUMNS.
 shopt -s checkwinsize
 
 export TERM="xterm-256color"
+# for setting history length see HISTSIZE and HISTFILESIZE in bash(1)
+export HISTSIZE=100000
+export HISTFILESIZE=200000
+# history -a: append this session's new history elements to the history file
+# history -c: clear this session's history list
+# history -r: read the history file's entries and make them the current history list
+export PROMPT_COMMAND="${PROMPT_COMMAND:+$PROMPT_COMMAND$'\n'}history -a"
 
 # If set, the pattern "**" used in a pathname expansion context will
 # match all files and zero or more directories and subdirectories.
@@ -79,9 +85,40 @@ if [[ -z "${debian_chroot:-}" ]] && [[ -r /etc/debian_chroot ]]; then
   debian_chroot=$(cat /etc/debian_chroot)
 fi
 
+log_debug "Loading bash_completion"
+# enable programmable completion features (you don't need to enable
+# this, if it's already enabled in /etc/bash.bashrc and /etc/profile
+# sources /etc/bash.bashrc).
+if ! shopt -oq posix; then
+  if [ -f /usr/share/bash-completion/bash_completion ]; then
+    source /usr/share/bash-completion/bash_completion
+  elif [ -f /etc/bash_completion ]; then
+    source /etc/bash_completion
+  fi
+fi
+
+log_debug "Loaded bash_completion"
+
+
+# Alias definitions.
+# You may want to put all your additions into a separate file like
+# ~/.bash_aliases, instead of adding them here directly.
+# See /usr/share/doc/bash-doc/examples in the bash-doc package.
+
+log_debug "Loading .bash* sources"
+if [ -f "${HOME}/.bash_aliases" ]; then
+  source "${HOME}/.bash_aliases"
+fi
+
+if [ -f "${HOME}/.bash_functions" ]; then
+  source "${HOME}/.bash_functions"
+fi
+log_debug "Loaded .bash* sources"
+
 # set a fancy prompt (non-color, unless we know we "want" color)
 case "${TERM}" in
   xterm-color) color_prompt=yes;;
+  xterm-256color) color_prompt=yes;;
 esac
 
 # uncomment for a colored prompt, if the terminal has the capability; turned
@@ -145,17 +182,17 @@ alias ll='ls -alF'
 alias la='ls -A'
 alias l='ls -CF'
 
-# Alias definitions.
-# You may want to put all your additions into a separate file like
-# ~/.bash_aliases, instead of adding them here directly.
-# See /usr/share/doc/bash-doc/examples in the bash-doc package.
+# Add an "alert" alias for long running commands.  Use like so:
+#   sleep 10; alert
+# alias alert='notify-send --urgency=low -i "$([ $? = 0 ] && echo terminal || echo error)" "$(history|tail -n1|sed -e '\''s/^\s*[0-9]\+\s*//;s/[;&|]\s*alert$//'\'')"'
 
-[[ -f "${HOME}/.bash_aliases" ]] && source "${HOME}/.bash_aliases"
-[[ -f "${HOME}/.bash_functions" ]] && source "${HOME}/.bash_functions"
+# Path additions
 
-export PATH="${PATH}:${HOME}/bin" # add local bin folder to path
+if [ -d "${HOME}/bin" ]; then
+  export PATH=$PATH:"$HOME/bin"
+fi
 
-if [[ -d "${HOME}/.local/bin" ]]; then
+if [ -d "${HOME}/.local/bin" ]; then
   export PATH="${PATH}:${HOME}/.local/bin"
 fi
 
@@ -173,6 +210,15 @@ if ! shopt -oq posix; then
     source /etc/bash_completion
   fi
 fi
+
+# Add RVM to PATH for scripting
+# custom environment variables
+# export J2D_PIXMAPS="shared"
+export NVM_DIR="${HOME}/.nvm"
+export CHECK_PACKAGES_CONFIG="${HOME}/.launchpad-helper"
+export NODE_VERSION="16.13.1"
+export BIN_UTILS_PASS_PHRASE_FILE="${HOME}/.bin-utils-pass-phrase"
+export SUBLIME_PROJECTS_FOLDER="${HOME}/sublime_projects"
 
 if [[ "$(uname)" =~ "Linux" ]]; then
   export GIT_EDITOR="${HOME}/.local/bin/emacs -nw"
@@ -206,8 +252,12 @@ if [[ "$(uname)" =~ "Linux" ]]; then
   fi
 fi
 
-if ! pgrep -af '.*emacs.*--daemon=tty-server.*' &>/dev/null; then
-    echo "emacs --daemon=tty-server" | at NOW
+if ! pgrep -af '.*emacs.*'"--daemon=${EMACS_TTY_SERVER}"'.*' &>/dev/null; then
+  if type at &>/dev/null; then
+    echo "emacs --daemon=${EMACS_TTY_SERVER}" | at NOW
+  else
+    (emacs --daemon=${EMACS_TTY_SERVER} &)
+  fi
 fi
 
 if [[ -z "${MONO_PATH}" ]]; then
@@ -216,16 +266,40 @@ else
   export MONO_PATH="${MONO_PATH}:/usr/bin/continuoustests"
 fi
 
+# This loads nvm
 export NVM_DIR="${HOME}/.nvm"
-[[ -s "${NVM_DIR}/nvm.sh" ]] && source "${NVM_DIR}/nvm.sh"  # This loads nvm
+log_debug "Loading NVM"
+[ -s "${NVM_DIR}/nvm.sh" ] && source "${NVM_DIR}/nvm.sh"
+# This loads nvm bash_completion
+log_debug "Loading NVM bash completion"
+[ -s "${NVM_DIR}/bash_completion" ] && \. "${NVM_DIR}/bash_completion"
+log_debug "Loaded NVM"
+
+# Load RVM into a shell session *as a function*
+log_debug "Loading RVM"
+[[ -s "${HOME}/.rvm/scripts/rvm" ]] && source "${HOME}/.rvm/scripts/rvm"
+log_debug "Loaded RVM"
+export PATH="${PATH}:${HOME}/.rvm/bin" # Add RVM to PATH for scripting
+
 # This sets up the default node version and loads it
 export NODE_VERSION="lts"
+log_debug "Loading node.js"
 node-check-use --silent
+log_debug "Loaded node.js"
+
+# Reads the pending log buffer
+log-buffer --read
+export http_proxy=''
+export https_proxy=''
+export ftp_proxy=''
+export socks_proxy=''
 
 # Enable fzf keybindings for Bash:
 [[ -f /usr/share/doc/fzf/examples/key-bindings.bash ]] && source /usr/share/doc/fzf/examples/key-bindings.bash
 
 # Enable fuzzy auto-completion for Bash:
 [[ -f /usr/share/doc/fzf/examples/completion.bash ]] && source /usr/share/doc/fzf/examples/completion.bash
+
 [[ -f "${HOME}/.fzf.bash" ]] && source "${HOME}/.fzf.bash"
 [ -s "$NVM_DIR/bash_completion" ] && \. "$NVM_DIR/bash_completion"  # This loads nvm bash_completion
+export BAT_CONFIG_PATH="${HOME}/.bat.conf"

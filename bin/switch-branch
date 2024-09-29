@@ -1,0 +1,45 @@
+#!/bin/bash
+
+pending_changes=`git status --porcelain`
+if [ "$pending_changes" -ne "" ]; then
+  echo "There are pending changes in the current repository."
+  exit 1
+fi
+
+branch_name=$1
+checked_out=$2
+
+if [ "$branch_name" -eq "" ]; then
+  echo "Please specify a branch name for the new checked out branch."
+fi
+
+if [ "$checked_out" -eq "" ]; then
+  echo "Please specify a branch to checkout"
+fi
+
+git co -b $branch_name $checked_out
+validate $? "Error while checking out the branch."
+
+git clean -dfx
+validate $? "git clean -dfx failed"
+
+cd build
+ant dev
+validate $? "ant dev failed :("
+
+ant start-k
+validate $? "ant start-k failed :("
+
+ant start-rdbms
+validate $? "ant start-rdbms failed :("
+
+sleep 2s
+ant start-appserver
+
+
+function validate() {
+  if [ $1 -ne 0 ]; then
+    echo $2
+    exit 1
+  fi
+}

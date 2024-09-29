@@ -89,7 +89,66 @@
       ;; We're actually able to control the font in GUI mode
       ;;  '(default ((t (:family "Azeret Mono" :foundry "NONE" :slant normal :weight normal :height 105 :width normal))))
       (set-face-attribute 'default nil :family "Azeret Mono" :height 105)))
+;; customize tab-bar-mode hotkeys
+(progn
+  (defun custom/switch-to-next-tab ()
+    (interactive)
+    (tab-bar-switch-to-next-tab 1))
+  (defun custom/move-tab-right ()
+    (interactive)
+    (tab-bar-move-tab 1))
+  (defun custom/move-tab-left ()
+    (interactive)
+    (tab-bar-move-tab -1))
+  (defvar tab-bar-key-map (make-sparse-keymap)
+    "Keymap for tab-related actions.")
+  (define-key tab-bar-key-map (kbd "M-<right>") 'custom/switch-to-next-tab)
+  (define-key tab-bar-key-map (kbd "M-<left>") 'tab-bar-switch-to-prev-tab)
+  (define-key tab-bar-key-map (kbd "C-<right>") 'custom/move-tab-right)
+  (define-key tab-bar-key-map (kbd "C-<left>") 'custom/move-tab-left)
+  (define-key tab-bar-key-map (kbd "M-q") 'tab-bar-close-tab)
+  (define-key tab-bar-key-map (kbd "M-n") 'tab-bar-new-tab)
+  (define-key tab-bar-key-map (kbd "M-T") 'tab-bar-undo-close-tab)
+  (define-key tab-bar-key-map (kbd "M-<f2>") 'tab-bar-rename-tab)
+  (define-key tab-bar-key-map (kbd "M-1") (lambda () (interactive) (tab-bar-select-tab 1)))
+  (define-key tab-bar-key-map (kbd "M-2") (lambda () (interactive) (tab-bar-select-tab 2)))
+  (define-key tab-bar-key-map (kbd "M-3") (lambda () (interactive) (tab-bar-select-tab 3)))
+  (define-key tab-bar-key-map (kbd "M-4") (lambda () (interactive) (tab-bar-select-tab 4)))
+  (define-key tab-bar-key-map (kbd "M-5") (lambda () (interactive) (tab-bar-select-tab 5)))
+  (define-key tab-bar-key-map (kbd "M-6") (lambda () (interactive) (tab-bar-select-tab 6)))
+  (define-key tab-bar-key-map (kbd "M-7") (lambda () (interactive) (tab-bar-select-tab 7)))
+  (define-key tab-bar-key-map (kbd "M-8") (lambda () (interactive) (tab-bar-select-tab 8)))
+  (define-key tab-bar-key-map (kbd "M-9") (lambda () (interactive) (tab-bar-select-tab -1)))
+  (define-key tab-bar-key-map (kbd "M-0") (lambda () (interactive) (tab-bar-select-tab -2)))
 
+  (put 'custom/switch-to-next-tab 'repeat-map 'tab-bar-key-map)
+  (put 'tab-bar-switch-to-prev-tab 'repeat-map 'tab-bar-key-map)
+  (put 'custom/move-tab-left 'repeat-map 'tab-bar-key-map)
+  (put 'custom/move-tab-right 'repeat-map 'tab-bar-key-map)
+  (put 'tab-bar-close-tab 'repeat-map 'tab-bar-key-map)
+  ;; This makes for a pretty bad user experience.
+  ;(put 'tab-bar-new-tab 'repeat-map 'tab-bar-key-map)
+  (put 'tab-bar-undo-close-tab 'repeat-map 'tab-bar-key-map)
+
+  (global-unset-key (kbd "M-t"))
+  (define-key global-map (kbd "M-t") (lambda () (interactive) (set-transient-map tab-bar-key-map))))
+
+(defun custom/tab-bar-appearance ()
+  ;; Customizes tab-bar-mode's appearance.
+  (set-face-attribute 'tab-bar nil
+                      :inherit 'variable-pitch
+                      :background "#1c1c1c"
+                      :foreground "#111111")
+  (set-face-attribute 'tab-bar-tab-inactive nil
+                      :inherit 'tab-bar
+                      :background "#505050"
+                      :underline nil)
+  (set-face-attribute 'tab-bar-tab nil
+                      :inherit 'tab-bar
+                      :weight 'bold
+                      :background "#2e3436"
+                      :foreground "f0f0e8"))
+(add-hook 'tab-bar-mode-hook 'custom/tab-bar-appearance)
 ;;; re-binds certain keys when inside a TMUX session
 (if (display-graphic-p)
     ;; if emacs is run as a GUI window
@@ -187,6 +246,20 @@
   (with-library flyspell-correct
     (define-key flyspell-mode-map (kbd "C-;") 'flyspell-correct-wrapper)))
 
+(savehist-mode 1)
+;; Save search strings across sessions
+(setq savehist-additional-variables (list 'search-ring 'regexp-search-ring))
+;; end: Command history configuration
+
+;; desktop package configuration
+(setq desktop-auto-save-timeout 10)
+(setq desktop-path (list "~/.emacs.d/desktop-save/default"))
+;; don't auto-load/auto-save previously stored desktop
+(desktop-save-mode 0)
+;; end: desktop package configuration
+;; Enable showing the namespace / function the cursor is at.
+(which-function-mode)
+
 (use-package org
   :config
   (defun custom:org-mode-hook ()
@@ -222,7 +295,11 @@
                      (quote ((agenda time-up priority-down tag-up))))
                     (org-deadline-warning-days 1)))
            ;; See: https://orgmode.org/manual/Matching-tags-and-properties.html
-           (tags "+TODO={DOING\\|TODO}+PRIORITY=\"0\"-STYLE=\"habit\"")
+           (tags "+TODO={DOING}-STYLE=\"habit\"+TODAY")
+           (tags "+TODO={TODO\\|WAITING}-STYLE=\"habit\"+TODAY")
+           (tags "+TODO={DOING\\|TODO\\|WAITING}-STYLE=\"habit\"+WEEK-TODAY")
+           (tags "+TODO={DOING\\|TODO}-STYLE=\"habit\"+MONTH-WEEK-TODAY")
+           (tags "+TODO={DOING\\|TODO}+PRIORITY=\"0\"-STYLE=\"habit\"-TODAY-WEEK-MONTH")
            (tags "+TODO={DOING\\|TODO}-PRIORITY=\"0\"-PRIORITY=\"2\"-STYLE=\"habit\"")
            (tags "+TODO=\"WAITING\"+PRIORITY=\"0\"-STYLE=\"habit\"")
            (tags "+TODO=\"WAITING\"-PRIORITY=\"0\"-PRIORITY=\"2\"-STYLE=\"habit\"")
@@ -235,7 +312,8 @@
                    ((org-agenda-sorting-strategy
                      (quote ((agenda time-up priority-down tag-up))))
                     (org-deadline-warning-days 1)))
-           (tags "-TODO={DONE\\|CANCELLED}")))
+           (tags "-TODO={DONE\\|CANCELLED}"))
+          ((org-agenda-tag-filter-preset '("+{WORK\\|BOTH}"))))
          ("Wd" "Daily Action List"
            ;; See: https://orgmode.org/manual/Filtering_002flimiting-agenda-items.html
           ((agenda ""
@@ -245,7 +323,11 @@
                      (quote ((agenda time-up priority-down tag-up))))
                     (org-deadline-warning-days 1)))
            ;; See: https://orgmode.org/manual/Matching-tags-and-properties.html
-           (tags "+TODO={DOING\\|TODO}+PRIORITY=\"0\"-STYLE=\"habit\"")
+           (tags "+TODO={DOING}-STYLE=\"habit\"+TODAY")
+           (tags "+TODO={TODO\\|WAITING}-STYLE=\"habit\"+TODAY")
+           (tags "+TODO={DOING\\|TODO\\|WAITING}-STYLE=\"habit\"+WEEK-TODAY")
+           (tags "+TODO={DOING\\|TODO}-STYLE=\"habit\"+QUARTER-WEEK-TODAY")
+           (tags "+TODO={DOING\\|TODO}+PRIORITY=\"0\"-STYLE=\"habit\"-TODAY-WEEK-QUARTER")
            (tags "+TODO={DOING\\|TODO}-PRIORITY=\"0\"-PRIORITY=\"2\"-STYLE=\"habit\"")
            (tags "+TODO=\"WAITING\"+PRIORITY=\"0\"-STYLE=\"habit\"")
            (tags "+TODO=\"WAITING\"-PRIORITY=\"0\"-PRIORITY=\"2\"-STYLE=\"habit\"")
@@ -324,6 +406,8 @@
       (flyspell-mode))
     (add-hook 'markdown-mode-hook 'markdown-enable-flyspell)))
 
+(use-package fzf
+  :ensure t)
 (use-package web-beautify
   :ensure t
   :config

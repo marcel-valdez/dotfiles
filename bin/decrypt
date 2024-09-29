@@ -1,3 +1,9 @@
 #!/usr/bin/env bash
 file=$1
-openssl enc -d -aes-256-cbc -in "$file.enc" -out "$file" #-pass file:$HOME/.ssh/key.bin
+
+if [ "$2" == "" ]; then
+  openssl enc -d -aes-256-cbc -in "$file.enc" -out "$file" #-pass file:$HOME/.ssh/key.bin
+else
+  pass_phrase="$2"
+  openssl enc -d -aes-256-cbc -in "$file.enc" -out "$file" -k $pass_phrase
+fi
