@@ -1,3 +1,5 @@
+#!/usr/bin/env bash
+
 # Setup fzf
 # ---------
 if [[ ! "$PATH" == *"${HOME}/.fzf/bin"* ]]; then
@@ -43,3 +45,5 @@ export FZF_ALT_C_OPTS="--preview 'tree -C {}'
 --bind 'ctrl-/:toggle-preview'
 --header 'CTRL-/: Toggle preview'
 "
+
+eval "$(fzf --bash)"
