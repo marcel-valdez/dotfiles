@@ -90,6 +90,16 @@
       ;; We're actually able to control the font in GUI mode
       ;;  '(default ((t (:family "Azeret Mono" :foundry "NONE" :slant normal :weight normal :height 105 :width normal))))
       (set-face-attribute 'default nil :family "Azeret Mono" :height 105)))
+;; Set font colors
+(set-face-attribute 'lazy-highlight nil
+                    :background "#181869"
+                    :distant-foreground "black")
+(set-face-attribute 'isearch
+                    :background "dodgerblue4"
+                    :foreground "lightskyblue1")
+(set-face-attribute 'isearch-fail
+                    :background "firebrick")
+
 ;; customize tab-bar-mode hotkeys
 (progn
   (defun custom/switch-to-next-tab ()
