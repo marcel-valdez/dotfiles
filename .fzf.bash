@@ -24,6 +24,7 @@ fi
 
 export FZF_DEFAULT_OPTS='-m '"
 --bind 'ctrl-y:execute-silent(echo -n {} | xclip -sel clip)+abort'
+--bind 'ctrl-space:select-all'
 "
 
 if [[ -n "${TMUX}" ]]; then
