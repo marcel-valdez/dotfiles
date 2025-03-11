@@ -845,3 +845,8 @@ function tmux-send-to-bash-panes {
   # Sends keys to all panes whose foreground command is bash.
   tmux list-panes -a -F "#{pane_id} #{pane_current_command}" | grep bash$ | cut -d' ' -f1 | xargs -Ipaneid tmux send-keys -t'paneid' "$@"
 }
+
+function tmux-send-to-session-panes {
+  # Sends keys to all panes whose foreground command is bash.
+  tmux list-panes -s -F "#{pane_id} #{pane_current_command}" | grep bash$ | cut -d' ' -f1 | xargs -Ipaneid tmux send-keys -t'paneid' "$@"
+}
