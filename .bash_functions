@@ -843,10 +843,24 @@ function fzf-navigate {
 
 function tmux-send-to-bash-panes {
   # Sends keys to all panes whose foreground command is bash.
-  tmux list-panes -a -F "#{pane_id} #{pane_current_command}" | grep bash$ | cut -d' ' -f1 | xargs -Ipaneid tmux send-keys -t'paneid' "$@"
+  _TMUX_PANE_PROC="bash" tmux-send-to-session-panes "$@"
 }
 
 function tmux-send-to-session-panes {
-  # Sends keys to all panes whose foreground command is bash.
-  tmux list-panes -s -F "#{pane_id} #{pane_current_command}" | grep bash$ | cut -d' ' -f1 | xargs -Ipaneid tmux send-keys -t'paneid' "$@"
+  # Sends keys to all panes whose foreground command is _TMUX_PANE_PROC (default: bash).
+  local process="${_TMUX_PANE_PROC}"
+  [[ -z "${process}" ]] && process="bash"
+
+  for arg in "$@"; do
+    tmux list-panes -s -F "#{pane_id} #{pane_current_command}" | grep "${process}"'$' | cut -d' ' -f1 | xargs -Ipaneid tmux send-keys -t'paneid' "${arg}"
+  done
+
+  local current_process=
+  current_process="$(tmux display-message -p '#{pane_pid}' | xargs ps -o comm= -p $(ps -o ppid= -p $(tmux display-message -p '#{pane_pid}')) | tail -1)"
+
+  if [[ "${current_process}" == "${process}" ]]; then
+    for arg in "$@"; do
+      tmux send-keys "${arg}"
+    done
+  fi
 }
