@@ -280,3 +280,5 @@ fi
 
 [[ -f "${HOME}/.fzf.bash" ]] && source "${HOME}/.fzf.bash"
 export BAT_CONFIG_PATH="${HOME}/.bat.conf"
+#+begin_src sh [ -n "$EAT_SHELL_INTEGRATION_DIR" ] && \ source "$EAT_SHELL_INTEGRATION_DIR/bash"
+#+end_src sh
