@@ -67,9 +67,9 @@ log_debug "Loading bash_completion"
 # sources /etc/bash.bashrc).
 if ! shopt -oq posix; then
   if [ -f /usr/share/bash-completion/bash_completion ]; then
-    source /usr/share/bash-completion/bash_completion
+    . /usr/share/bash-completion/bash_completion
   elif [ -f /etc/bash_completion ]; then
-    source /etc/bash_completion
+    . /etc/bash_completion
   fi
 fi
 
@@ -82,18 +82,18 @@ log_debug "Loaded bash_completion"
 # See /usr/share/doc/bash-doc/examples in the bash-doc package.
 
 log_debug "Loading .bash* sources"
-if [ -f "${HOME}/.bash_aliases" ]; then
-  source "${HOME}/.bash_aliases"
+if [ -s "${HOME}/.bash_aliases" ]; then
+  . "${HOME}/.bash_aliases"
 fi
 
-if [ -f "${HOME}/.bash_functions" ]; then
-  source "${HOME}/.bash_functions"
+if [ -s "${HOME}/.bash_functions" ]; then
+  . "${HOME}/.bash_functions"
 fi
 log_debug "Loaded .bash* sources"
 
 log_debug "Loading .google* sources"
-if [ -f "${HOME}/.googlerc.d/.googlerc" ]; then
-  source "${HOME}/.googlerc.d/.googlerc"
+if [ -s "${HOME}/.googlerc.d/.googlerc" ]; then
+  . "${HOME}/.googlerc.d/.googlerc"
 fi
 log_debug "Loaded .google* sources"
 
@@ -189,7 +189,7 @@ alias l='ls -CF'
 
 # Path additions
 if [ -d "${HOME}/bin" ]; then
-  export PATH=$PATH:"$HOME/bin"
+  export PATH="${PATH}:${HOME}/bin"
 fi
 
 if [ -d "${HOME}/.local/bin" ]; then
@@ -247,15 +247,15 @@ fi
 
 # This loads nvm
 log_debug "Loading NVM"
-[ -s "${NVM_DIR}/nvm.sh" ] && source "${NVM_DIR}/nvm.sh"
+[ -s "${NVM_DIR}/nvm.sh" ] && . "${NVM_DIR}/nvm.sh"
 # This loads nvm bash_completion
 log_debug "Loading NVM bash completion"
-[ -s "${NVM_DIR}/bash_completion" ] && \. "${NVM_DIR}/bash_completion"
+[ -s "${NVM_DIR}/bash_completion" ] && . "${NVM_DIR}/bash_completion"
 log_debug "Loaded NVM"
 
 # Load RVM into a shell session *as a function*
 log_debug "Loading RVM"
-[[ -s "${HOME}/.rvm/scripts/rvm" ]] && source "${HOME}/.rvm/scripts/rvm"
+[ -s "${HOME}/.rvm/scripts/rvm" ] && . "${HOME}/.rvm/scripts/rvm"
 log_debug "Loaded RVM"
 export PATH="${PATH}:${HOME}/.rvm/bin" # Add RVM to PATH for scripting
 
@@ -272,13 +272,18 @@ export ftp_proxy=''
 export socks_proxy=''
 
 # Enable fzf keybindings for Bash:
-[[ -f /usr/share/doc/fzf/examples/key-bindings.bash ]] && source /usr/share/doc/fzf/examples/key-bindings.bash
+[ -s /usr/share/doc/fzf/examples/key-bindings.bash ] && . /usr/share/doc/fzf/examples/key-bindings.bash
 # Enable fuzzy auto-completion for Bash:
-if [[ -f /usr/share/doc/fzf/examples/completion.bash ]]; then
-  source /usr/share/doc/fzf/examples/completion.bash
+if [ -s /usr/share/doc/fzf/examples/completion.bash ]; then
+  . /usr/share/doc/fzf/examples/completion.bash
 fi
 
-[[ -f "${HOME}/.fzf.bash" ]] && source "${HOME}/.fzf.bash"
-export BAT_CONFIG_PATH="${HOME}/.bat.conf"
+[ -s "${HOME}/.fzf.bash" ] && . "${HOME}/.fzf.bash"
+
+[ -s "${HOME}/.bat.conf" ] && export BAT_CONFIG_PATH="${HOME}/.bat.conf"
+
+[ -s "${HOME}/.cargo/env" ] && . "${HOME}/.cargo/env"
+
 #+begin_src sh [ -n "$EAT_SHELL_INTEGRATION_DIR" ] && \ source "$EAT_SHELL_INTEGRATION_DIR/bash"
 #+end_src sh
+
