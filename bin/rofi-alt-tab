@@ -1,2 +1,2 @@
 #!/usr/bin/env bash
-rofi -config /usr/local/google/home/marcelvaldez/.config/rofi/window.rasi -show windowcd
+rofi -config /usr/local/google/home/marcelvaldez/.config/rofi/window.rasi -show window

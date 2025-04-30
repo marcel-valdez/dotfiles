@@ -3,7 +3,7 @@
 configuration {
 /* automatically selects once filtered down to 1 item */
 /*	auto-select: true; */
-	modes: "windowcd,window";
+	modes: "window,windowcd";
 	kb-element-next: "Tab,Alt+Tab";
 	kb-element-prev: "ISO_Left_Tab,Alt+ISO_Left_Tab";
 	window-format: "{workspace}/{title}/{class}";
