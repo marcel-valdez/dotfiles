@@ -1,0 +1,2 @@
+#!/usr/bin/env bash
+rofi -config /usr/local/google/home/marcelvaldez/.config/rofi/window.rasi -show window -filter "Workspace $(($(xdotool get_desktop)+1)) "

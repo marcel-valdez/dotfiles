@@ -1,0 +1,10 @@
+@import "common_config.rasi"
+
+configuration {
+/* automatically selects once filtered down to 1 item */
+/*	auto-select: true; */
+	kb-element-next: "Tab,Alt+Tab";
+	kb-element-prev: "ISO_Left_Tab,Alt+ISO_Left_Tab";
+}
+
+@theme "/usr/share/rofi/themes/docu.rasi"
