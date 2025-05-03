@@ -2,8 +2,14 @@
 
 # Setup fzf
 # ---------
-if [[ ! "$PATH" == *"${HOME}/.fzf/bin"* ]]; then
-  export PATH="${PATH:+${PATH}:}/home/marcelvaldez/.fzf/bin"
+if [[ -d "${HOME}/.fzf/bin" ]]; then
+    if [[ ! "$PATH" == *"${HOME}/.fzf/bin"* ]]; then
+        export PATH="${PATH:+${PATH}:}${HOME}/.fzf/bin"
+    fi
+elif  [[ -d "${HOME}/modules/fzf/bin" ]]; then
+    if [[ ! "$PATH" == *${HOME}/modules/fzf/bin* ]]; then
+        export PATH="${PATH:+${PATH}:}:${HOME}/modules/fzf/bin"
+    fi
 fi
 
 # Auto-completion
