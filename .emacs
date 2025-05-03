@@ -94,10 +94,10 @@
 (set-face-attribute 'lazy-highlight nil
                     :background "#181869"
                     :distant-foreground "black")
-(set-face-attribute 'isearch
-                    :background "dodgerblue4"
+(set-face-attribute 'isearch t
+                    :background "#104e8b"
                     :foreground "lightskyblue1")
-(set-face-attribute 'isearch-fail
+(set-face-attribute 'isearch-fail t
                     :background "firebrick")
 
 ;; customize tab-bar-mode hotkeys
@@ -680,7 +680,7 @@
   :ensure t
   :config
   (with-library eslint-fix
-    (setq eslint-fix-executable "/home/marcel/.nvm/versions/node/v13.9.0/bin/eslint")
+    (setq eslint-fix-executable (concat "/home/marcel/.nvm/versions/node/v" (getenv "NODE_VERSION") "/bin/eslint"))
     (eval-after-load 'js-mode
       '(add-hook 'js-mode-hook (lambda () (add-hook 'after-save-hook 'eslint-fix nil t))))
     (eval-after-load 'js2-mode
@@ -690,7 +690,7 @@
   :ensure t
   :config
   (with-library flymake-jslint
-    (setq flymake-jslint-command "/home/marcel/.nvm/versions/node/v13.9.0/bin/jslint")
+    (setq flymake-jslint-command (concat "/home/marcel/.nvm/versions/node/v" (getenv "NODE_VERSION") "/bin/jslint"))
     (eval-after-load 'js2-mode
       '(add-hook 'js2-mode-hook 'flymake-jslint-load))
     (eval-after-load 'js-mode
@@ -709,7 +709,7 @@
  '(global-display-line-numbers-mode t)
  '(menu-bar-mode nil)
  '(package-selected-packages
-   '(dap-mode eglot-java fzf flymake-shellcheck el-get company-jedi web-beautify company-lua lua-mode js-auto-format-mode pylint javascript-mode omnisharp csharp-mode erc-status-sidebar markdown-mode flyspell-correct flycheck helm-descbinds helm-dash company-ctags ggtags helm-gtags telephone-line use-ttf use-package use-package-ensure-system-package zeal-at-point flycheck-checkbashisms graphviz-dot-mode flyspell-correct-helm helm-flycheck better-defaults company xclip helm git helm-grepint helm-helm-commands helm-ispell helm-ls-git helm-proc helm-pydoc helm-rubygems-org helm-themes helm-wordnet helm-xref hgignore-mode undo-tree rotate rjsx-mode multiple-cursors multi-term markdownfmt markdown-toc markdown-preview-mode helm-git gtags flycheck-tip flycheck-package cycle-resize auto-complete))
+   '(format-all dap-mode eglot-java fzf flymake-shellcheck el-get company-jedi web-beautify company-lua lua-mode js-auto-format-mode pylint javascript-mode omnisharp csharp-mode erc-status-sidebar markdown-mode flyspell-correct flycheck helm-descbinds helm-dash company-ctags ggtags helm-gtags telephone-line use-ttf use-package use-package-ensure-system-package zeal-at-point flycheck-checkbashisms graphviz-dot-mode flyspell-correct-helm helm-flycheck better-defaults company xclip helm git helm-grepint helm-helm-commands helm-ispell helm-ls-git helm-proc helm-pydoc helm-rubygems-org helm-themes helm-wordnet helm-xref hgignore-mode undo-tree rotate rjsx-mode multiple-cursors multi-term markdownfmt markdown-toc markdown-preview-mode helm-git gtags flycheck-tip flycheck-package cycle-resize auto-complete))
  '(safe-local-variable-values '((xref-etags-mode . t)))
  '(tool-bar-mode nil))
 (custom-set-faces
