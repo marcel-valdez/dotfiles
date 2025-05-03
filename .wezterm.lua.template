@@ -104,6 +104,7 @@ return {
     color_schemes = {
         [scheme_name] = scheme
     },
+    default_cursor_style = "BlinkingBar",
     audible_bell = "Disabled",
     color_scheme = scheme_name,
     use_fancy_tab_bar = false,

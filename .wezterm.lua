@@ -1,43 +1,179 @@
-local wezterm = require 'wezterm';
+local wezterm = require "wezterm"
 
 local scheme_name = "Hybrid" -- Hybrid, JetBrains Darcula, Tomorrow Night, Molokai, Sundried, Japanesque, NightLion v2, FirefoxDev, Wryan, Monokai Remastered, Hardcore, Teerb, Wombat, Operator Mono Dark, OneHalfDark, Ripped Casts, lovelace
 local scheme = wezterm.get_builtin_color_schemes()[scheme_name]
 scheme.background = "#121212"
+scheme.visual_bell = "#211919"
+
+local copy_mode = nil
+if wezterm.gui then
+    copy_mode = wezterm.gui.default_key_tables().copy_mode
+    table.insert(copy_mode, {key = "f", mods = "CTRL|SHIFT", action = wezterm.action.CopyMode "EditPattern"})
+    table.insert(copy_mode, {key = "Tab", mods = "NONE", action = wezterm.action.CopyMode "AcceptPattern"})
+    table.insert(copy_mode, {key = "r", mods = "CTRL", action = wezterm.action.CopyMode "CycleMatchType"})
+    table.insert(copy_mode, {key = "e", mods = "CTRL", action = wezterm.action.CopyMode "MoveToEndOfLineContent"})
+    table.insert(copy_mode, {key = "a", mods = "CTRL", action = wezterm.action.CopyMode "MoveToStartOfLineContent"})
+    table.insert(copy_mode, {key = "f", mods = "ALT", action = wezterm.action.CopyMode "MoveForwardWord"})
+    table.insert(copy_mode, {key = "b", mods = "ALT", action = wezterm.action.CopyMode "MoveBackwardWord"})
+    table.insert(copy_mode, {key = "n", mods = "CTRL|ALT", action = wezterm.action.CopyMode "MoveForwardSemanticZone"})
+    table.insert(copy_mode, {key = "p", mods = "CTRL|ALT", action = wezterm.action.CopyMode "MoveBackwardSemanticZone"})
+    table.insert(copy_mode, {key = "n", mods = "CTRL", action = wezterm.action.CopyMode "MoveDown"})
+    table.insert(copy_mode, {key = "p", mods = "CTRL", action = wezterm.action.CopyMode "MoveUp"})
+    table.insert(copy_mode, {key = "s", mods = "CTRL", action = wezterm.action.CopyMode "NextMatch"})
+    table.insert(copy_mode, {key = "s", mods = "CTRL|SHIFT", action = wezterm.action.CopyMode "PriorMatch"})
+    table.insert(
+        copy_mode,
+        {key = "Space", mods = "CTRL", action = wezterm.action.CopyMode {SetSelectionMode = "Cell"}}
+    )
+    table.insert(
+        copy_mode,
+        {
+            key = "w",
+            mods = "CTRL",
+            action = wezterm.action.Multiple {
+                wezterm.action {CopyTo = "ClipboardAndPrimarySelection"},
+                wezterm.action.CopyMode "Close"
+            }
+        }
+    )
+end
+
+-- The filled in variant of the < symbol
+local SOLID_LEFT_ARROW = wezterm.nerdfonts.pl_right_hard_divider
+-- The filled in variant of the > symbol
+local SOLID_RIGHT_ARROW = wezterm.nerdfonts.pl_left_hard_divider
+
+function get_tab_bar_style(tab, tabs, panes, config, hover, max_width)
+    local title = ""
+    if tab.tab_title and #tab.tab_title > 0 then
+        title = tab.tab_title
+    else
+        title = tab.active_pane.title
+    end
+
+    tab_style = {}
+    if tab.is_active then
+        if tab.tab_index > 0 then
+            table.insert(tab_style, {Background = {Color = "#000000"}})
+            table.insert(tab_style, {Foreground = {Color = "#ffffff"}})
+            table.insert(tab_style, {Text = SOLID_RIGHT_ARROW})
+        end
+        table.insert(tab_style, "ResetAttributes")
+        table.insert(tab_style, {Attribute = {Intensity = "Bold"}})
+        table.insert(tab_style, {Attribute = {Underline = "Single"}})
+        table.insert(tab_style, {Text = title})
+        table.insert(tab_style, "ResetAttributes")
+        if tab.tab_index < #tabs - 1 then
+            table.insert(tab_style, {Background = {Color = "#ffffff"}})
+            table.insert(tab_style, {Foreground = {Color = "#000000"}})
+            table.insert(tab_style, {Text = SOLID_RIGHT_ARROW})
+        else
+            table.insert(tab_style, {Background = {Color = "#333333"}})
+            table.insert(tab_style, {Foreground = {Color = "#000000"}})
+            table.insert(tab_style, {Text = SOLID_RIGHT_ARROW})
+        end
+    else
+        if tab.tab_index > 0 then
+            table.insert(tab_style, {Background = {Color = "#333333"}})
+            table.insert(tab_style, {Foreground = {Color = "#ffffff"}})
+            table.insert(tab_style, {Text = SOLID_RIGHT_ARROW})
+        end
+        table.insert(tab_style, "ResetAttributes")
+        table.insert(tab_style, {Foreground = {Color = "#888888"}})
+        table.insert(tab_style, {Text = title})
+        if tab.tab_index < #tabs - 1 then
+            table.insert(tab_style, {Background = {Color = "#ffffff"}})
+            table.insert(tab_style, {Foreground = {Color = "#333333"}})
+            table.insert(tab_style, {Text = SOLID_RIGHT_ARROW})
+        else
+            table.insert(tab_style, {Text = " "})
+        end
+    end
+
+    return tab_style
+end
+
+wezterm.on("format-tab-title", get_tab_bar_style)
 
 return {
-   color_schemes = {
-      [scheme_name] = scheme
-   },
-   color_scheme = scheme_name,
-   enable_tab_bar = false,
-   window_decorations = "NONE",
-   -- weight: Thin, ExtraLight, Light, Regular, Medium, SemiBold, Bold, ExtraBold
-   -- stretch: Normal, SemiCondensed, Condensed, ExtraCondensed
-   font = wezterm.font_with_fallback({
-      {
-        family="Azeret Mono",
-        weight="Regular",
-        stretch="Normal",
-        italic=false,
-        harfbuzz_features={"calt=0","liga=0"}
-      },
-      { family="Noto Sans Mono", weight="Regular", stretch="Normal", italic=false },
-      { family="Source Code Pro"},
-      { family="Consolas"},
-      { family="Terminus"}
-   }),
-   adjust_window_size_when_changing_font_size = false,
-   disable_default_key_bindings = true,
-   keys = {
-      { key="2", mods="CTRL", action = wezterm.action{ SendString="\x00"} },
-      { key="PageDown", mods="SHIFT|CTRL", action = wezterm.action { ActivateTabRelative=1 } },
-      { key="PageUp", mods="SHIFT|CTRL", action = wezterm.action { ActivateTabRelative=-1 } },
-      -- { key="c", mods="SHIFT|CTRL", action=wezterm.action { CopyTo="ClipboardAndPrimarySelection" } },
-      { key="v", mods="SHIFT|CTRL", action=wezterm.action { PasteFrom="Clipboard" } },
-      { key="r", mods="SHIFT|SUPER", action = "ReloadConfiguration" },
-      { key = "-", mods="CTRL", action = "DecreaseFontSize" },
-      { key = "=", mods="CTRL", action = "IncreaseFontSize" },
-      { key = "w", mods="SUPER", action = wezterm.action { CloseCurrentTab = { confirm = true } } },
-      { key = "t", mods="SUPER", action = wezterm.action { SpawnTab="CurrentPaneDomain" } },
-   }
+    -- Note that this may cause issues when SSH-ing into computers that are not
+    -- under my control, since they won't have the wezterm terminfo installed.
+    -- An alternative is to use xterm-256color but install the wezterm terminfo
+    -- on computers I control.
+    term = "wezterm",
+    color_schemes = {
+        [scheme_name] = scheme
+    },
+    default_cursor_style = "BlinkingBar",
+    audible_bell = "Disabled",
+    color_scheme = scheme_name,
+    use_fancy_tab_bar = false,
+    enable_tab_bar = true,
+    hide_tab_bar_if_only_one_tab = true,
+    window_frame = {
+        border_left_width = 0,
+        border_right_width = 0,
+        border_bottom_height = 0,
+        border_top_height = 0
+    },
+    window_padding = {
+        left = 2,
+        right = 0,
+        top = 0,
+        bottom = 0
+    },
+    window_decorations = "NONE",
+    -- weight: Thin, ExtraLight, Light, Regular, Medium, SemiBold, Bold, ExtraBold
+    -- stretch: Normal, SemiCondensed, Condensed, ExtraCondensed
+    font = wezterm.font_with_fallback(
+        {
+            {
+                family = "Azeret Mono",
+                weight = "Regular",
+                stretch = "Normal",
+                italic = false,
+                harfbuzz_features = {"calt=0", "liga=0"}
+            },
+            {family = "Source Code Pro"},
+            {
+                family = "Noto Sans Mono",
+                weight = "Regular",
+                stretch = "Normal",
+                italic = false
+            },
+            {family = "Consolas"},
+            {family = "Terminus"}
+        }
+    ),
+    adjust_window_size_when_changing_font_size = false,
+    disable_default_key_bindings = true,
+    keys = {
+        {key = "2", mods = "CTRL", action = wezterm.action {SendString = "\x00"}},
+        {key = "PageDown", mods = "SHIFT|CTRL", action = wezterm.action {ActivateTabRelative = 1}},
+        {key = "PageUp", mods = "SHIFT|CTRL", action = wezterm.action {ActivateTabRelative = -1}},
+        {key = "c", mods = "SHIFT|CTRL", action = wezterm.action {CopyTo = "Clipboard"}},
+        {key = "v", mods = "SHIFT|CTRL", action = wezterm.action {PasteFrom = "Clipboard"}},
+        {key = "r", mods = "SHIFT|SUPER", action = "ReloadConfiguration"},
+        {key = "-", mods = "CTRL", action = "DecreaseFontSize"},
+        {key = "=", mods = "CTRL", action = "IncreaseFontSize"},
+        {key = "w", mods = "SUPER", action = wezterm.action {CloseCurrentTab = {confirm = true}}},
+        {key = "t", mods = "SUPER", action = wezterm.action {SpawnTab = "CurrentPaneDomain"}},
+        {key = "x", mods = "SHIFT|CTRL", action = "ActivateCopyMode"},
+        {key = "PageDown", mods = "SUPER|CTRL", action = wezterm.action.MoveTabRelative(1)},
+        {key = "PageUp", mods = "SUPER|CTRL", action = wezterm.action.MoveTabRelative(-1)},
+        {
+            key = "F2", mods = "SUPER", action = wezterm.action.PromptInputLine {
+                description = "Enter new tab name",
+                action = wezterm.action_callback(function(window, pane, line)
+                        if line then
+                            window:active_tab():set_title(line)
+                        end
+                    end
+                ),
+            }
+        },
+    },
+    key_tables = {
+        copy_mode = copy_mode
+    }
 }
