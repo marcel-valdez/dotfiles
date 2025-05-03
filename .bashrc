@@ -300,5 +300,5 @@ export socks_proxy=''
 [[ -f /usr/share/doc/fzf/examples/completion.bash ]] && source /usr/share/doc/fzf/examples/completion.bash
 
 [[ -f "${HOME}/.fzf.bash" ]] && source "${HOME}/.fzf.bash"
-[ -s "$NVM_DIR/bash_completion" ] && \. "$NVM_DIR/bash_completion"  # This loads nvm bash_completion
+[ -s "$NVM_DIR/bash_completion" ] && \. "${NVM_DIR}/bash_completion"  # This loads nvm bash_completion
 export BAT_CONFIG_PATH="${HOME}/.bat.conf"
