@@ -125,7 +125,7 @@ color_prompt=yes
 export TZ="US/Pacific"
 log_debug "Setting PS1 (prompt)"
 g4_functions_exist=$(type g4-client-name >&/dev/null && echo "yes")
-if [ "${g4_functions_exist}" == "yes" ]; then
+if [ "${g4_functions_exist}" == "yes" ] && ! [[ "${DISABLE_G4_PS1}" ]]; then
   # NOTE: This requires 256 color support.
   PS1_SUFFIX='$(g4-client-ps1) \[\033[0m\[\033[38;5;237m\D{%H:%M:%S}\[\033[0;0m\n\$ '
   WORKDIR='$(g4-workdir-ps1)'
