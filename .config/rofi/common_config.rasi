@@ -73,7 +73,7 @@ configuration {
 /*	kb-move-word-forward: "Alt+f,Control+Right";*/
 /*	kb-move-char-back: "Left,Control+b";*/
 /*	kb-move-char-forward: "Right,Control+f";*/
-/*	kb-remove-word-back: "Control+Alt+h,Control+BackSpace";*/
+	kb-remove-word-back: "Control+Alt+h,Control+BackSpace,Alt+BackSpace";
 /*	kb-remove-word-forward: "Control+Alt+d";*/
 /*	kb-remove-char-forward: "Delete,Control+d";*/
 /*	kb-remove-char-back: "BackSpace,Shift+BackSpace,Control+h";*/
