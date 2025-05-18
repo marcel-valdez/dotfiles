@@ -6,6 +6,22 @@
 (require 'google3-eglot)
 (require 'llm-goose)
 
+;; goose-v3.5-m => 128k input tokens, 8k output tokens, Takes *minutes* to
+;;                 answer.
+;;   - This is WAY too slow for quick questions / answers, may be good for
+;;     large tasks.
+;; goose-v3.5-s => 128k input tokens, 8k output tokesn, Takes *## seconds* to
+;;                 answer.
+;;   - This should be good enough for coding tasks.
+;; goose-v3.5-xs => 32k input tokens, 8k output tokens, Takes *# seconds* to
+;;                  answer.
+;;   - This is too imprecise for coding tasks, but good for consultation
+;;     questions, not for solving problems.
+
+(setf llm-goose-default-it
+      (make-llm-goose :model "goose-v3.5-s"))
+(setq llm-default-model "goose-v3.5-s")
+
 (defun eglot-hook-fn ()
   (local-set-key (kbd "C-x <f2>") #'eglot-rename)
   ;; Use manual activation of current symbol documentation
@@ -73,6 +89,136 @@
                 ))))))))
 
 (add-hook 'emacs-startup-hook #'marcelvaldez-project-desktop-setup) ; Add the function to the emacs startup hook.
+
+(defun get-buffer-id ()
+  "Get the full file path if visiting a file, otherwise show the buffer name."
+  (interactive) ; Makes this function callable with M-x
+    (let ((file-name (buffer-file-name))
+          (buf-name (buffer-name)))
+      (if file-name file-name buf-name)))
+
+(defun get-region-start-end-columns ()
+  "Return a list (start-column end-column) for the active region.
+Returns nil if the region is not active."
+  (interactive)
+  (if (use-region-p)
+      (let ((start-pos (region-beginning))
+            (end-pos (region-end)))
+        (list
+         (save-excursion
+           (goto-char start-pos)
+           (current-column))
+         (save-excursion
+           (goto-char end-pos)
+           (current-column))))
+    nil))
+
+(defun get-buffer-prompt ()
+  "Get a prompt for the full file path if visiting a file, otherwise prompt with the buffer name."
+  (interactive) ; Makes this function callable with M-x
+  (let ((file-name (buffer-file-name))
+        (buf-name (buffer-name)))
+    (if file-name
+        (format "The file being modified in the emacs buffer is: %s" file-name)
+      (format "The emacs buffer is a transient buffer with no file open and it is named: %s" buf-name))))
+
+(defun llm-goose-gen (&optional buffer-context)
+  "Ask Goose a question and see the answer.
+
+ The full query is formed by combining BUFFER-CONTEXT and any
+ user prompt provided by the user.
+
+ When called interactively:
+ 1. BUFFER-CONTEXT is determined as follows:
+    - If a region is active: its content is used.
+    - Else if `llm-goose-ask-behavior' is `min-to-point': the buffer
+      content from `point-min' to `point' is used.
+ 2. Then, the user is prompted for a prompt.
+
+ When called non-interactively, BUFFER-CONTEXT and user prompt
+ should be provided as strings.  If the user prompt is an empty string
+ or nil, it may be ignored or handled as appropriate by the combination logic."
+  (interactive
+   (let* ((buffer-text (buffer-string))
+          (buffer-id (get-buffer-id))
+          (region-active (use-region-p))
+          (region-start (if region-active (region-beginning) (point)))
+          (region-end (if region-active (region-end) (point)))
+          (buffer-name-prompt (get-buffer-prompt))
+          (buffer-or-region-lines-prompt
+           (if region-active
+               (format "The active region has %d lines." (count-lines region-start region-end))
+               (format "The buffer has %d total lines." (count-lines (point-min) (point-max)))))
+          (user-prompt (read-string "Prompt: "))
+          (context-info
+           (if region-active
+               (let ((region-columns (get-region-start-end-columns))
+                 (region-column-start (car region-columns))
+                 (region-column-end (cadr region-columns)))
+               (format "The selected region starts at line %d and ends at line %d, starts at column %d and ends at column %d. "
+                       (line-number-at-pos region-start)
+                       (line-number-at-pos region-end)
+                       region-column-start
+                       region-column-end))
+             (format "The cursor is at line %d. " (line-number-at-pos (point)))))
+          (base-prompt
+           (format
+            "You are an expert software engineer. You are helping me modify code in emacs.
+If the help I request is a code modification, please provide the answer in a format that can be applied via emacs ediff using ```diff to mark the beginning of the diff and ``` to mark the end, the same way markdown code blocks work; otherwise, provide the answer as a normal text.
+
+The buffer's contents will be within the sections marked >>>START-BUFFER:buffer-identifier<<< and >>>END-BUFFER:buffer-identifier<<< where buffer-identifier is a placeholder for the name of the file or buffer being modified.
+
+%s
+%s
+%s
+
+>>>START-BUFFER:%s<<<
+%s
+>>>END-BUFFER:%s<<<
+" buffer-name-prompt buffer-or-region-lines-prompt context-info buffer-id buffer-text buffer-id))
+          (full-prompt (if
+                            (and user-prompt (not (string-empty-p user-prompt)))
+                            (format "%s
+
+%s" base-prompt user-prompt)
+                         base-prompt))
+          (final-prompt (replace-regexp-in-string "\\\\" "\\\\\\\\" full-prompt)))
+     (with-current-buffer (get-buffer-create "*goose answer*")
+       (visual-line-mode +1)
+       (goto-char (point-max))
+       ;; Use the combined final-prompt
+       (insert (format "
+===== BEGIN =====
+%s
+" final-prompt))
+       (pop-to-buffer (current-buffer)))
+     (llm-chat-async
+      llm-goose-default-it
+      (llm-make-chat-prompt final-prompt :temperature 1.0)
+      (lambda (response)
+        (with-current-buffer (get-buffer-create "*goose answer*")
+          (goto-char (point-max))
+          ;;; Unescape the response before inserting it
+          ;;; (let ((unescaped-response (replace-regexp-in-string "\\\\" "\\\\\\\\" response)))
+          (let ((unescaped-response (replace-regexp-in-string "\\\\(.)" "\\1" response)))
+            (insert unescaped-response))
+          (insert "
+===== END =====
+")))
+      (lambda (type err)
+        (with-current-buffer (get-buffer-create "*goose answer*")
+          (goto-char (point-max))
+          (let* ((err-msg (if (and (listp err) (assoc :msg err) (stringp (cdr (assoc :msg err))))
+                              (cdr (assoc :msg err))
+                            (if (stringp err)
+                                err
+                               (format "Error Type: %S, Error: %S" type err))))
+                 )
+            (insert (format "%s" err-msg))
+            (insert "
+===== ERROR =====
+"))))))))
+
 
 (provide 'at-office)
 ;;; at-office.el ends here
