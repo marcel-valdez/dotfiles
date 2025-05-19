@@ -204,6 +204,10 @@
 ;; Enable showing the namespace / function the cursor is at.
 (which-function-mode)
 
+(setq ediff-patch-options
+      (string-join '("--ignore-whitespace" "--merge") " "))
+(setq ediff-fuzz-factor 2)
+
 (use-package org
   :config
   (defun custom:org-mode-hook ()
