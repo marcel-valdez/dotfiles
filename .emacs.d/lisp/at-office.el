@@ -270,6 +270,7 @@ The buffer's contents will be within the sections marked >>>START-BUFFER:buffer-
 %s
 >>>END-USER-PROVIDED-PROMPT<<<" base-prompt input-prompt)
                          base-prompt))
+          ;; Replace backslah with 2 backslashes so protobuf can parse the string.
           (final-prompt (replace-regexp-in-string "\\\\" "\\\\\\\\" full-prompt)))
      (with-current-buffer (get-buffer-create "*goose answer*")
        (visual-line-mode +1)
@@ -286,7 +287,7 @@ The buffer's contents will be within the sections marked >>>START-BUFFER:buffer-
       (lambda (response)
         (with-current-buffer (get-buffer-create "*goose answer*")
           (goto-char (point-max))
-          ;;; Unescape the response before inserting it
+          ;;; Unescape the response before inserting it into the buffer.
           (let ((unescaped-response (replace-regexp-in-string "\\\\(.)" "\\1" response)))
             (insert unescaped-response))
           (insert "
