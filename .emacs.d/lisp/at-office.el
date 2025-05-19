@@ -139,25 +139,88 @@ Returns nil if the region is not active."
           (push line result)))))
     (mapconcat #'identity (nreverse result) "\n")))
 
+(defun at-office/buffer-visible-on-selected-frame-p (buffer-name)
+  "Return non-nil if BUFFER-NAME is visible in a window on the selected frame."
+  (let ((buf (get-buffer buffer-name)))
+    (when buf
+      (seq-some
+       (lambda (win)
+         (and (eq (window-buffer win) buf)
+              (eq (window-frame win) (selected-frame))))
+       (window-list)))))
+
+(defmacro at-office/create-buffer-in-same-window (source-buffer-name new-buffer-name &rest body)
+  "Create NEW-BUFFER-NAME, run BODY inside it, and display it in the same window where SOURCE-BUFFER-NAME is visible."
+  `(let ((new-buf (get-buffer-create ,new-buffer-name))
+         (target-window
+          (get-buffer-window ,source-buffer-name 'visible)))
+     (with-current-buffer new-buf
+       ,@body)
+     (if target-window
+         (set-window-buffer target-window new-buf)
+       (pop-to-buffer new-buf))
+     new-buf))
+
 (defun at-office/create-diff-hunk-buffer (content)
   "Create a new buffer named *goose-diff-hunk* and insert CONTENT into it."
-  (let ((buf (get-buffer-create "*goose-diff-hunk*")))
-    (with-current-buffer buf
-      (erase-buffer)
-      (insert content)
-      (diff-mode))
-    (display-buffer buf)))
+  (at-office/create-buffer-in-same-window "*goose answer*" "*goose-diff-hunk*"
+                                          (erase-buffer)
+                                          (insert content)
+                                          (diff-mode)))
 
 (defun llm-goose-gen (input-prompt)
-  "Ask Goose a question and see the answer.
+  "Generate code or text using the Goose LLM.
 
-User interaction is required.
+This function facilitates interaction with the Goose LLM, providing a
+structured way to query and receive responses.  It constructs a detailed
+prompt that includes:
 
-The full query is formed by combining the buffer's contents, total lines,
-selected lines, cursor position and a prompt from the user.
+  - The current buffer's content.
+  - The buffer's identifier (file path or buffer name).
+  - The total number of lines in the buffer (or the number of lines in the
+    selected region).
+  - The cursor position (or the selected region's boundaries).
+  - User-provided prompt (if any).
 
-If the Goose response contains a diff-hunk then a buffer and window will be
-opened in ediff-mode to see and/or apply the patch."
+The function then sends this prompt to Goose, displays the response in a
+new buffer, and if the response contains a diff-hunk, it opens a separate
+buffer in `ediff-mode` to preview and apply the changes.
+
+Parameters:
+  INPUT-PROMPT: A string containing the user's specific instructions or
+                question for Goose.  If empty or nil, Goose will be
+                queried with the context of the current buffer only.
+
+User Interaction:
+  - The function prompts the user for an `input-prompt` before sending the
+    request to Goose.
+  - If a diff-hunk is returned, the user can review and apply the changes
+    in the opened `ediff-mode` buffer.
+
+Return Value:
+  This function does not return a value directly.  It displays the Goose
+  response in a buffer and may open another buffer for diffs.
+
+Side Effects:
+  - Creates and populates a buffer named `*goose answer*` with the
+    Goose response.
+  - Creates and populates a buffer named `*goose-diff-hunk*` if a diff-hunk
+    is present in the response.
+  - Opens a new window for the `*goose-diff-hunk*` buffer if it was created.
+  - May modify the current buffer if a diff-hunk is applied.
+
+Example:
+  To ask Goose to add a docstring to the current function:
+  (llm-goose-gen \"Add a docstring to the current function.\")
+
+  To ask Goose to fix a bug in the selected region:
+  (llm-goose-gen \"Fix the bug in the selected region.\")
+
+  To ask Goose a general question about the current buffer:
+  (llm-goose-gen \"\")
+
+  To ask Goose a question without any context:
+  (llm-goose-gen nil)"
   (interactive
    (list (read-string "Prompt: ")))
    (let* ((buffer-text (buffer-string))
@@ -172,7 +235,7 @@ opened in ediff-mode to see and/or apply the patch."
                (format "The buffer has %d total lines." (count-lines (point-min) (point-max)))))
           (context-info
            (if region-active
-               (let ((region-columns (at-office/get-region-start-end-columns))
+               (let* ((region-columns (at-office/get-region-start-end-columns))
                  (region-column-start (car region-columns))
                  (region-column-end (cadr region-columns)))
                (format "The selected region starts at line %d and ends at line %d, starts at column %d and ends at column %d. "
