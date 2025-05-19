@@ -454,6 +454,9 @@
 ;; highlight the current line
 (global-hl-line-mode 1)
 (set-face-background 'hl-line "#2c2c2c")
+(set-face-extend 'hl-line t)
+;; Make sure it doesn't make the whole line black.
+(set-face-attribute 'hl-line nil :inherit nil)
 (set-face-foreground 'highlight nil)
 (set-face-foreground 'success "darkseagreen")
 
