@@ -130,7 +130,6 @@ if [ "${g4_functions_exist}" == "yes" ] && ! [[ "${DISABLE_G4_PS1}" ]]; then
   PS1_SUFFIX='$(g4-client-ps1) \[\033[0m\[\033[38;5;237m\D{%H:%M:%S}\[\033[0;0m\n\$ '
   WORKDIR='$(g4-workdir-ps1)'
 else
-
   PS1_SUFFIX=' \[\033[38;5;237m\D{%H:%M:%S}\[\033[0;0m\n\$ '
   WORKDIR='\w'
 fi
@@ -185,7 +184,7 @@ alias l='ls -CF'
 
 # Add an "alert" alias for long running commands.  Use like so:
 #   sleep 10; alert
-# alias alert='notify-send --urgency=low -i "$([ $? = 0 ] && echo terminal || echo error)" "$(history|tail -n1|sed -e '\''s/^\s*[0-9]\+\s*//;s/[;&|]\s*alert$//'\'')"'
+# alias alert='notify-send --urgency=low -i "$([ ${?} = 0 ] && echo terminal || echo error)" "$(history|tail -n1|sed -e '\''s/^\s*[0-9]\+\s*//;s/[;&|]\s*alert$//'\'')"'
 
 # Path additions
 if [ -d "${HOME}/bin" ]; then
@@ -205,12 +204,12 @@ export BIN_UTILS_PASS_PHRASE_FILE="${HOME}/.bin-utils-pass-phrase"
 export SUBLIME_PROJECTS_FOLDER="${HOME}/sublime_projects"
 
 if [ "$(expr substr $(uname) 1 5)" == "Linux" ]; then
-  if [[ "$TERM" =~ "eterm" ]]; then
+  if [[ "${TERM}" =~ "eterm" ]]; then
     export EDITOR="emacs-client"
-    export GIT_EDITOR=$EDITOR
+    export GIT_EDITOR=${EDITOR}
   else
     export EDITOR="emacsclient --socket-name=${EMACS_TTY_SERVER} --tty"
-    export GIT_EDITOR=$EDITOR
+    export GIT_EDITOR=${EDITOR}
   fi
   # if the terminal has not been initialized yet
   if [ -z "${TERMINAL_SESSION_INITIALIZED}" ]; then
@@ -224,7 +223,7 @@ if [ "$(expr substr $(uname) 1 5)" == "Linux" ]; then
 
   # if we are not within tmux and not within an emacs ansi-term
   # start or join a tmux session
-  if [ "$TMUX" == "" ] && [[ ! "$TERM" =~ "eterm" ]] ; then
+  if [ "${TMUX}" == "" ] && [[ ! "${TERM}" =~ "eterm" ]] ; then
     # this will run once per non-eterm terminal opened
     tmux_attach_initial_session
   fi
