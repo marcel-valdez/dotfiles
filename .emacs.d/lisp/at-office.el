@@ -148,23 +148,18 @@ Returns nil if the region is not active."
       (diff-mode))
     (display-buffer buf)))
 
-(defun llm-goose-gen (&optional buffer-context)
+(defun llm-goose-gen (input-prompt)
   "Ask Goose a question and see the answer.
 
- The full query is formed by combining BUFFER-CONTEXT and any
- user prompt provided by the user.
+User interaction is required.
 
- When called interactively:
- 1. BUFFER-CONTEXT is determined as follows:
-    - If a region is active: its content is used.
-    - Else if `llm-goose-ask-behavior' is `min-to-point': the buffer
-      content from `point-min' to `point' is used.
- 2. Then, the user is prompted for a prompt.
+The full query is formed by combining the buffer's contents, total lines,
+selected lines, cursor position and a prompt from the user.
 
- When called non-interactively, BUFFER-CONTEXT and user prompt
- should be provided as strings.  If the user prompt is an empty string
- or nil, it may be ignored or handled as appropriate by the combination logic."
+If the Goose response contains a diff-hunk then a buffer and window will be
+opened in ediff-mode to see and/or apply the patch."
   (interactive
+   (list (read-string "Prompt: ")))
    (let* ((buffer-text (buffer-string))
           (buffer-id (at-office/get-buffer-id))
           (region-active (use-region-p))
@@ -175,7 +170,6 @@ Returns nil if the region is not active."
            (if region-active
                (format "The active region has %d lines." (count-lines region-start region-end))
                (format "The buffer has %d total lines." (count-lines (point-min) (point-max)))))
-          (user-prompt (read-string "Prompt: "))
           (context-info
            (if region-active
                (let ((region-columns (at-office/get-region-start-end-columns))
@@ -207,11 +201,11 @@ The buffer's contents will be within the sections marked >>>START-BUFFER:buffer-
 >>>END-BUFFER:%s<<<
 " buffer-name-prompt buffer-or-region-lines-prompt context-info buffer-id buffer-text buffer-id))
           (full-prompt (if
-                            (and user-prompt (not (string-empty-p user-prompt)))
+                            (and input-prompt (not (string-empty-p input-prompt)))
                             (format "%s
 >>>START-USER-PROVIDED-PROMPT<<<
 %s
->>>END-USER-PROVIDED-PROMPT<<<" base-prompt user-prompt)
+>>>END-USER-PROVIDED-PROMPT<<<" base-prompt input-prompt)
                          base-prompt))
           (final-prompt (replace-regexp-in-string "\\\\" "\\\\\\\\" full-prompt)))
      (with-current-buffer (get-buffer-create "*goose answer*")
@@ -230,7 +224,6 @@ The buffer's contents will be within the sections marked >>>START-BUFFER:buffer-
         (with-current-buffer (get-buffer-create "*goose answer*")
           (goto-char (point-max))
           ;;; Unescape the response before inserting it
-          ;;; (let ((unescaped-response (replace-regexp-in-string "\\\\" "\\\\\\\\" response)))
           (let ((unescaped-response (replace-regexp-in-string "\\\\(.)" "\\1" response)))
             (insert unescaped-response))
           (insert "
@@ -240,19 +233,13 @@ The buffer's contents will be within the sections marked >>>START-BUFFER:buffer-
         (let* ((diff-hunk (at-office/extract-diff-block response))
                (diff-found-p (not (string-empty-p (or diff-hunk "")))))
           (cond (diff-found-p (at-office/create-diff-hunk-buffer diff-hunk)))))
-      (lambda (type err)
+      (lambda (err msg)
         (with-current-buffer (get-buffer-create "*goose answer*")
           (goto-char (point-max))
-          (let* ((err-msg (if (and (listp err) (assoc :msg err) (stringp (cdr (assoc :msg err))))
-                              (cdr (assoc :msg err))
-                            (if (stringp err)
-                                err
-                               (format "Error Type: %S, Error: %S" type err))))
-                 )
-            (insert (format "%s" err-msg))
-            (insert "
+          (insert err msg)
+          (insert "
 ===== ERROR =====
-"))))))))
+"))))))
 
 
 (provide 'at-office)
