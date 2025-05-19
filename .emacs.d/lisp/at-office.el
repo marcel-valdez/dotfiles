@@ -90,17 +90,15 @@
 
 (add-hook 'emacs-startup-hook #'marcelvaldez-project-desktop-setup) ; Add the function to the emacs startup hook.
 
-(defun get-buffer-id ()
+(defun at-office/get-buffer-id ()
   "Get the full file path if visiting a file, otherwise show the buffer name."
-  (interactive) ; Makes this function callable with M-x
     (let ((file-name (buffer-file-name))
           (buf-name (buffer-name)))
       (if file-name file-name buf-name)))
 
-(defun get-region-start-end-columns ()
+(defun at-office/get-region-start-end-columns ()
   "Return a list (start-column end-column) for the active region.
 Returns nil if the region is not active."
-  (interactive)
   (if (use-region-p)
       (let ((start-pos (region-beginning))
             (end-pos (region-end)))
@@ -113,14 +111,42 @@ Returns nil if the region is not active."
            (current-column))))
     nil))
 
-(defun get-buffer-prompt ()
+(defun at-office/get-buffer-prompt ()
   "Get a prompt for the full file path if visiting a file, otherwise prompt with the buffer name."
-  (interactive) ; Makes this function callable with M-x
   (let ((file-name (buffer-file-name))
         (buf-name (buffer-name)))
     (if file-name
         (format "The file being modified in the emacs buffer is: %s" file-name)
       (format "The emacs buffer is a transient buffer with no file open and it is named: %s" buf-name))))
+
+(defun at-office/extract-diff-block (input)
+  "Return a single multi-line string between >>>START-DIFF<<< and >>>END-DIFF<<< in INPUT."
+  (let ((start-marker ">>>START-DIFF<<<")
+        (end-marker ">>>END-DIFF<<<")
+        (lines (split-string input "\n"))
+        (collecting nil)
+        (result '()))
+    (dolist (line lines)
+      ;;(message "%s" line)
+      (let
+          ((trimmed-line (string-trim line)))
+        (cond
+         ((string= trimmed-line start-marker)
+          (setq collecting t))
+         ((string= trimmed-line end-marker)
+          (setq collecting nil))
+         (collecting
+          (push line result)))))
+    (mapconcat #'identity (nreverse result) "\n")))
+
+(defun at-office/create-diff-hunk-buffer (content)
+  "Create a new buffer named *goose-diff-hunk* and insert CONTENT into it."
+  (let ((buf (get-buffer-create "*goose-diff-hunk*")))
+    (with-current-buffer buf
+      (erase-buffer)
+      (insert content)
+      (diff-mode))
+    (display-buffer buf)))
 
 (defun llm-goose-gen (&optional buffer-context)
   "Ask Goose a question and see the answer.
@@ -140,11 +166,11 @@ Returns nil if the region is not active."
  or nil, it may be ignored or handled as appropriate by the combination logic."
   (interactive
    (let* ((buffer-text (buffer-string))
-          (buffer-id (get-buffer-id))
+          (buffer-id (at-office/get-buffer-id))
           (region-active (use-region-p))
           (region-start (if region-active (region-beginning) (point)))
           (region-end (if region-active (region-end) (point)))
-          (buffer-name-prompt (get-buffer-prompt))
+          (buffer-name-prompt (at-office/get-buffer-prompt))
           (buffer-or-region-lines-prompt
            (if region-active
                (format "The active region has %d lines." (count-lines region-start region-end))
@@ -152,7 +178,7 @@ Returns nil if the region is not active."
           (user-prompt (read-string "Prompt: "))
           (context-info
            (if region-active
-               (let ((region-columns (get-region-start-end-columns))
+               (let ((region-columns (at-office/get-region-start-end-columns))
                  (region-column-start (car region-columns))
                  (region-column-end (cadr region-columns)))
                (format "The selected region starts at line %d and ends at line %d, starts at column %d and ends at column %d. "
@@ -163,14 +189,18 @@ Returns nil if the region is not active."
              (format "The cursor is at line %d. " (line-number-at-pos (point)))))
           (base-prompt
            (format
-            "You are an expert software engineer. You are helping me modify code in emacs.
-If the help I request is a code modification, please provide the answer in a format that can be applied via emacs ediff using ```diff to mark the beginning of the diff and ``` to mark the end, the same way markdown code blocks work; otherwise, provide the answer as a normal text.
+            ">>>START-GENERAL-REQUEST-INSTRUCTIONS<<<
+You are an expert software engineer. You are helping me modify code in emacs.
+If the help I request is a code modification, please provide the answer in a format that can be applied via emacs ediff using >>>START-DIFF<<< to mark the beginning of the diff and >>>END-DIFF<<< to mark the end, otherwise, provide the answer as a normal text, it is necessary you use those exact markers for the diff beginning and end, because they'll be post-processed by an emacs function that has those strings hardcoded.
 
 The buffer's contents will be within the sections marked >>>START-BUFFER:buffer-identifier<<< and >>>END-BUFFER:buffer-identifier<<< where buffer-identifier is a placeholder for the name of the file or buffer being modified.
+>>>END-GENERAL-REQUEST-INSTRUCTIONS<<<
 
+>>>START-EMACS-REGION-AND-CURSOR-CONTEXT<<<
 %s
 %s
 %s
+>>>END-EMACS-REGION-AND-CURSOR-CONTEXT<<<
 
 >>>START-BUFFER:%s<<<
 %s
@@ -179,8 +209,9 @@ The buffer's contents will be within the sections marked >>>START-BUFFER:buffer-
           (full-prompt (if
                             (and user-prompt (not (string-empty-p user-prompt)))
                             (format "%s
-
-%s" base-prompt user-prompt)
+>>>START-USER-PROVIDED-PROMPT<<<
+%s
+>>>END-USER-PROVIDED-PROMPT<<<" base-prompt user-prompt)
                          base-prompt))
           (final-prompt (replace-regexp-in-string "\\\\" "\\\\\\\\" full-prompt)))
      (with-current-buffer (get-buffer-create "*goose answer*")
@@ -194,7 +225,7 @@ The buffer's contents will be within the sections marked >>>START-BUFFER:buffer-
        (pop-to-buffer (current-buffer)))
      (llm-chat-async
       llm-goose-default-it
-      (llm-make-chat-prompt final-prompt :temperature 1.0)
+      (llm-make-chat-prompt final-prompt :temperature 0.15)
       (lambda (response)
         (with-current-buffer (get-buffer-create "*goose answer*")
           (goto-char (point-max))
@@ -204,7 +235,11 @@ The buffer's contents will be within the sections marked >>>START-BUFFER:buffer-
             (insert unescaped-response))
           (insert "
 ===== END =====
-")))
+"))
+        ;; Open a diff-hunk buffer if the response contains a diff hunk.
+        (let* ((diff-hunk (at-office/extract-diff-block response))
+               (diff-found-p (not (string-empty-p (or diff-hunk "")))))
+          (cond (diff-found-p (at-office/create-diff-hunk-buffer diff-hunk)))))
       (lambda (type err)
         (with-current-buffer (get-buffer-create "*goose answer*")
           (goto-char (point-max))
