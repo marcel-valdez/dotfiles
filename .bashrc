@@ -15,7 +15,7 @@ function log_debug() {
   [ "${DEBUG_BASHRC}" != "" ] && echo "$(date +%H:%M:%S) $1"
 }
 
-function tmux_attach_initial_session() {
+function tmux_attach_or_create_initial_session() {
   local _tmux=tmux
   type tmx2 &>/dev/null && _tmux=tmx2
 
@@ -134,12 +134,12 @@ else
   WORKDIR='\w'
 fi
 
-if [[ -z ${PS1_HOST} ]]; then
+if [[ -z "${PS1_HOST}" ]]; then
   PS1_HOST=$(hostname)
   PS1_HOST=${PS1_HOST/.mtv.*/}
 fi
 
-if [[ "${color_prompt}" = "yes" ]]; then
+if [[ "${color_prompt}" == "yes" ]]; then
   log_debug "Using color_prompt PS1"
   PS1="\[\033[00;1m[Exit: \[\033[1;31m\]\${PIPESTATUS[@]/#0/\[\033[0;1m\]\[\033[1;32m\]0\[\033[1;31m\]}\[\033[0;1m\]] "
 else
@@ -147,7 +147,7 @@ else
   PS1="[Exit: \${PIPESTATUS[@]/#0/0}] "
 fi
 
-if [ "${color_prompt}" = yes ]; then
+if [ "${color_prompt}" = "yes" ]; then
   PS1="${PS1}"'${debian_chroot:+($debian_chroot)}\[\033[01;32m\]@${PS1_HOST}\[\033[00m\]:\[\033[01;34m\]'${WORKDIR}'\[\033[00;1m\]'${PS1_SUFFIX}
 else
   PS1="${PS1}"'${debian_chroot:+($debian_chroot)}@${PS1_HOST}:\w'${PS1_SUFFIX}
@@ -206,10 +206,10 @@ export SUBLIME_PROJECTS_FOLDER="${HOME}/sublime_projects"
 if [ "$(expr substr $(uname) 1 5)" == "Linux" ]; then
   if [[ "${TERM}" =~ "eterm" ]]; then
     export EDITOR="emacs-client"
-    export GIT_EDITOR=${EDITOR}
+    export GIT_EDITOR="${EDITOR}"
   else
     export EDITOR="emacsclient --socket-name=${EMACS_TTY_SERVER} --tty"
-    export GIT_EDITOR=${EDITOR}
+    export GIT_EDITOR="${EDITOR}"
   fi
   # if the terminal has not been initialized yet
   if [ -z "${TERMINAL_SESSION_INITIALIZED}" ]; then
@@ -225,7 +225,7 @@ if [ "$(expr substr $(uname) 1 5)" == "Linux" ]; then
   # start or join a tmux session
   if [ "${TMUX}" == "" ] && [[ ! "${TERM}" =~ "eterm" ]] ; then
     # this will run once per non-eterm terminal opened
-    tmux_attach_initial_session
+    tmux_attach_or_create_initial_session
   fi
 
   # this will run for every terminal opened and tmux pane
@@ -240,7 +240,7 @@ if ! pgrep -af '.*emacs.*'"--daemon=${EMACS_TTY_SERVER}"'.*' &>/dev/null; then
   if type at &>/dev/null; then
     echo "emacs --daemon=${EMACS_TTY_SERVER}" | at NOW
   else
-    (emacs --daemon=${EMACS_TTY_SERVER} &)
+    (emacs --daemon="${EMACS_TTY_SERVER}" &)
   fi
 fi
 
