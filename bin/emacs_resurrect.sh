@@ -49,6 +49,17 @@ declare -a ORIGINAL_ARGS=("$@")
 
 log "ORIGINAL_ARGS: ${ORIGINAL_ARGS[*]}"
 
+has_no_window_system=
+for arg in ${ORIGINAL_ARGS[@]}; do
+  if [[ "${arg}" == "--no-window-system" ]]; then
+    has_no_window_system=1
+  fi
+done
+
+if [[ -z "${has_no_window_system}" ]]; then
+  ORIGINAL_ARGS+=("--no-window-system")
+fi
+
 if [[ "${GOOGLE3}" -eq 1 ]] && [[ -f "${HOME}/.googlerc.d/.google_functions" ]]; then
   run source "${HOME}/.googlerc.d/.google_functions"
   run exec google-emacs "${ORIGINAL_ARGS[@]}"
