@@ -8,7 +8,7 @@ options = {}
 OptionParser.new do |opts|
   opts.banner = "remind-me [options]"
 
-  opts.on("-s", "--start TIME", "Time at which to trigger reminder (see: man at)") do |start_time|
+  opts.on("-a", "--at TIME", "Time at which to trigger reminder (see: man at)") do |start_time|
     options[:start_time] = start_time
   end
 
@@ -42,7 +42,14 @@ if !options[:alarm].nil?
   alarm_snd = "#{Dir.home}/bin/beep 5"
 end
 
-escaped_msg_cmd = %Q{"/usr/bin/notify-send '"'#{options[:title]}'"' '"'#{options[:message]}'"'; #{alarm_snd}"}
+DISPLAY_ID=ENV['DISPLAY'] or ":0.0"
+# Keep the notification open for 4 hours
+sticky_duration_ms = 1000*4*60*60
+escaped_msg_cmd = %Q{"DISPLAY=#{DISPLAY_ID} /usr/bin/notify-send \
+  --expire-time=#{sticky_duration_ms} \
+  '"'#{options[:title]}'"' \
+  '"'#{options[:message]}'"'; \
+#{alarm_snd}"}
 task_cmd = %Q{echo #{escaped_msg_cmd} | /usr/bin/at #{options[:start_time]}}
 
 result = `#{task_cmd}`
