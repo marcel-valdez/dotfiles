@@ -105,7 +105,16 @@ end
 
 wezterm.on('format-window-title', get_window_title_style)
 
-return {
+local config_overrides = {}
+local window_switcher_mode = os.getenv("WEZTERM_WINDOW_SWITCHER_MODE")
+if window_switcher_mode == "1" then
+   config_overrides = {
+      initial_cols = 80,
+      initial_rows = 14
+   }
+end
+
+local config = {
     -- Note that this may cause issues when SSH-ing into computers that are not
     -- under my control, since they won't have the wezterm terminfo installed.
     -- An alternative is to use xterm-256color but install the wezterm terminfo
@@ -187,3 +196,10 @@ return {
         copy_mode = copy_mode
     }
 }
+
+for k, v in pairs(config_overrides) do
+   config[k] = v
+end
+
+return config
+
