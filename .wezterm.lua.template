@@ -151,7 +151,7 @@ local config = {
                 weight = "Regular",
                 stretch = "Normal",
                 italic = false,
-                harfbuzz_features = {"calt=0", "liga=0"}
+                harfbuzz_features = {"calt=0", "liga=0", "zero=1"}
             },
             {family = "Source Code Pro"},
             {
