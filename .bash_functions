@@ -80,7 +80,7 @@ function node-lts-version() {
 function node-check-use() {
   if ! type nvm &>/dev/null; then
     # Do not proceed if NVM is not installed
-    echo "WARNING: NVM is not installed on this machine."
+    echo "WARNING: NVM is not installed on this machine." >&2
     return 1
   fi
 
@@ -90,19 +90,22 @@ function node-check-use() {
   fi
 
   node_version=$(node --version 2>/dev/null)
+  __debug "Node is version: ${node_version} and env variable NODE_VERSION is ${NODE_VERSION}"
   if [[ "${node_version}" != "v${NODE_VERSION}" ]]; then
     node_version_installed=$(nvm ls 2>/dev/null | grep "${NODE_VERSION}")
-    if [ "${node_version_installed}" == "" ]; then
-      echo "Node v${NODE_VERSION} is not installed, installing now."
+    if [[ "${node_version_installed}" =~ .*N/A.* ]]; then
+      echo "Node v${NODE_VERSION} is not installed, installing now." >&2
       nvm install "v${NODE_VERSION}"
     fi
 
     case "$1" in
       -s|--silent)
-        nvm use "${NODE_VERSION}" &>/dev/null
+        __debug "nvm use '${NODE_VERSION}' &>/dev/null"
+        nvm use "v${NODE_VERSION}" &>/dev/null
         ;;
       *)
-        nvm use "${NODE_VERSION}"
+        __debug "nvm use '${NODE_VERSION}'"
+        nvm use "v${NODE_VERSION}"
         ;;
     esac
     # put the path to the node executable
