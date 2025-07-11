@@ -288,6 +288,11 @@ fi
 
 [ -s "${HOME}/.cargo/env" ] && . "${HOME}/.cargo/env"
 
+
+if [ -s "${HOME}/.gemini.key" ]; then
+  GEMINI_API_KEY="$(cat "${HOME}/.gemini.key")"
+  export GEMINI_API_KEY
+fi
+
 #+begin_src sh [ -n "$EAT_SHELL_INTEGRATION_DIR" ] && \ source "$EAT_SHELL_INTEGRATION_DIR/bash"
 #+end_src sh
-
