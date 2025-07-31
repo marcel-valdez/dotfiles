@@ -867,3 +867,10 @@ function tmux-send-to-session-panes {
     done
   fi
 }
+
+function hg-update-fzf {
+  hg xl --color=always | \
+    fzf --ansi \
+    --preview 'echo {} | grep -Eo "[ ]([0-f]{6,})[ ]" | xargs -Iccc hg log --stat -r ccc' \
+    --bind 'enter:become:echo {} | grep -Eo "[ ]([0-f]{6,})[ ]" | xargs -Iccc hg update -r ccc'
+}
