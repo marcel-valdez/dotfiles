@@ -26,4 +26,4 @@ fi
 cmd="$1"
 shift
 
-python "$script_dir/continuous_file_listener.py" "${file}" "${cmd}" "$@"
+python3 "$script_dir/continuous_file_listener.py" "${file}" "${cmd}" "$@"
