@@ -43,8 +43,8 @@ conky.config = {
     draw_outline = false,
     draw_shades = false,
     use_xft = true,
-    font = 'DejaVu Sans Mono:size=12',
-    gap_x = 5,
+    font = 'monospace:size=12', -- Try 'monospace' first, then 'DejaVu Sans Mono'
+    gap_x = 20, -- Increase gaps to start
     gap_y = 60,
     minimum_height = 5,
     minimum_width = 5,
@@ -71,7 +71,7 @@ conky.config = {
     uppercase = false,
     use_spacer = 'none',
     show_graph_scale = false,
-    show_graph_range = false
+    show_graph_range = false,
 }
 
 conky.text = [[
