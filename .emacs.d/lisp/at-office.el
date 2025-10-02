@@ -98,15 +98,19 @@ This function is added as a hook to `python-mode-hook`.  It configures eldoc to:
                 (unless (file-directory-p desktop-save-dir)
                   (make-directory desktop-save-dir t))
                 (setq desktop-dirname desktop-save-dir)
-                (setq desktop-path desktop-save-file)
+                (setq desktop-path (list desktop-save-dir))
 
-                (when (file-exists-p desktop-save-file)
+                (if (file-exists-p desktop-save-file)
                   ;; Prompt the user before loading the desktop.
                   (if (y-or-n-p (format "Load desktop from %s? " desktop-save-file))
                       ;; Only restore if user answers 'y'
                       (progn
                         (desktop-read desktop-save-dir)
-                        (desktop-save-mode 1))))
+                        (desktop-save-mode 1)))
+                  (if (y-or-n-p (format "Auto-save desktop for this session?"))
+                      (progn
+                        (desktop-save-mode 1)
+                        (desktop-save-in-desktop-dir))))
                 ))))))))
 
 (add-hook 'emacs-startup-hook #'marcelvaldez-project-desktop-setup) ; Add the function to the emacs startup hook.
@@ -289,7 +293,7 @@ Example:
 If you provide a diff block, turn into a perfect patch creator and make completely certain that the line numbers for diff sections are completely correct (with no offset) and they match the buffer contents line for line, otherwise the patch can not be applied. Try yourself to apply the patch using the line numbers you specify in the response to make sure it is correct in all instances, if they don't match then fix it, re-check it is correct, if not repeat the process until you have a correct patch and then reply to me with the perfectly applicable diff block in the response.
 
 DO NOT WRAP THE DIFF BLOCK IN AN ADDITIONAL ```diff markdown-style block.")
-         (new-content-prompt "If the help I request is a code modification, you MUST rewrite the entire buffer and put the entire new buffer contents in the response using EXACTLY >>>START-NEW-BUFFER<<< and EXACTLY >>>END-NEW-BUFFER<<< to mark beginning and end of the new buffer's context, you MUST add a new line EXACTLY after >>>START-NEW-BUFFER<<< and another EXACTLY right before >>>END-NEW-BUFFER<<<, an emacs function will remove them when using your contents. YOU MUST NOT PROVIDE A ```diff block, INSTEAD YOU MUST PROVIDE THE NEW ENTIRE BUFFER CONTENTS.")
+         (new-content-prompt "IF AND ONLY IF the help I request is a code modification represented via a diff against a buffer with code in it, you MUST rewrite the entire buffer and put the entire new buffer contents in the response using EXACTLY >>>START-NEW-BUFFER<<< and EXACTLY >>>END-NEW-BUFFER<<< to mark beginning and end of the new buffer content, you MUST add a new line EXACTLY after >>>START-NEW-BUFFER<<< and another EXACTLY before >>>END-NEW-BUFFER<<<, an emacs function will remove them when consuming your new contents. YOU MUST NOT PROVIDE A ```diff block, INSTEAD YOU MUST PROVIDE THE NEW ENTIRE BUFFER CONTENTS.")
          (base-prompt
           (format
            ">>>START-GENERAL-REQUEST-INSTRUCTIONS<<<
