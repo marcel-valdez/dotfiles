@@ -209,7 +209,7 @@ function tmux-to-clip() {
 }
 
 function copy-to-tmux() {
-  tmux set-buffer "$(get-arg-or-stdin $@)"
+  tmux set-buffer -w "$(get-arg-or-stdin "$@")"
 }
 
 function history-cmd-only() {
