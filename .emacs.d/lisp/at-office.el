@@ -10,6 +10,7 @@
 (require 'compilation-colorization)
 (require 'google3-eglot)
 (require 'llm-goose)
+(require 'cider-agent)
 
 ;; goose-v3.5-m => 128k input tokens, 8k output tokens, Takes *minutes* to
 ;;                 answer.
