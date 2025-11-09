@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-DEBUG=1
+DEBUG=
 LOG_FILE="/tmp/emacs_resurrect_debug.log"
 
 function log {
@@ -50,7 +50,7 @@ declare -a ORIGINAL_ARGS=("$@")
 log "ORIGINAL_ARGS: ${ORIGINAL_ARGS[*]}"
 
 has_no_window_system=
-for arg in ${ORIGINAL_ARGS[@]}; do
+for arg in "${ORIGINAL_ARGS[@]}"; do
   if [[ "${arg}" == "--no-window-system" ]]; then
     has_no_window_system=1
   fi
@@ -62,7 +62,7 @@ fi
 
 if [[ "${GOOGLE3}" -eq 1 ]] && [[ -f "${HOME}/.googlerc.d/.google_functions" ]]; then
   run source "${HOME}/.googlerc.d/.google_functions"
-  run exec google-emacs "${ORIGINAL_ARGS[@]}"
+  run exec emacs "${ORIGINAL_ARGS[@]}"
 elif [[ -f "${HOME}/.bash_functions" ]]; then
   run source "${HOME}/.bash_functions"
   run exec emacs "${ORIGINAL_ARGS[@]}"
