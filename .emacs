@@ -182,8 +182,8 @@
         ;; toggle showing/hiding the dedicated terminal window
         (global-set-key (kbd "C-t C-d")
                         (lambda () (interactive) (multi-term-dedicated-toggle))))
-
-      )
+      (global-unset-key (kbd "C-?"))
+      (global-set-key (kbd "C-?") 'xref-find-references))
   (with-library in-tmux))
 
 (setq browse-url-browser-function 'browse-url-generic)
@@ -723,7 +723,8 @@
  '(package-selected-packages
    '(jedi elpy rotate lua-mode telephone-line use-package multiple-cursors multi-term helm-flycheck helm-xref windresize async xclip undo-tree))
  '(show-paren-mode t)
- '(tool-bar-mode nil))
+ '(tool-bar-mode nil)
+ '(warning-suppress-types '((comp))))
 (custom-set-faces
  ;; custom-set-faces was added by Custom.
  ;; If you edit it by hand, you could mess it up, so be careful.
@@ -742,6 +743,7 @@
  '(persp-selected-face ((t (:foreground "#1e30ff" :weight bold))))
  '(undo-tree-visualizer-active-branch-face ((t (:foreground "color-231" :weight bold))))
  '(undo-tree-visualizer-default-face ((t (:foreground "brightwhite"))))
+ '(vertical-border ((t (:inherit mode-line-inactive :background "#1c1c1c" :foreground "#1c1c1c"))))
  '(warning ((t (:foreground "brightyellow" :underline t))))
  '(whitespace-line ((t (:background "color-238")))))
 (put 'upcase-region 'disabled nil)
