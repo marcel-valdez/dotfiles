@@ -189,15 +189,16 @@ alias l='ls -CF'
 # Path additions
 
 if [ -d "${HOME}/bin" ]; then
-  export PATH=$PATH:"$HOME/bin"
+  export PATH="${PATH}:${HOME}/bin"
 fi
 
 if [ -d "${HOME}/.local/bin" ]; then
   export PATH="${PATH}:${HOME}/.local/bin"
 fi
 
-export PATH="${PATH}:${HOME}/.rvm/bin" # Add RVM to PATH for scripting
-export PATH="${PATH}:${HOME}/modules/buck/bin" # Add buck to the PATH
+if [ -d "${HOME}/modules/buck/bin" ]; then
+  export PATH="${PATH}:${HOME}/modules/buck/bin" # Add buck to the PATH
+fi
 
 
 # enable programmable completion features (you don't need to enable
@@ -278,7 +279,7 @@ log_debug "Loaded NVM"
 log_debug "Loading RVM"
 [[ -s "${HOME}/.rvm/scripts/rvm" ]] && source "${HOME}/.rvm/scripts/rvm"
 log_debug "Loaded RVM"
-export PATH="${PATH}:${HOME}/.rvm/bin" # Add RVM to PATH for scripting
+[[ -d "${HOME}/.rvm/bin" ]] && export PATH="${PATH}:${HOME}/.rvm/bin" # Add RVM to PATH for scripting
 
 # This sets up the default node version and loads it
 export NODE_VERSION="lts"
@@ -292,6 +293,8 @@ export http_proxy=''
 export https_proxy=''
 export ftp_proxy=''
 export socks_proxy=''
+
+[[ -d "${HOME}/modules/fzf/bin" ]] && export PATH="${PATH}:${HOME}/modules/fzf/bin"
 
 # Enable fzf keybindings for Bash:
 [[ -f /usr/share/doc/fzf/examples/key-bindings.bash ]] && source /usr/share/doc/fzf/examples/key-bindings.bash
