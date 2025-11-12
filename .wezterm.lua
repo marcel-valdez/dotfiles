@@ -95,6 +95,20 @@ end
 
 wezterm.on("format-tab-title", get_tab_bar_style)
 
+function get_window_title_style(tab, pane, tabs, panes, config)
+   tab_index = ''
+   if #tabs > 1 then
+      tab_index = string.format('[%d/%d] ', tab.tab_index + 1, #tabs)
+   end
+   if tab.tab_title == nil or tab.tab_title == "" then
+      return string.format('wezterm > %s %s', pane.title, tab_index)
+   else
+      return string.format('wezterm > %s > %s %s', tab.tab_title, pane.title, tab_index)
+   end
+end
+
+wezterm.on('format-window-title', get_window_title_style)
+
 return {
     -- Note that this may cause issues when SSH-ing into computers that are not
     -- under my control, since they won't have the wezterm terminfo installed.
