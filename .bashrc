@@ -302,3 +302,4 @@ export socks_proxy=''
 [[ -f "${HOME}/.fzf.bash" ]] && source "${HOME}/.fzf.bash"
 [ -s "$NVM_DIR/bash_completion" ] && \. "${NVM_DIR}/bash_completion"  # This loads nvm bash_completion
 export BAT_CONFIG_PATH="${HOME}/.bat.conf"
+export OPENAI_API_KEY="$(cat "${HOME}/.openaikey")"
