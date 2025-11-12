@@ -544,7 +544,8 @@
 (use-package helm
   :ensure t
   :config
-    (helm-mode 1)
+  (helm-mode 1)
+    (setq helm-move-to-line-cycle-in-source nil)
     (global-set-key (kbd "C-x C-f") 'helm-find-files)
     (global-set-key (kbd "M-s o") 'helm-occur)
     (global-set-key (kbd "M-x") 'helm-M-x)
