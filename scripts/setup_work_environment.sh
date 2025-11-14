@@ -3,7 +3,11 @@
 [[ -f "${HOME}/.bash_functions" ]] && source "${HOME}/.bash_functions"
 [[ -f "${HOME}/.googlerc.d/.googlerc" ]] && source "${HOME}/.googlerc.d/.googlerc"
 
-GCLOUD_FOLDERS=("notes" "gtd")
+GCLOUD_FOLDERS=("notes" "gtd" "tmp")
+declare -A LOCAL_MOUNT_FOLDER_NAMES
+LOCAL_MOUNT_FOLDER_NAMES["tmp"]="gcloud_tmp"
+
+
 GCLOUD_HOST="${USER}.c.googlers.com"
 OFFICE_HOST="${USER}.mtv.corp.google.com"
 LAPTOP_HOST="${USER}-glaptop"
@@ -45,21 +49,25 @@ function is_folder_mounted {
 function mount_remote_gcloud_folders {
   echo "Re-mounting (if necessary) folders from host ${USER}.c.googlers.com"
   for folder in "${GCLOUD_FOLDERS[@]}"; do
-    if ! is_folder_mounted "${folder}"; then
-      if ! [[ -e "${HOME}/${folder}" ]]; then
-        mkdir "${HOME}/${folder}"
+    local local_folder_name="${LOCAL_MOUNT_FOLDER_NAMES[${folder}]}"
+    if [[ -z "${local_folder_name}" ]]; then
+      local_folder_name="${folder}"
+    fi
+    if ! is_folder_mounted "${local_folder_name}"; then
+      if ! [[ -e "${HOME}/${local_folder_name}" ]]; then
+        mkdir "${HOME}/${local_folder_name}"
       fi
       local remote_folder="/usr/local/google/home/${USER}/${folder}"
-      echo "Mounting ${GCLOUD_HOST}:${remote_folder} on ${HOME}/${folder}"
-      sshpass -p "$(get_secret)" sshfs -o compression=yes -o auto_cache -o reconnect "${USER}@${GCLOUD_HOST}:${remote_folder}" "${HOME}/${folder}"
+      echo "Mounting ${GCLOUD_HOST}:${remote_folder} on ${HOME}/${local_folder_name}"
+      sshpass -p "$(get_secret)" sshfs -o compression=yes -o auto_cache -o reconnect "${USER}@${GCLOUD_HOST}:${remote_folder}" "${HOME}/${local_folder_name}"
       if [[ $? -ne 0 ]]; then
         echo "Unable to mount folder ${HOME}/${folder}. Unmounting and remounting once." >&2
-        umount "${HOME}/${folder}"
-        sshpass -p "$(get_secret)" sshfs -o compression=yes -o auto_cache -o reconnect "${USER}@${GCLOUD_HOST}:${remote_folder}" "${HOME}/${folder}"
+        umount "${HOME}/${local_folder_name}"
+        sshpass -p "$(get_secret)" sshfs -o compression=yes -o auto_cache -o reconnect "${USER}@${GCLOUD_HOST}:${remote_folder}" "${HOME}/${local_folder_name}"
       fi
     fi
     # attempt to list directory contents in order to force reconnect of the SSHFS mount
-    ls "${HOME}/${folder}" &>/dev/null
+    ls "${HOME}/${local_folder_name}" &>/dev/null
   done
 }
 
