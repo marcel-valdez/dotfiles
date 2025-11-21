@@ -257,6 +257,15 @@
   (with-library flyspell-correct
     (define-key flyspell-mode-map (kbd "C-;") 'flyspell-correct-wrapper)))
 
+(use-package xterm-color
+  :ensure t)
+(use-package zoom-window
+  :ensure t)
+(use-package beframe
+  :ensure t
+  :config
+  (beframe-mode 1))
+
 (savehist-mode 1)
 ;; Save search strings across sessions
 (setq savehist-additional-variables (list 'search-ring 'regexp-search-ring))
@@ -545,14 +554,21 @@
   :ensure t
   :config
   (helm-mode 1)
-    (setq helm-move-to-line-cycle-in-source nil)
-    (global-set-key (kbd "C-x C-f") 'helm-find-files)
-    (global-set-key (kbd "M-s o") 'helm-occur)
-    (global-set-key (kbd "M-x") 'helm-M-x)
-    (global-set-key (kbd "C-x C-b") 'helm-buffers-list)
-    (set-face-attribute 'helm-selection nil
-                        :background "gray1"
-                        :foreground "cornflowerblue"))
+  (setq helm-move-to-line-cycle-in-source nil)
+  (global-set-key (kbd "C-x C-f") 'helm-find-files)
+  (global-set-key (kbd "M-s o") 'helm-occur)
+  (global-set-key (kbd "M-x") 'helm-M-x)
+  (global-set-key (kbd "C-x C-b") 'helm-buffers-list)
+  (set-face-attribute 'helm-selection nil
+                      :background "gray1"
+                      :foreground "cornflowerblue")
+
+  (with-eval-after-load 'helm-buffers
+    (setq helm-source-buffers-list
+          (helm-build-sync-source "Beframe Buffers"
+            :candidates (lambda () (beframe--buffer-names))
+            :coerce (lambda (bufname) (get-buffer bufname))
+            :action helm-type-buffer-actions))))
 
 (use-package imenu-list
   :ensure t)
