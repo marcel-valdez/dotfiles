@@ -101,65 +101,84 @@
                     :background "firebrick")
 
 ;; customize tab-bar-mode hotkeys
-(progn
-  (defun custom/switch-to-next-tab ()
-    (interactive)
-    (tab-bar-switch-to-next-tab 1))
-  (defun custom/move-tab-right ()
-    (interactive)
-    (tab-bar-move-tab 1))
-  (defun custom/move-tab-left ()
-    (interactive)
-    (tab-bar-move-tab -1))
-  (defvar tab-bar-key-map (make-sparse-keymap)
-    "Keymap for tab-related actions.")
-  (define-key tab-bar-key-map (kbd "M-<right>") 'custom/switch-to-next-tab)
-  (define-key tab-bar-key-map (kbd "M-<left>") 'tab-bar-switch-to-prev-tab)
-  (define-key tab-bar-key-map (kbd "C-<right>") 'custom/move-tab-right)
-  (define-key tab-bar-key-map (kbd "C-<left>") 'custom/move-tab-left)
-  (define-key tab-bar-key-map (kbd "M-q") 'tab-bar-close-tab)
-  (define-key tab-bar-key-map (kbd "M-n") 'tab-bar-new-tab)
-  (define-key tab-bar-key-map (kbd "M-T") 'tab-bar-undo-close-tab)
-  (define-key tab-bar-key-map (kbd "M-<f2>") 'tab-bar-rename-tab)
-  (define-key tab-bar-key-map (kbd "M-1") (lambda () (interactive) (tab-bar-select-tab 1)))
-  (define-key tab-bar-key-map (kbd "M-2") (lambda () (interactive) (tab-bar-select-tab 2)))
-  (define-key tab-bar-key-map (kbd "M-3") (lambda () (interactive) (tab-bar-select-tab 3)))
-  (define-key tab-bar-key-map (kbd "M-4") (lambda () (interactive) (tab-bar-select-tab 4)))
-  (define-key tab-bar-key-map (kbd "M-5") (lambda () (interactive) (tab-bar-select-tab 5)))
-  (define-key tab-bar-key-map (kbd "M-6") (lambda () (interactive) (tab-bar-select-tab 6)))
-  (define-key tab-bar-key-map (kbd "M-7") (lambda () (interactive) (tab-bar-select-tab 7)))
-  (define-key tab-bar-key-map (kbd "M-8") (lambda () (interactive) (tab-bar-select-tab 8)))
-  (define-key tab-bar-key-map (kbd "M-9") (lambda () (interactive) (tab-bar-select-tab -1)))
-  (define-key tab-bar-key-map (kbd "M-0") (lambda () (interactive) (tab-bar-select-tab -2)))
+(use-package tab-bar
+  :ensure nil
+  :after tab-bar
+  :config
+  (if (not (display-graphic-p))
+      (progn
+        (defun custom/switch-to-next-tab ()
+          (interactive)
+          (tab-bar-switch-to-next-tab 1))
+        (defun custom/move-tab-right ()
+          (interactive)
+          (tab-bar-move-tab 1))
+        (defun custom/move-tab-left ()
+          (interactive)
+          (tab-bar-move-tab -1))
+        (defvar tab-bar-key-map (make-sparse-keymap)
+          "Keymap for tab-related actions.")
+        (define-key tab-bar-key-map (kbd "M-<right>") 'custom/switch-to-next-tab)
+        (define-key tab-bar-key-map (kbd "M-<left>") 'tab-bar-switch-to-prev-tab)
+        (define-key tab-bar-key-map (kbd "C-<right>") 'custom/move-tab-right)
+        (define-key tab-bar-key-map (kbd "C-<left>") 'custom/move-tab-left)
+        (define-key tab-bar-key-map (kbd "M-q") 'tab-bar-close-tab)
+        (define-key tab-bar-key-map (kbd "M-n") 'tab-bar-new-tab)
+        (define-key tab-bar-key-map (kbd "M-T") 'tab-bar-undo-close-tab)
+        (define-key tab-bar-key-map (kbd "M-<f2>") 'tab-bar-rename-tab)
+        (define-key tab-bar-key-map (kbd "M-1") (lambda () (interactive) (tab-bar-select-tab 1)))
+        (define-key tab-bar-key-map (kbd "M-2") (lambda () (interactive) (tab-bar-select-tab 2)))
+        (define-key tab-bar-key-map (kbd "M-3") (lambda () (interactive) (tab-bar-select-tab 3)))
+        (define-key tab-bar-key-map (kbd "M-4") (lambda () (interactive) (tab-bar-select-tab 4)))
+        (define-key tab-bar-key-map (kbd "M-5") (lambda () (interactive) (tab-bar-select-tab 5)))
+        (define-key tab-bar-key-map (kbd "M-6") (lambda () (interactive) (tab-bar-select-tab 6)))
+        (define-key tab-bar-key-map (kbd "M-7") (lambda () (interactive) (tab-bar-select-tab 7)))
+        (define-key tab-bar-key-map (kbd "M-8") (lambda () (interactive) (tab-bar-select-tab 8)))
+        (define-key tab-bar-key-map (kbd "M-9") (lambda () (interactive) (tab-bar-select-tab -1)))
+        (define-key tab-bar-key-map (kbd "M-0") (lambda () (interactive) (tab-bar-select-tab -2)))
 
-  (put 'custom/switch-to-next-tab 'repeat-map 'tab-bar-key-map)
-  (put 'tab-bar-switch-to-prev-tab 'repeat-map 'tab-bar-key-map)
-  (put 'custom/move-tab-left 'repeat-map 'tab-bar-key-map)
-  (put 'custom/move-tab-right 'repeat-map 'tab-bar-key-map)
-  (put 'tab-bar-close-tab 'repeat-map 'tab-bar-key-map)
-  ;; This makes for a pretty bad user experience.
-  ;(put 'tab-bar-new-tab 'repeat-map 'tab-bar-key-map)
-  (put 'tab-bar-undo-close-tab 'repeat-map 'tab-bar-key-map)
+        (put 'custom/switch-to-next-tab 'repeat-map 'tab-bar-key-map)
+        (put 'tab-bar-switch-to-prev-tab 'repeat-map 'tab-bar-key-map)
+        (put 'custom/move-tab-left 'repeat-map 'tab-bar-key-map)
+        (put 'custom/move-tab-right 'repeat-map 'tab-bar-key-map)
+        (put 'tab-bar-close-tab 'repeat-map 'tab-bar-key-map)
+        ;; This makes for a pretty bad user experience.
+                                        ;(put 'tab-bar-new-tab 'repeat-map 'tab-bar-key-map)
+        (put 'tab-bar-undo-close-tab 'repeat-map 'tab-bar-key-map)
 
-  (global-unset-key (kbd "M-t"))
-  (define-key global-map (kbd "M-t") (lambda () (interactive) (set-transient-map tab-bar-key-map))))
+        (global-unset-key (kbd "M-t"))
+        (define-key global-map (kbd "M-t") (lambda () (interactive) (set-transient-map tab-bar-key-map))))
+    (progn
+      (global-unset-key (kbd "C-<next>"))
+      (global-set-key (kbd "C-<next>") (lambda () (interactive) (tab-bar-switch-to-next-tab)))
+      (global-unset-key (kbd "C-S-<next>"))
+      (global-set-key (kbd "C-S-<next>") (lambda () (interactive) (tab-bar-move-tab 1)))
 
-(defun custom/tab-bar-appearance ()
-  ;; Customizes tab-bar-mode's appearance.
-  (set-face-attribute 'tab-bar nil
-                      :inherit 'variable-pitch
-                      :background "#1c1c1c"
-                      :foreground "#111111")
-  (set-face-attribute 'tab-bar-tab-inactive nil
-                      :inherit 'tab-bar
-                      :background "#505050"
-                      :underline nil)
-  (set-face-attribute 'tab-bar-tab nil
-                      :inherit 'tab-bar
-                      :weight 'bold
-                      :background "#2e3436"
-                      :foreground "f0f0e8"))
-(add-hook 'tab-bar-mode-hook 'custom/tab-bar-appearance)
+      (global-unset-key (kbd "C-<prior>"))
+      (global-set-key (kbd "C-<prior>") (lambda () (interactive) (tab-bar-switch-to-prev-tab)))
+      (global-unset-key (kbd "C-S-<prior>"))
+      (global-set-key (kbd "C-S-<prior>") (lambda () (interactive) (tab-bar-move-tab-backward)))
+      (global-unset-key (kbd "M-t"))
+      (global-set-key (kbd "M-t") (lambda () (interactive) (tab-bar-new-tab)))
+      (global-unset-key (kbd "C-<f4>"))
+      (global-set-key (kbd "C-<f4>") (lambda () (interactive) (tab-bar-close-tab)))))
+
+  (defun custom/tab-bar-appearance ()
+    ;; Customizes tab-bar-mode's appearance.
+    (set-face-attribute 'tab-bar nil
+                        :inherit 'variable-pitch
+                        :background "#1c1c1c"
+                        :foreground "#111111")
+    (set-face-attribute 'tab-bar-tab-inactive nil
+                        :inherit 'tab-bar
+                        :background "#505050"
+                        :underline nil)
+    (set-face-attribute 'tab-bar-tab nil
+                        :inherit 'tab-bar
+                        :weight 'bold
+                        :background "#2e3436"
+                        :foreground "f0f0e8"))
+  (add-hook 'tab-bar-mode-hook 'custom/tab-bar-appearance))
 ;;; re-binds certain keys when inside a TMUX session
 (if (display-graphic-p)
     ;; if emacs is run as a GUI window
@@ -185,20 +204,7 @@
                         (lambda () (interactive) (multi-term-prev)))
         ;; toggle showing/hiding the dedicated terminal window
         (global-set-key (kbd "C-t C-d")
-                        (lambda () (interactive) (multi-term-dedicated-toggle))))
-      (global-unset-key (kbd "C-<next>"))
-      (global-set-key (kbd "C-<next>") (lambda () (interactive) (tab-bar-switch-to-next-tab)))
-      (global-unset-key (kbd "C-S-<next>"))
-      (global-set-key (kbd "C-S-<next>") (lambda () (interactive) (tab-bar-move-tab 1)))
-
-      (global-unset-key (kbd "C-<prior>"))
-      (global-set-key (kbd "C-<prior>") (lambda () (interactive) (tab-bar-switch-to-prev-tab)))
-      (global-unset-key (kbd "C-S-<prior>"))
-      (global-set-key (kbd "C-S-<prior>") (lambda () (interactive) (tab-bar-move-tab-backward)))
-      (global-unset-key (kbd "M-t"))
-      (global-set-key (kbd "M-t") (lambda () (interactive) (tab-bar-new-tab)))
-      (global-unset-key (kbd "C-<f4>"))
-      (global-set-key (kbd "C-<f4>") (lambda () (interactive) (tab-bar-close-tab))))
+                        (lambda () (interactive) (multi-term-dedicated-toggle)))))
   ;; if emacs is run as a terminal application
   (with-library in-tmux
     (use-package helm-dash
