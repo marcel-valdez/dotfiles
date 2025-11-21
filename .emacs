@@ -265,12 +265,15 @@
 
 (use-package xterm-color
   :ensure t)
+
 (use-package zoom-window
   :ensure t)
+
 (use-package beframe
   :ensure t
-  :config
-  (beframe-mode 1))
+  :init
+  (beframe-mode 1)
+  (setq beframe-global-buffers '("*scratch*" "*Messages*")))
 
 (savehist-mode 1)
 ;; Save search strings across sessions
@@ -560,21 +563,56 @@
   :ensure t
   :config
   (helm-mode 1)
-  (setq helm-move-to-line-cycle-in-source nil)
+  ;; Keyboard shortcuts
   (global-set-key (kbd "C-x C-f") 'helm-find-files)
   (global-set-key (kbd "M-s o") 'helm-occur)
   (global-set-key (kbd "M-x") 'helm-M-x)
+  ; By default simply use helm-buffers-list to switch buffer
   (global-set-key (kbd "C-x C-b") 'helm-buffers-list)
+
+  ;; Appearance
   (set-face-attribute 'helm-selection nil
                       :background "gray1"
                       :foreground "cornflowerblue")
 
-  (with-eval-after-load 'helm-buffers
-    (setq helm-source-buffers-list
-          (helm-build-sync-source "Beframe Buffers"
-            :candidates (lambda () (beframe--buffer-names))
-            :coerce (lambda (bufname) (get-buffer bufname))
-            :action helm-type-buffer-actions))))
+  ;; Behavior
+  (setq helm-move-to-line-cycle-in-source nil)
+
+  (with-library beframe
+    ; When using beframe override C-x C-b to use beframe by default
+    (global-set-key (kbd "C-x C-b") 'custom-helm-beframe-buffers)
+    ; Use helm switch buffers as an alternative with C-x b
+    (global-set-key (kbd "C-x b") 'custom-helm-global-buffers)
+    ;; 1️⃣ Beframe-filtered buffer list
+    (defun custom-helm-beframe-buffers ()
+      "Helm buffer list filtered through Beframe."
+      (interactive)
+      (require 'helm-buffers)
+      (helm
+       :sources
+       (helm-build-sync-source "Beframe Buffers"
+         :candidates (lambda () (beframe--buffer-names))
+         :coerce     #'get-buffer
+         :action     helm-type-buffer-actions)
+       :buffer "*Helm Beframe buffers*"))
+
+    ;; 2️⃣ Global buffer list (ignores Beframe)
+    (defun custom-helm-global-buffers ()
+      "Traditional Helm buffer list ignoring Beframe."
+      (interactive)
+      (require 'helm-buffers)
+      ;; Temporarily disable Beframe for this call only
+      (let ((beframe-mode nil))
+        (helm-buffers-list)))))
+
+
+;  (with-eval-after-load 'helm-buffers
+;    (setq helm-source-buffers-list
+;          (helm-build-sync-source "Beframe Buffers"
+;            :candidates (lambda () (beframe--buffer-names))
+;            ;:coerce (lambda (bufname) (get-buffer bufname))
+;            :action helm-type-buffer-actions))))
+
 
 (use-package imenu-list
   :ensure t)
