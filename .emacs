@@ -94,65 +94,66 @@
       (with-library xclip (xclip-mode 1))))
 
 ;; customize tab-bar-mode hotkeys
-(progn
-  (defun custom/switch-to-next-tab ()
-    (interactive)
-    (tab-bar-switch-to-next-tab 1))
-  (defun custom/move-tab-right ()
-    (interactive)
-    (tab-bar-move-tab 1))
-  (defun custom/move-tab-left ()
-    (interactive)
-    (tab-bar-move-tab -1))
-  (defvar tab-bar-key-map (make-sparse-keymap)
-    "Keymap for tab-related actions.")
-  (define-key tab-bar-key-map (kbd "M-<right>") 'custom/switch-to-next-tab)
-  (define-key tab-bar-key-map (kbd "M-<left>") 'tab-bar-switch-to-prev-tab)
-  (define-key tab-bar-key-map (kbd "C-<right>") 'custom/move-tab-right)
-  (define-key tab-bar-key-map (kbd "C-<left>") 'custom/move-tab-left)
-  (define-key tab-bar-key-map (kbd "M-q") 'tab-bar-close-tab)
-  (define-key tab-bar-key-map (kbd "M-n") 'tab-bar-new-tab)
-  (define-key tab-bar-key-map (kbd "M-T") 'tab-bar-undo-close-tab)
-  (define-key tab-bar-key-map (kbd "M-<f2>") 'tab-bar-rename-tab)
-  (define-key tab-bar-key-map (kbd "M-1") (lambda () (interactive) (tab-bar-select-tab 1)))
-  (define-key tab-bar-key-map (kbd "M-2") (lambda () (interactive) (tab-bar-select-tab 2)))
-  (define-key tab-bar-key-map (kbd "M-3") (lambda () (interactive) (tab-bar-select-tab 3)))
-  (define-key tab-bar-key-map (kbd "M-4") (lambda () (interactive) (tab-bar-select-tab 4)))
-  (define-key tab-bar-key-map (kbd "M-5") (lambda () (interactive) (tab-bar-select-tab 5)))
-  (define-key tab-bar-key-map (kbd "M-6") (lambda () (interactive) (tab-bar-select-tab 6)))
-  (define-key tab-bar-key-map (kbd "M-7") (lambda () (interactive) (tab-bar-select-tab 7)))
-  (define-key tab-bar-key-map (kbd "M-8") (lambda () (interactive) (tab-bar-select-tab 8)))
-  (define-key tab-bar-key-map (kbd "M-9") (lambda () (interactive) (tab-bar-select-tab -1)))
-  (define-key tab-bar-key-map (kbd "M-0") (lambda () (interactive) (tab-bar-select-tab -2)))
+(with-eval-after-load 'tab-bar
+  (progn
+    (defun custom/switch-to-next-tab ()
+      (interactive)
+      (tab-bar-switch-to-next-tab 1))
+    (defun custom/move-tab-right ()
+      (interactive)
+      (tab-bar-move-tab 1))
+    (defun custom/move-tab-left ()
+      (interactive)
+      (tab-bar-move-tab -1))
+    (defvar tab-bar-key-map (make-sparse-keymap)
+      "Keymap for tab-related actions.")
+    (define-key tab-bar-key-map (kbd "M-<right>") 'custom/switch-to-next-tab)
+    (define-key tab-bar-key-map (kbd "M-<left>") 'tab-bar-switch-to-prev-tab)
+    (define-key tab-bar-key-map (kbd "C-<right>") 'custom/move-tab-right)
+    (define-key tab-bar-key-map (kbd "C-<left>") 'custom/move-tab-left)
+    (define-key tab-bar-key-map (kbd "M-q") 'tab-bar-close-tab)
+    (define-key tab-bar-key-map (kbd "M-n") 'tab-bar-new-tab)
+    (define-key tab-bar-key-map (kbd "M-T") 'tab-bar-undo-close-tab)
+    (define-key tab-bar-key-map (kbd "M-<f2>") 'tab-bar-rename-tab)
+    (define-key tab-bar-key-map (kbd "M-1") (lambda () (interactive) (tab-bar-select-tab 1)))
+    (define-key tab-bar-key-map (kbd "M-2") (lambda () (interactive) (tab-bar-select-tab 2)))
+    (define-key tab-bar-key-map (kbd "M-3") (lambda () (interactive) (tab-bar-select-tab 3)))
+    (define-key tab-bar-key-map (kbd "M-4") (lambda () (interactive) (tab-bar-select-tab 4)))
+    (define-key tab-bar-key-map (kbd "M-5") (lambda () (interactive) (tab-bar-select-tab 5)))
+    (define-key tab-bar-key-map (kbd "M-6") (lambda () (interactive) (tab-bar-select-tab 6)))
+    (define-key tab-bar-key-map (kbd "M-7") (lambda () (interactive) (tab-bar-select-tab 7)))
+    (define-key tab-bar-key-map (kbd "M-8") (lambda () (interactive) (tab-bar-select-tab 8)))
+    (define-key tab-bar-key-map (kbd "M-9") (lambda () (interactive) (tab-bar-select-tab -1)))
+    (define-key tab-bar-key-map (kbd "M-0") (lambda () (interactive) (tab-bar-select-tab -2)))
 
-  (put 'custom/switch-to-next-tab 'repeat-map 'tab-bar-key-map)
-  (put 'tab-bar-switch-to-prev-tab 'repeat-map 'tab-bar-key-map)
-  (put 'custom/move-tab-left 'repeat-map 'tab-bar-key-map)
-  (put 'custom/move-tab-right 'repeat-map 'tab-bar-key-map)
-  (put 'tab-bar-close-tab 'repeat-map 'tab-bar-key-map)
-  ;; This makes for a pretty bad user experience.
-  ;(put 'tab-bar-new-tab 'repeat-map 'tab-bar-key-map)
-  (put 'tab-bar-undo-close-tab 'repeat-map 'tab-bar-key-map)
+    (put 'custom/switch-to-next-tab 'repeat-map 'tab-bar-key-map)
+    (put 'tab-bar-switch-to-prev-tab 'repeat-map 'tab-bar-key-map)
+    (put 'custom/move-tab-left 'repeat-map 'tab-bar-key-map)
+    (put 'custom/move-tab-right 'repeat-map 'tab-bar-key-map)
+    (put 'tab-bar-close-tab 'repeat-map 'tab-bar-key-map)
+    ;; This makes for a pretty bad user experience.
+                                        ;(put 'tab-bar-new-tab 'repeat-map 'tab-bar-key-map)
+    (put 'tab-bar-undo-close-tab 'repeat-map 'tab-bar-key-map)
 
-  (global-unset-key (kbd "M-t"))
-  (define-key global-map (kbd "M-t") (lambda () (interactive) (set-transient-map tab-bar-key-map))))
+    (global-unset-key (kbd "M-t"))
+    (define-key global-map (kbd "M-t") (lambda () (interactive) (set-transient-map tab-bar-key-map))))
 
-(defun custom/tab-bar-appearance ()
-  ;; Customizes tab-bar-mode's appearance.
-  (set-face-attribute 'tab-bar nil
-                      :inherit 'variable-pitch
-                      :background "#1c1c1c"
-                      :foreground "#111111")
-  (set-face-attribute 'tab-bar-tab-inactive nil
-                      :inherit 'tab-bar
-                      :background "#505050"
-                      :underline nil)
-  (set-face-attribute 'tab-bar-tab nil
-                      :inherit 'tab-bar
-                      :weight 'bold
-                      :background "#2e3436"
-                      :foreground "f0f0e8"))
-(add-hook 'tab-bar-mode-hook 'custom/tab-bar-appearance)
+  (defun custom/tab-bar-appearance ()
+    ;; Customizes tab-bar-mode's appearance.
+    (set-face-attribute 'tab-bar nil
+                        :inherit 'variable-pitch
+                        :background "#1c1c1c"
+                        :foreground "#111111")
+    (set-face-attribute 'tab-bar-tab-inactive nil
+                        :inherit 'tab-bar
+                        :background "#505050"
+                        :underline nil)
+    (set-face-attribute 'tab-bar-tab nil
+                        :inherit 'tab-bar
+                        :weight 'bold
+                        :background "#2e3436"
+                        :foreground "f0f0e8"))
+  (add-hook 'tab-bar-mode-hook 'custom/tab-bar-appearance))
 
 
 
@@ -366,16 +367,6 @@
 ;                  '(:time "1h" :actions -notify))
 ;  (if (display-graphic-p) (org-notify-start)))
 
-;(use-package centaur-tabs :ensure t
-;  :hook (emacs-startup . centaur-tabs-mode)
-;  :init
-;  (setq centaur-tabs-set-modified-marker t
-;        centaur-tabs-set-modified-marker "*"
-;        centaur-tabs-cycle-scope 'tabs)
-;  :config
-;  (centaur-tabs-mode t)
-;  )
-
 (use-package perspective
   :disabled t
   ;:bind
@@ -385,19 +376,35 @@
   :init
   (persp-mode))
 
+(use-package xterm-color
+  :ensure t)
+
+(use-package zoom-window
+  :ensure t)
+
+(use-package beframe
+  :ensure t
+  :init
+  (with-eval-after-load 'beframe
+    (beframe-mode 1)
+    (setq beframe-global-buffers '("*scratch*" "*Messages*" "*Backtrace*"))))
+
 (use-package fzf
   :ensure t)
 
 (use-package helm
   :ensure t
   :config
+  ;; Behavior
   (helm-mode 1)
   (helm-autoresize-mode)
   (setq helm-move-to-line-cycle-in-source nil)
+  ;; Keyboard shortcuts
   (global-set-key (kbd "C-x C-f") 'helm-find-files)
   (global-set-key (kbd "M-s o") 'helm-occur)
   (global-set-key (kbd "M-x") 'helm-M-x)
   (global-set-key (kbd "C-x C-b") 'helm-buffers-list)
+  ;; Appearance
   (set-face-attribute 'helm-buffer-directory nil :background "LightGray" :foreground "indianred")
   (set-face-attribute 'helm-ff-directory nil :background "lavender" :foreground "indianred")
   (set-face-attribute 'helm-ff-dotted-directory nil :background "DimGray" :foreground "white")
@@ -406,7 +413,36 @@
   (set-face-attribute 'helm-visible-mark nil :background "darkseagreen" :foreground "steelblue")
   (set-face-attribute 'helm-selection nil
                       :background "#2c2c2c"
-                      :distant-foreground "#eeeeec"))
+                      :distant-foreground "#eeeeec")
+  ;; Integrations
+  (with-library beframe
+    (with-eval-after-load 'beframe
+      ;; When using beframe override C-x C-b to use beframe by default
+      (global-set-key (kbd "C-x C-b") 'custom-helm-beframe-buffers)
+      ;; Use helm switch buffers as an alternative with C-x b
+      (global-set-key (kbd "C-x b") 'custom-helm-global-buffers)
+      ;; [1] Beframe-filtered buffer list
+      (defun custom-helm-beframe-buffers ()
+        "Helm buffer list filtered through Beframe."
+        (interactive)
+        (require 'helm-buffers)
+        (helm
+         :sources
+         (helm-build-sync-source "Beframe Buffers"
+           :candidates (lambda () (beframe--buffer-names))
+           :coerce     #'get-buffer
+           :action     helm-type-buffer-actions)
+         :buffer "*Helm Beframe buffers*"))
+
+      ;; [2] Global buffer list (ignores Beframe)
+      (defun custom-helm-global-buffers ()
+        "Traditional Helm buffer list ignoring Beframe."
+        (interactive)
+        (require 'helm-buffers)
+        ;; Temporarily disable Beframe for this call only
+        (let ((beframe-mode nil))
+          (helm-buffers-list))))))
+
 
 (use-package helm-xref
   :ensure t
