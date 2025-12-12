@@ -248,7 +248,9 @@
   :ensure t
   :commands flymake-shellcheck-load
   :init
-  (add-hook 'sh-mode-hook 'flymake-shellcheck-load))
+  (add-hook 'sh-mode-hook 'flymake-shellcheck-load)
+  :config
+  (setq flymake-shellcheck-allow-external-files t))
 
 (use-package flymake
   :ensure t

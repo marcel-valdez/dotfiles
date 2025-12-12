@@ -139,7 +139,7 @@ fi
 
 # Remove username from prompt but shortened hostname,
 # in order to avoid confusion when SSHing
-short_hostname=$(echo ${HOSTNAME} | egrep '^.{0,20}' | head -1)
+short_hostname=$(echo "${HOSTNAME}" | grep -E '^.{0,20}' | head -1)
 if [[ "${color_prompt}" = "yes" ]]; then
   log_debug "Using color_prompt PS1"
   PS1="[Exit: \[\033[1;31m\]\${PIPESTATUS[@]/#0/\[\033[0m\]\[\033[1;32m\]0\[\033[1;31m\]}\[\033[0m\]] "
@@ -246,7 +246,7 @@ if [[ "$(uname)" =~ "Linux" ]]; then
     # A new TMUX pane was created
     __ignore__=1 # only added so BASH does not hate us
     if [[ -e "/usr/share/doc/tmux/examples/bash_completion_tmux.sh" ]]; then
-      source /usr/share/doc/tmux/examples/bash_completion_tmux.sh
+      source "/usr/share/doc/tmux/examples/bash_completion_tmux.sh"
     fi
     # put commands here that should execute with every opened pane
   fi
@@ -272,7 +272,7 @@ log_debug "Loading NVM"
 [ -s "${NVM_DIR}/nvm.sh" ] && source "${NVM_DIR}/nvm.sh"
 # This loads nvm bash_completion
 log_debug "Loading NVM bash completion"
-[ -s "${NVM_DIR}/bash_completion" ] && \. "${NVM_DIR}/bash_completion"
+[ -s "${NVM_DIR}/bash_completion" ] && source "${NVM_DIR}/bash_completion"
 log_debug "Loaded NVM"
 
 # Load RVM into a shell session *as a function*
@@ -297,12 +297,23 @@ export socks_proxy=''
 [[ -d "${HOME}/modules/fzf/bin" ]] && export PATH="${PATH}:${HOME}/modules/fzf/bin"
 
 # Enable fzf keybindings for Bash:
-[[ -f /usr/share/doc/fzf/examples/key-bindings.bash ]] && source /usr/share/doc/fzf/examples/key-bindings.bash
+if [[ -f "${HOME}/.fzf.bash" ]]; then
+    source "${HOME}/.fzf.bash"
+else
+    if [[ -f "${HOME}/modules/fzf/shell/key-bindings.bash" ]]; then
+        source "${HOME}/modules/fzf/shell/key-bindings.bash"
+    elif [[ -f "/usr/share/doc/fzf/examples/key-bindings.bash" ]]; then
+        source "/usr/share/doc/fzf/examples/key-bindings.bash"
+    fi
+    if [[ -f "${HOME}/modules/fzf/shell/completion.bash" ]]; then
+        source "${HOME}/modules/fzf/shell/completion.bash"
+    elif [[ -f "/usr/share/doc/fzf/examples/completion.bash" ]]; then
+        source "/usr/share/doc/fzf/examples/completion.bash"
+    fi
+fi
 
-# Enable fuzzy auto-completion for Bash:
-[[ -f /usr/share/doc/fzf/examples/completion.bash ]] && source /usr/share/doc/fzf/examples/completion.bash
+# This loads nvm bash_completion
+[ -s "${NVM_DIR}/bash_completion" ] && source "${NVM_DIR}/bash_completion"
 
-[[ -f "${HOME}/.fzf.bash" ]] && source "${HOME}/.fzf.bash"
-[ -s "$NVM_DIR/bash_completion" ] && \. "${NVM_DIR}/bash_completion"  # This loads nvm bash_completion
 export BAT_CONFIG_PATH="${HOME}/.bat.conf"
 export OPENAI_API_KEY="$(cat "${HOME}/.openaikey")"

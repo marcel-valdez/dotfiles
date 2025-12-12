@@ -1,6 +1,6 @@
-# Save ssh key
+#!/usr/bin/env bash
 
-source ~/.bash_functions
+source "${HOME}/.bash_functions"
 
 if fails type log_debug; then
   function log_debug() {
@@ -11,14 +11,14 @@ fi
 
 # Note: ~/.ssh/environment should not be used, as it
 #       already has a different purpose in SSH
-env=~/.ssh/agent.env
+SSH_AGENT_ENV="${HOME}/.ssh/agent.env"
 
 # Note: Don't bother checking SSH_AGENT_PID. It's not used
 #       by SSH itself, and it might even be incorrect
 #       (for example, when using agent-forwarding over SSH).
 
 agent_is_running() {
-    if [ "$SSH_AUTH_SOCK" ]; then
+    if [ "${SSH_AUTH_SOCK}" ]; then
         # ssh-add returns:
         #   0 = agent running, has keys
         #   1 = agent running, no keys
@@ -34,12 +34,12 @@ agent_has_keys() {
 }
 
 agent_load_env() {
-    source ${env} >/dev/null
+    source "${SSH_AGENT_ENV}" >/dev/null
 }
 
 agent_start() {
-    (umask 077; ssh-agent > ${env})
-    source ${env} >/dev/null
+    (umask 077; ssh-agent > "${SSH_AGENT_ENV}")
+    source "${SSH_AGENT_ENV}" >/dev/null
 }
 
 if ! agent_is_running; then
@@ -55,4 +55,4 @@ elif ! agent_has_keys; then
     ssh-add
 fi
 
-unset env
+unset SSH_AGENT_ENV

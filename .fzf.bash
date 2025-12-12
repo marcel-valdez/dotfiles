@@ -16,16 +16,20 @@ fi
 # ---------------
 if [[ $- == *i* ]]; then
   if [[ -f "${HOME}/.fzf/shell/completion.bash" ]]; then
-    source "${HOME}/.fzf/shell/completion.bash" 2> /dev/null
-  elif [[ -f /usr/share/doc/fzf/examples/completion.bash ]]; then
-    source /usr/share/doc/fzf/examples/completion.bash
+      source "${HOME}/.fzf/shell/completion.bash" 2> /dev/null
+  elif [[ -f "${HOME}/modules/fzf/shell/completion.bash" ]]; then
+    source "${HOME}/modules/fzf/shell/completion.bash"
+  elif [[ -f "/usr/share/doc/fzf/examples/completion.bash" ]]; then
+    source "/usr/share/doc/fzf/examples/completion.bash"
   fi
 fi
 
 # Key bindings
 # ------------
 if [[ -f "${HOME}/.fzf/shell/key-bindings.bash" ]]; then
-  source "${HOME}/.fzf/shell/key-bindings.bash"
+    source "${HOME}/.fzf/shell/key-bindings.bash"
+elif [[ -f "${HOME}/modules/fzf/shell/key-bindings.bash" ]]; then
+    source "${HOME}/modules/fzf/shell/key-bindings.bash"
 elif [[ -f /usr/share/doc/fzf/examples/key-bindings.bash ]]; then
   source /usr/share/doc/fzf/examples/key-bindings.bash
 fi
