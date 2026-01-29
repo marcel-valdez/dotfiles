@@ -15,7 +15,6 @@ CHROMEOS_HOST="${USER}28"
 REVERSE_TUNNEL_PORT=3333
 CLIPBOARD_DAEMON_BIN="${HOME}/bin/clipboard-daemon.sh"
 
-
 function is_gcloud_host {
   [[ "${HOSTNAME}" == "${GCLOUD_HOST}" ]]
 }
@@ -26,6 +25,17 @@ function is_office_host {
 
 function is_laptop_host {
   [[ "${HOSTNAME}" == "${LAPTOP_HOST}" ]] || [[ "${HOSTNAME}" == "${CHROMEOS_HOST}" ]]
+}
+
+# override sshpass & get_secret for now as they are broken
+function get_secret {
+  echo "__BAD__"
+}
+
+function sshpass {
+  shift  # -p
+  shift  # secret
+  "$@"
 }
 
 function remote_ssh_cmd() {
