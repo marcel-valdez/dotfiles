@@ -402,7 +402,22 @@
   ;; Keyboard shortcuts
   (global-set-key (kbd "C-x C-f") 'helm-find-files)
   (global-set-key (kbd "M-s o") 'helm-occur)
-  (global-set-key (kbd "M-x") 'helm-M-x)
+
+  (setq helm-M-x-show-short-doc t)
+  (setq helm-M-x-fuzzy-match t)
+
+  (defun my/helm-M-x-optimized (orig-fun &rest args)
+    "Run helm-M-x while hard-silencing beframe's expensive hooks."
+    (advice-add 'beframe--frame-buffer-p :override #'ignore)
+    (advice-add 'beframe-buffer-list :override #'buffer-list)
+    (unwind-protect
+        (apply orig-fun args)
+      ;; Always remove the overrides after Helm is done
+      (advice-remove 'beframe--frame-buffer-p #'ignore)
+      (advice-remove 'beframe-buffer-list #'buffer-list)))
+
+  (advice-add 'helm-M-x :around #'my/helm-M-x-optimized)
+
   (global-set-key (kbd "C-x C-b") 'helm-buffers-list)
   ;; Appearance
   (set-face-attribute 'helm-buffer-directory nil :background "LightGray" :foreground "indianred")
