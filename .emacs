@@ -402,6 +402,7 @@
   ;; Keyboard shortcuts
   (global-set-key (kbd "C-x C-f") 'helm-find-files)
   (global-set-key (kbd "M-s o") 'helm-occur)
+  (global-set-key (kbd "M-x") 'helm-M-x)
 
   (setq helm-M-x-show-short-doc t)
   (setq helm-M-x-fuzzy-match t)
