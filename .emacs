@@ -11,6 +11,19 @@
 ;; If you want to learn more about Emacs at Google, see http://go/emacs.
 
 ;;; Code:
+;;; General Performance Settings
+;; 16 Mb Garbage Collector threshold (vs 800kb default :s)
+(setq gc-cons-threshold (* 16 1024 1024))
+;; Sets high GC threshold while in minibuffer (running commands)
+(defun gc/minibuffer-setup-hook ()
+  (setq gc-cons-threshold (* 128 1024 1024)))
+;; Sets normal garbage collector threshold everywhere else.
+(defun gc/minibuffer-exit-hook ()
+  (setq gc-cons-threshold (* 16 1024 1024)))
+;; Register minibuffer hooks.
+(add-hook 'minibuffer-setup-hook #'gc/minibuffer-setup-hook)
+(add-hook 'minibuffer-exit-hook #'gc/minibuffer-exit-hook)
+
 (setq inhibit-startup-screen t)
 (setq load-prefer-newer t)
 
