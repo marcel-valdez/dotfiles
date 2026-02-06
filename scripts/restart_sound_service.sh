@@ -27,7 +27,7 @@ echo "(1/6) Done."
 sleep 1
 
 echo "2. Resetting ALSA kernel state..."
-sudo alsactl init  || exit_error "Unable to reset ALSA kernel state."
+sudo alsactl init  || warning "Unable to reset ALSA kernel state."
 echo "(2/6) Done."
 
 sleep 1
@@ -48,7 +48,8 @@ sleep 1
 
 # This actually waits for wireplumber to register the devices.
 echo "5. Audio stack has been reset. Checking status..." 
-wpctl status | grep -A 5 "Sources" || warning "Audio devices not listed properly in wpctl"
+wpctl status | grep -A 5 "Sources" || \
+  warning "Audio devices not listed properly in wpctl"
 echo "(5/6) Done."
 
 # Forces the USB Condenser Mic (ID 61) to be the default.
