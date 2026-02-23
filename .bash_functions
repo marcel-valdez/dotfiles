@@ -874,3 +874,7 @@ function hg-update-fzf {
     --preview 'echo {} | grep -Eo "[ ]([0-f]{6,})[ ]" | xargs -Iccc hg log --stat -r ccc' \
     --bind 'enter:become:echo {} | grep -Eo "[ ]([0-f]{6,})[ ]" | xargs -Iccc hg update -r ccc'
 }
+
+function wayland-maximize {
+  gdbus call --session --dest org.gnome.Shell --object-path /org/gnome/Shell --method org.gnome.Shell.Eval "global.display.get_focus_window().move_resize_frame(true, 0, 0, 3840, 1080);"
+}
