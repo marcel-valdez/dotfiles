@@ -243,9 +243,9 @@ fi
 
 if ! pgrep -af '.*emacs.*'"--daemon=${EMACS_TTY_SERVER}"'.*' &>/dev/null; then
   if type at &>/dev/null; then
-    echo "emacs --daemon=${EMACS_TTY_SERVER}" | at NOW
+    echo "emacs --daemon=${EMACS_TTY_SERVER}" &> "/tmp/emacs-${EMACS_TTY_SERVER}-server.log" | at NOW
   else
-    (emacs --daemon="${EMACS_TTY_SERVER}" &)
+    (emacs --daemon="${EMACS_TTY_SERVER}" &> "/tmp/emacs-${EMACS_TTY_SERVER}-server.log") & disown
   fi
 fi
 
