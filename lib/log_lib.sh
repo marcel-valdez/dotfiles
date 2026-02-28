@@ -26,11 +26,11 @@ if [[ -z "${LOG_FILE}" ]]; then
   fi
 fi
 
-function now {
+function log::now {
   date "+%H:%M:%S"
 }
 
-function log {
+function log::log {
   local log_level=$1
   local log_type=$2
   shift
@@ -51,23 +51,23 @@ function log {
   fi
 }
 
-function debug {
+function log::debug {
   log 3 DEBUG "$@" & disown
 }
 
-function info {
+function log::info {
   log 2 INFO "$@" & disown
 }
 
-function warn {
+function log::warn {
   log 1 WARN "$@" & disown
 }
 
-function error {
+function log::error {
   log 0 ERROR "$@" & disown
 }
 
-function fatal {
+function log::fatal {
   log 0 FATAL "$@" & disown
   exit 1
 }
