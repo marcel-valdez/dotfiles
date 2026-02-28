@@ -4,7 +4,7 @@
 export LOG_SCRIPT_NAME=
 LOG_SCRIPT_NAME="$(basename "$0")"
 [[ -z "${LOG_LEVEL}" ]] && export LOG_LEVEL=2
-[[ -z "${LOG_FILE}" ]] && export LOG_FILE="/tmp/gemini_after_agent_hook.log"
+[[ -z "${LOG_FILE}" ]] && export LOG_FILE="/tmp/gemini_notify_hook.log"
 source "${HOME}/scripts/log_lib.sh"
 
 function dispatch {
@@ -12,31 +12,32 @@ function dispatch {
   "$@" &>/dev/null & disown
 }
 
+function run {
+  debug "run $*"
+  "$@"
+}
+
 # Read the incoming JSON context from Gemini CLI
 read -r -d '' PAYLOAD
+info "Processing: $(echo "${PAYLOAD}" | run jq --monochrome-output)"
 
-
-NOTIFICATION_TYPE="$(echo "${PAYLOAD}" | jq -r '.notification_type')"
+NOTIFICATION_TYPE="$(echo "${PAYLOAD}" | run jq -r '.notification_type')"
 if ! [[ "${NOTIFICATION_TYPE}" == "ToolPermission" ]]; then
   echo "{}"
   exit 0
 fi
 
+TOOL_NAME="$(echo "${PAYLOAD}" | run jq -r '.details.command')"
+CWD="$(echo "${PAYLOAD}" | run jq -r '.cwd')"
+WORKSPACE="$(run basename "${CWD}")"
 
-TOOL_NAME="$(echo "${PAYLOAD}" | jq -r '.details.toolName')"
-CWD="$(echo "${PAYLOAD}" | jq -r '.cwd')"
-WORKSPACE="$(basename "${CWD}")"
-
-if echo "${CWD}" | grep "/google3" &>/dev/null; then
-  GOOGLE3_DIR="$(echo "${CWD}" | grep -o ".*/google3")"
-  WORKSPACE_DIR="$(dirname "${GOOGLE3_DIR}")"
-  WORKSPACE="$(basename "${WORKSPACE_DIR}")"
+if echo "${CWD}" | run grep "/google3" &>/dev/null; then
+  GOOGLE3_DIR="$(echo "${CWD}" | run grep -o ".*/google3")"
+  WORKSPACE_DIR="$(run dirname "${GOOGLE3_DIR}")"
+  WORKSPACE="$(run basename "${WORKSPACE_DIR}")"
 fi
 
-PARSED_DATA="${TOOL_NAME}|${WORKSPACE}"
-
-# If PARSED_DATA is empty, exit gracefully
-if [ -z "${PARSED_DATA}" ]; then
+if [[ -z "${TOOL_NAME}" ]] || [[ -z "${WORKSPACE}" ]]; then
   echo "{}"
   exit 0
 fi
@@ -56,11 +57,11 @@ else
   TITLE="Gemini CLI"
   # Otherwise use local notifications on terminal & desktop.
   notified=
-  if type tmux-notify &>/dev/null; then
+  if run type tmux-notify &>/dev/null; then
     dispatch tmux-notify "${TITLE}" "${MSG}"
     notified=1
   fi
-  if [[ -n "${DISPLAY}" ]] && type notify-send &>/dev/null; then
+  if [[ -n "${DISPLAY}" ]] && run type notify-send &>/dev/null; then
     dispatch notify-send "${TITLE}" "${MSG}"
     notified=1
   fi
