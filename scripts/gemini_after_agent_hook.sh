@@ -5,15 +5,15 @@ export LOG_SCRIPT_NAME=
 LOG_SCRIPT_NAME="$(basename "$0")"
 [[ -z "${LOG_LEVEL}" ]] && export LOG_LEVEL=2
 [[ -z "${LOG_FILE}" ]] && export LOG_FILE="/tmp/gemini_after_agent_hook.log"
-source "${HOME}/scripts/log_lib.sh"
+source "${HOME}/lib/log_lib.sh"
 
 function run {
-  debug "run $*"
+  log::debug "run $*"
   "$@"
 }
 
 function dispatch {
-  debug "dispatch $*"
+  log::debug "dispatch $*"
   "$@" &>/dev/null & disown
 }
 
@@ -23,13 +23,13 @@ TMUX_SESSION="Unknown"
 TMUX_WINDOW="Unknown"
 # https://geminicli.com/docs/hooks/reference/#afteragent
 read -r -d '' PAYLOAD
-debug "PAYLOAD: ${PAYLOAD}"
+log::debug "PAYLOAD: ${PAYLOAD}"
 event_name="$(echo "${PAYLOAD}" | run jq -r '.hook_event_name')"
-debug "event_name: ${event_name}"
+log::debug "event_name: ${event_name}"
 prompt="$(echo "${PAYLOAD}" | run jq -r '.prompt')"
-debug "prompt: ${prompt}"
+log::debug "prompt: ${prompt}"
 prompt_response="$(echo "${PAYLOAD}" | run jq -r '.prompt_response')"
-debug "prompt_response: ${prompt_response}"
+log::debug "prompt_response: ${prompt_response}"
 
 function populate_tmux_info {
   local cli_tty
@@ -46,14 +46,14 @@ function populate_tmux_info {
   fi
 }
 
-info "Processing: $(echo "${PAYLOAD}" | run jq --monochrome-output)"
+log::info "Processing: $(echo "${PAYLOAD}" | run jq --monochrome-output)"
 if [[ "${event_name}" == "AfterAgent" ]]; then
   if [[ -f "${TRACKER_FILE}" ]]; then
     start_time="$(run cat "${TRACKER_FILE}")"
 
     end_time=$(run date +%s)
     elapsed=$((end_time-start_time))
-    debug "elapsed: ${elapsed}"
+    log::debug "elapsed: ${elapsed}"
     if [[ "${elapsed}" -ge "${NOTIFICATION_THRESHOLD_SECS}" ]]; then
       title="Gemini CLI"
       populate_tmux_info
@@ -82,7 +82,7 @@ EOF
           notified=1
         fi
         if [[ -z "${notified}" ]]; then
-          error "neither tmux-notify nor notify-send where available to notify the user."
+          log::error "neither tmux-notify nor notify-send where available to notify the user."
         fi
       fi
     fi

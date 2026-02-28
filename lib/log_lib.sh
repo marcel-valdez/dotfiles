@@ -68,6 +68,6 @@ function log::error {
 }
 
 function log::fatal {
-  log 0 FATAL "$@" & disown
+  log -1 FATAL "$@" & disown
   exit 1
 }

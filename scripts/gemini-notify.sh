@@ -5,21 +5,21 @@ export LOG_SCRIPT_NAME=
 LOG_SCRIPT_NAME="$(basename "$0")"
 [[ -z "${LOG_LEVEL}" ]] && export LOG_LEVEL=2
 [[ -z "${LOG_FILE}" ]] && export LOG_FILE="/tmp/gemini_notify_hook.log"
-source "${HOME}/scripts/log_lib.sh"
+source "${HOME}/lib/log_lib.sh"
 
 function dispatch {
-  debug "dispatch $*"
+  log::debug "dispatch $*"
   "$@" &>/dev/null & disown
 }
 
 function run {
-  debug "run $*"
+  log::debug "run $*"
   "$@"
 }
 
 # Read the incoming JSON context from Gemini CLI
 read -r -d '' PAYLOAD
-info "Processing: $(echo "${PAYLOAD}" | run jq --monochrome-output)"
+log::info "Processing: $(echo "${PAYLOAD}" | run jq --monochrome-output)"
 
 NOTIFICATION_TYPE="$(echo "${PAYLOAD}" | run jq -r '.notification_type')"
 if ! [[ "${NOTIFICATION_TYPE}" == "ToolPermission" ]]; then
@@ -66,7 +66,7 @@ else
     notified=1
   fi
   if [[ -z "${notified}" ]]; then
-    error "neither tmux-notify nor notify-send where available to notify the user."
+    log::error "neither tmux-notify nor notify-send where available to notify the user."
   fi
 fi
 
