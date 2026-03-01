@@ -43,31 +43,31 @@ function log::log {
       if ! [[ -e "${LOG_FILE}" ]]; then
         touch "${LOG_FILE}"
       fi
-      echo "[${log_type}] @$(now) ${LOG_SCRIPT_NAME}/${LOG_PID}: $*" >> "${LOG_FILE}"
+      echo "[${log_type}] @$(log::now) ${LOG_SCRIPT_NAME}/${LOG_PID}: $*" >> "${LOG_FILE}"
     fi
     if [[ -n "${LOG_TO_STDERR}" ]]; then
-      echo "[${log_type}] @$(now) ${LOG_SCRIPT_NAME}/${LOG_PID}: $*" >&2
+      echo "[${log_type}] @$(log::now) ${LOG_SCRIPT_NAME}/${LOG_PID}: $*" >&2
     fi
   fi
 }
 
 function log::debug {
-  log 3 DEBUG "$@" & disown
+  log::log 3 DEBUG "$@" & disown
 }
 
 function log::info {
-  log 2 INFO "$@" & disown
+  log::log 2 INFO "$@" & disown
 }
 
 function log::warn {
-  log 1 WARN "$@" & disown
+  log::log 1 WARN "$@" & disown
 }
 
 function log::error {
-  log 0 ERROR "$@" & disown
+  log::log 0 ERROR "$@" & disown
 }
 
 function log::fatal {
-  log -1 FATAL "$@" & disown
+  log::log -1 FATAL "$@" & disown
   exit 1
 }
