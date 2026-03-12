@@ -13,6 +13,8 @@ alias webserver='python -m SimpleHTTPServer'
 alias wget_page='wget -q -O -'
 alias less-lineno='less -N'
 alias nano-crypto=crypto-file
+# refreshed kitty environment
+alias rk='refresh_kitty'
 
 # start git commands
 
@@ -65,7 +67,5 @@ alias g-shell='git-shell'
 alias g-upload-archive='git-upload-archive'
 alias g-receive-pack='git-receive-pack'
 alias g-upload-pack='git-load-pack'
-
 # end git commands
-
 

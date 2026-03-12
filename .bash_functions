@@ -878,3 +878,13 @@ function hg-update-fzf {
 function wayland-maximize {
   gdbus call --session --dest org.gnome.Shell --object-path /org/gnome/Shell --method org.gnome.Shell.Eval "global.display.get_focus_window().move_resize_frame(true, 0, 0, 3840, 1080);"
 }
+
+# Function to refresh the Kitty socket inside tmux
+function refresh_kitty {
+  if [ -n "${TMUX}" ]; then
+    eval "$(tmux show-environment -s KITTY_LISTEN_ON)"
+    eval "$(tmux show-environment -s KITTY_PUBLIC_KEY)"
+    eval "$(tmux show-environment -s KITTY_PID)"
+    eval "$(tmux show-environment -s KITTY_WINDOW_ID)"
+  fi
+}
