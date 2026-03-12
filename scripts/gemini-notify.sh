@@ -28,6 +28,7 @@ if ! [[ "${NOTIFICATION_TYPE}" == "ToolPermission" ]]; then
 fi
 
 TOOL_NAME="$(echo "${PAYLOAD}" | run jq -r '.details.command')"
+MSG="$(echo "${PAYLOAD}" | run jq -r '.message')"
 CWD="$(echo "${PAYLOAD}" | run jq -r '.cwd')"
 WORKSPACE="$(run basename "${CWD}")"
 
@@ -37,14 +38,12 @@ if echo "${CWD}" | run grep "/google3" &>/dev/null; then
   WORKSPACE="$(run basename "${WORKSPACE_DIR}")"
 fi
 
-if [[ -z "${TOOL_NAME}" ]] || [[ -z "${WORKSPACE}" ]]; then
-  echo "{}"
-  exit 0
-fi
-
 # Trigger Knock with the custom message
 # Ensure knock.sh is sourced in your shell or the environment where this script runs.
-MSG="Gemini CLI needs approval for '${TOOL_NAME}'"
+if [[ -z "${MESSAGE}" ]]; then
+  MSG="Gemini CLI needs approval for '${TOOL_NAME}'"
+fi
+
 if [[ -e /google/bin/releases/knock/knock.sh ]]; then
   # If we don't have access to knock due to missing gcert, skip.
   source /google/bin/releases/knock/knock.sh
