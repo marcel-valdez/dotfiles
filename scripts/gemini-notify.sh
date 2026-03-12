@@ -40,7 +40,7 @@ fi
 
 # Trigger Knock with the custom message
 # Ensure knock.sh is sourced in your shell or the environment where this script runs.
-if [[ -z "${MESSAGE}" ]]; then
+if [[ -z "${MSG}" ]]; then
   MSG="Gemini CLI needs approval for '${TOOL_NAME}'"
 fi
 
