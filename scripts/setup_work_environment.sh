@@ -2,6 +2,7 @@
 
 [[ -f "${HOME}/.bash_functions" ]] && source "${HOME}/.bash_functions"
 [[ -f "${HOME}/.googlerc.d/.googlerc" ]] && source "${HOME}/.googlerc.d/.googlerc"
+[[ -f "${HOME}/lib/log_lib.sh" ]] &&  source "${HOME}/lib/log_lib.sh"
 
 GCLOUD_FOLDERS=("notes" "gtd" "tmp")
 declare -A LOCAL_MOUNT_FOLDER_NAMES
@@ -57,7 +58,7 @@ function is_folder_mounted {
 }
 
 function mount_remote_gcloud_folders {
-  echo "Re-mounting (if necessary) folders from host ${USER}.c.googlers.com"
+  log::info "Re-mounting (if necessary) folders from host ${USER}.c.googlers.com"
   for folder in "${GCLOUD_FOLDERS[@]}"; do
     local local_folder_name="${LOCAL_MOUNT_FOLDER_NAMES[${folder}]}"
     if [[ -z "${local_folder_name}" ]]; then
@@ -68,10 +69,10 @@ function mount_remote_gcloud_folders {
         mkdir "${HOME}/${local_folder_name}"
       fi
       local remote_folder="/usr/local/google/home/${USER}/${folder}"
-      echo "Mounting ${GCLOUD_HOST}:${remote_folder} on ${HOME}/${local_folder_name}"
+      log::info "Mounting ${GCLOUD_HOST}:${remote_folder} on ${HOME}/${local_folder_name}"
       sshpass -p "$(get_secret)" sshfs -o compression=yes -o auto_cache -o reconnect "${USER}@${GCLOUD_HOST}:${remote_folder}" "${HOME}/${local_folder_name}"
       if [[ $? -ne 0 ]]; then
-        echo "Unable to mount folder ${HOME}/${folder}. Unmounting and remounting once." >&2
+        log::warn "Unable to mount folder ${HOME}/${folder}. Unmounting and remounting once."
         umount "${HOME}/${local_folder_name}"
         sshpass -p "$(get_secret)" sshfs -o compression=yes -o auto_cache -o reconnect "${USER}@${GCLOUD_HOST}:${remote_folder}" "${HOME}/${local_folder_name}"
       fi
@@ -129,7 +130,7 @@ function refresh_gcert {
   fi
 
   if ! "${check_gcert}" -quiet=true; then
-    echo "Refreshing ${gcert_msg}, as it is invalid now."
+    log::info "Refreshing ${gcert_msg}, as it is invalid now."
     retry_cmd "${do_refresh_gcert}"
     return $?
   else
@@ -141,7 +142,7 @@ function refresh_gcert {
     done
 
     if [[ "${remaining_hrs}" -lt 8 ]]; then
-      echo "Less than 8 hr remaining (${remaining_hrs} hr left) in ${gcert_msg}. Refreshing now."
+      log::info "Less than 8 hr remaining (${remaining_hrs} hr left) in ${gcert_msg}. Refreshing now."
       retry_cmd "${do_refresh_gcert}"
       return $?
     fi
@@ -169,7 +170,7 @@ KILLED_MASTER_SESSION=
 function exit_remote_reverse_tunnel {
   if is_laptop_host; then
     if office_ssh_cmd ssh gcloud -O check &>/dev/null; then
-      echo "Shutting down SSH master session for ${OFFICE_HOST}"
+      log::info "Shutting down SSH master session for ${OFFICE_HOST}"
       office_ssh_cmd ssh gcloud -O exit
     fi
   else
@@ -179,7 +180,7 @@ function exit_remote_reverse_tunnel {
     # opened the reverse tunnel.
     # If the gcloud process isn't running (meaning another process is connected).
     if ! ssh gcloud -O check &>/dev/null; then
-      echo "Closing the master session directly on the cloud host ${GCLOUD_HOST}"
+      log::info "Closing the master session directly on the cloud host ${GCLOUD_HOST}"
       cloud_ssh_cmd "/usr/local/google/home/${USER}/scripts/close_port.sh" "${REVERSE_TUNNEL_PORT}"
     fi
   fi
@@ -187,7 +188,7 @@ function exit_remote_reverse_tunnel {
   # Give the previous command 100 ms to run.
   sleep "0.1"
   if is_reverse_tunnel_setup; then
-    echo "We were unable to close the pre-existing reverse tunnel to the cloud instance ${GCLOUD_HOST} at port ${REVERSE_TUNNEL_PORT}" >&2
+    log::error "We were unable to close the pre-existing reverse tunnel to the cloud instance ${GCLOUD_HOST} at port ${REVERSE_TUNNEL_PORT}"
     return 1
   fi
 
@@ -224,14 +225,14 @@ function restart_master_session {
   # Stop the master session if it already exists
   # but not if it was already killed in the script.
   if [[ -z "${KILLED_MASTER_SESSION}" ]] && is_master_session_active &>/dev/null; then
-    echo "Stopping the previous master SSH session."
+    log::info "Stopping the previous master SSH session."
     KILLED_MASTER_SESSION=1
     kill_master_session
   fi
   # Initiate an SSH session in order to start the Master SSH Session
   # assumes there is a master session configuration.
   if ! is_master_session_active &>/dev/null; then
-    echo "Starting a new master SSH session."
+    log::info "Starting a new master SSH session."
     start_master_session
   fi
 }
@@ -305,8 +306,8 @@ function parse_args {
         done
 
         if [[ -z "${found}" ]]; then
-          echo "ERROR: Unknown command or parameter: $1" >&2
-          exit 1
+          log::error "ERROR: Unknown command or parameter: $1"
+          return 1
         fi
         COMMANDS+=("$1")
         shift
@@ -334,17 +335,12 @@ function run {
     fi
   fi
 
-  if ! refresh_gcert; then
-    echo "Failed to refresh gcert. Unable to continue." >&2
-    exit 1
-  fi
-
   if ! is_gcloud_host; then
     # NOTE: Always exit the clipboard daemon first, since it may kill any existing master session if the
     # previous clipboard tunnel owner is the same computer this script runs on.
     if [[ "${DO_CLIPBOARD_DAEMON}" ]]; then
       if ! exit_remote_reverse_tunnel; then
-        echo "Cancelling creation of clipboard daemon & reverse tunnel." >&2
+        log::warn "Cancelling creation of clipboard daemon & reverse tunnel."
         DO_CLIPBOARD_DAEMON=
       fi
     fi
@@ -366,8 +362,8 @@ function run {
     # tunnel owner is the same computer this script runs on.
     if [[ "${DO_CLIPBOARD_DAEMON}" ]]; then
       if ! is_clipboard_daemon_running; then
-        echo "Clipboard Daemon is not running yet, starting it in the background."
-        "${CLIPBOARD_DAEMON_BIN}" &>/dev/null &
+        log::info "Clipboard Daemon is not running yet, starting it in the background."
+        ("${CLIPBOARD_DAEMON_BIN}" &>/dev/null) & disown
       fi
       sleep "0.125s"
       #if is_clipboard_daemon_running; then
@@ -380,12 +376,38 @@ function run {
   fi
 }
 
+function check_gcert {
+  if ! type gcertstatus &>/dev/null; then
+    log::error "gcertstatus not available."
+    return 1
+  fi
+
+  if ! gcertstatus &>/dev/null; then
+    log::info "No gcert certificate available. Running gcert."
+
+    if ! gcert; then
+      log::error "gcert not available, is this a corp machine?"
+      return 1
+    fi
+
+    /usr/bin/gcert
+  fi
+}
+
 function main {
-  parse_args "$@"
+  if ! parse_args "$@"; then
+    log::error "Error while parsing args."
+    return 1
+  fi
+  if ! check_gcert; then
+    log::error "Unable to obtain a gcert certificate, cannot proceed."
+    return 1
+  fi
+
   if [[ ${#COMMANDS[@]} -gt 0 ]]; then
     for cmd in "${COMMANDS[@]}"; do
       if ! run "${cmd}" "${ARGS[@]}"; then
-        exit 1
+        return 1
       fi
     done
   else
@@ -395,5 +417,7 @@ function main {
 
 if ! (return 0 2>/dev/null); then
   SCRIPT=$0
-  main "$@"
+  if ! main "$@"; then
+    log::fatal "Encountered a fatal error."
+  fi
 fi
