@@ -3,12 +3,12 @@
 configuration {
 /* automatically selects once filtered down to 1 item */
 /*	auto-select: true; */
-	modes: "window,windowcd";
+	modes: "windowcd,window";
 	kb-element-next: "Tab,Alt+Tab";
 	kb-element-prev: "ISO_Left_Tab,Alt+ISO_Left_Tab";
 	window-format: "{workspace}/{title}/{class}";
   window {
-    close-on-delete: false;
+    close-on-delete: true;
   }
 }
 
@@ -66,7 +66,7 @@ textbox {
 element-text {
     background-color: inherit;
     text-color:       inherit;
-    font:   "Azeret Mono 10";
+    font:   "Inter 11";
     vertical-align: 0.5;
 }
 element-icon {
@@ -121,7 +121,7 @@ mode-switcher {
 inputbar {
     background-color: @background;
     text-color: @normal-foreground;
-    font:   "Azeret Mono 12";
+    font:   "Inter 12";
 }
 icon-keyboard {
     background-color: @background;
