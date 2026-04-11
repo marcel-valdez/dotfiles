@@ -26,7 +26,7 @@ function pause() {
 function resume() {
   # custom code to run when the pomodoro is resumed
   if [[ "$1" == "pomodoro" ]]; then
-    NOTIFICATION_SOUND="${HOME}/res/bell_hop.mp3"
+    NOTIFICATION_SOUND="${HOME}/res/resume_pomodoro.mp3"
     "${HOME}/bin/do-not-disturb" enable
   fi
 }
@@ -37,7 +37,7 @@ function shortbreak_start() {
 }
 
 function shortbreak_end() {
-  # custom code to run when the pomodoro short break starts
+  # custom code to run when the pomodoro short break ends
   # "${HOME}/bin/do-not-disturb" enable
   echo &>/dev/null  # NOOP
 }
@@ -48,7 +48,7 @@ function longbreak_start() {
 }
 
 function longbreak_end() {
-  # custom code to run when the pomodoro short break starts
+  # custom code to run when the pomodoro short break ends
   # "${HOME}/bin/do-not-disturb" disable
   echo &>/dev/null  # NOOP
 }
@@ -71,10 +71,9 @@ function run_command() {
     log "No handler for event: ${fn_name}"
   fi
 
-#  if [[ "${NOTIFICATION_SOUND}" ]]; then
-#    play -q "${NOTIFICATION_SOUND}" &
-#    disown $!
-#  fi
+ if [[ "${NOTIFICATION_SOUND}" ]]; then
+    systemd-run --user ffplay -nodisp -autoexit "${NOTIFICATION_SOUND}"
+ fi
 }
 
 function run_pomodoro_raw() {
