@@ -2,7 +2,7 @@
 
 async_conky() {
   sleep 20
-  DISPLAY=":1.0" /usr/bin/conky --daemonize --config="${HOME}/.quotes.conkyrc" &> "${HOME}/logs/conkyrc.log"
+  /usr/bin/conky --daemonize --config="${HOME}/.quotes.conkyrc" &> "${HOME}/logs/conkyrc.log"
 }
 
 export -f async_conky
