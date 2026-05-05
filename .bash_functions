@@ -372,20 +372,20 @@ function emacs() {
   if [[ "${TERM}" =~ "eterm" ]]; then
     emacs-client "$@"
   else
-    /usr/bin/emacs --no-window-system "$@" &>/tmp/emacs-${USER}-${RANDOM}.log
+    /usr/bin/emacs --no-window-system "$@" &>"/tmp/emacs-${USER}-${RANDOM}.log"
   fi
 }
 
 function emacs-client() {
-  local editor_cmd=(/usr/bin/emacsclient --create-frame --tty --socket-name=${EMACS_TTY_SERVER})
+  local editor_cmd=(/usr/bin/emacsclient --create-frame --tty --socket-name="${EMACS_TTY_SERVER}")
   if ! EDITOR="'""${editor_cmd[@]}""'" "${editor_cmd[@]}" "$@"; then
-    if type at &>/dev/null; then
-      echo "emacs --daemon=${EMACS_TTY_SERVER}" | at NOW
+    if [[ -x /usr/bin/systemd-run ]]; then
+      (nohup /usr/bin/systemd-run --user /usr/bin/emacs --daemon="${EMACS_TTY_SERVER}") & disown
     else
-      (emacs --bg-daemon=${EMACS_TTY_SERVER} &)
+      (nohup /usr/bin/emacs --bg-daemon="${EMACS_TTY_SERVER}") & disown
     fi
-    # Give the server 125ms to start listening for connections.
-    sleep 0.125
+    # Give the server 250ms to start listening for connections.
+    sleep 0.250
     EDITOR="'""${editor_cmd[@]}""'" "${editor_cmd[@]}" "$@"
   fi
 }
@@ -869,10 +869,14 @@ function tmux-send-to-session-panes {
 }
 
 function hg-update-fzf {
-  hg xl --color=always | \
-    fzf --ansi \
+  hg xl --color=always | fzf --ansi \
+    --header='alt+o: Focus on log patch / alt+l: Switch to file changes' \
+    --header-label-pos=bottom \
     --preview 'echo {} | grep -Eo "[ ]([0-f]{6,})[ ]" | xargs -Iccc hg log --stat -r ccc' \
-    --bind 'enter:become:echo {} | grep -Eo "[ ]([0-f]{6,})[ ]" | xargs -Iccc hg update -r ccc'
+    --bind 'enter:become:echo {} | grep -Eo "[ ]([0-f]{6,})[ ]" | xargs -Iccc hg update -r ccc' \
+    --bind 'alt-l:change-preview(echo {} | grep -Eo "[ ]([0-f]{6,})[ ]" | xargs -Iccc hg log --color=always --patch -r ccc)+change-header(alt+o: Focus on log patch / alt+s: Preview file stats only)' \
+    --bind 'alt-s:change-preview(echo {} | grep -Eo "[ ]([0-f]{6,})[ ]" | xargs -Iccc hg log --stat -r ccc)+change-header(alt+o: Focus on log patch / alt+l: Preview full file changes)' \
+    --bind "alt-o:execute:echo {} | grep -Eo '[ ]([0-f]{6,})[ ]' | xargs -Iccc hg log --color=always -r ccc --patch | less -R"
 }
 
 function wayland-maximize {
