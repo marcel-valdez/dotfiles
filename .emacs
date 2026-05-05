@@ -51,6 +51,9 @@
 ;; interfere
 ;; core macros used for basic functionality
 (require 'marcel-core-macros)
+(with-library action-logger
+  (with-eval-after-load 'action-logger
+    (action-logger-start)))
 
 ;; initialize use-package
 (unless (package-installed-p 'use-package)
