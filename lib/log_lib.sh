@@ -8,16 +8,16 @@
 # LOG_PID: PID for the program logging the entries. Default: $$ (recommended).
 # DEBUG: (deprecated) Forced logging DEBUG statements (NOT equivalent to LOG_LEVEL=3). Default: empty.
 
-[[ -z "${LOG_PID}" ]] && export LOG_PID="$$"
-[[ -z "${LOG_LEVEL}" ]] && export LOG_LEVEL=2
-if [[ -z "${LOG_SCRIPT_NAME}" ]]; then
+[[ -z "${LOG_PID:-}" ]] && export LOG_PID="$$"
+[[ -z "${LOG_LEVEL:-}" ]] && export LOG_LEVEL=2
+if [[ -z "${LOG_SCRIPT_NAME:-}" ]]; then
   if [[ -n "${BASH_SOURCE[1]}" ]]; then
     export LOG_SCRIPT_NAME="$(basename ${BASH_SOURCE[1]})"
   else
     export LOG_SCRIPT_NAME="$(basename $(ps -p "${LOG_PID}" -o comm=))"
   fi
 fi
-if [[ -z "${LOG_FILE}" ]]; then
+if [[ -z "${LOG_FILE:-}" ]]; then
   if [[ -n "${BASH_SOURCE[1]}" ]]; then
     export LOG_FILE="/tmp/${LOG_SCRIPT_NAME}.log"
   else
