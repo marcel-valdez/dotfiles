@@ -242,11 +242,12 @@ if [ "$(expr substr $(uname) 1 5)" == "Linux" ]; then
 fi
 
 if ! pgrep -af '.*emacs.*'"--daemon=${EMACS_TTY_SERVER}"'.*' &>/dev/null; then
-  #if type at &>/dev/null; then
-  #  echo "emacs --daemon=${EMACS_TTY_SERVER}" &> "/tmp/emacs-${EMACS_TTY_SERVER}-server.log" | at NOW
-  #else
-  (emacs --daemon="${EMACS_TTY_SERVER}" &> "/tmp/emacs-${EMACS_TTY_SERVER}-server.log") & disown
-  #fi
+  if [[ -x /usr/bin/systemd-run ]]; then
+    (nohup /usr/bin/systemd-run --user /usr/bin/emacs --daemon="${EMACS_TTY_SERVER}") & disown
+
+  else
+    (nohup /usr/bin/emacs --daemon="${EMACS_TTY_SERVER}" &> "/tmp/emacs-${EMACS_TTY_SERVER}-server.log") & disown
+  fi
 fi
 
 # This loads nvm
