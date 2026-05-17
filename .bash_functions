@@ -869,14 +869,7 @@ function tmux-send-to-session-panes {
 }
 
 function hg-update-fzf {
-  hg xl --color=always | fzf --ansi \
-    --header='alt+o: Focus on log patch / alt+l: Switch to file changes' \
-    --header-label-pos=bottom \
-    --preview 'echo {} | grep -Eo "[ ]([0-f]{6,})[ ]" | xargs -Iccc hg log --stat -r ccc' \
-    --bind 'enter:become:echo {} | grep -Eo "[ ]([0-f]{6,})[ ]" | xargs -Iccc hg update -r ccc' \
-    --bind 'alt-l:change-preview(echo {} | grep -Eo "[ ]([0-f]{6,})[ ]" | xargs -Iccc hg log --color=always --patch -r ccc)+change-header(alt+o: Focus on log patch / alt+s: Preview file stats only)' \
-    --bind 'alt-s:change-preview(echo {} | grep -Eo "[ ]([0-f]{6,})[ ]" | xargs -Iccc hg log --stat -r ccc)+change-header(alt+o: Focus on log patch / alt+l: Preview full file changes)' \
-    --bind "alt-o:execute:echo {} | grep -Eo '[ ]([0-f]{6,})[ ]' | xargs -Iccc hg log --color=always -r ccc --patch | less -R"
+  "${HOME}/bin/hg-xl-fzf" "$@"
 }
 
 function wayland-maximize {

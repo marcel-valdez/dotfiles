@@ -1,0 +1,13 @@
+#!/usr/bin/env bash
+
+# TODO: Add the 'delete' command to prune a commit.
+# TODO: Add the 'histedit' command to histedit up to that commit.
+
+hg xl --color=always "$@" | fzf --ansi \
+  --header='alt+o: Open diff view / alt+l: Preview diff / enter: Checkout commit' \
+  --header-label-pos=bottom \
+  --preview 'echo {} | grep -Eo "[ ]([0-f]{6,})[ ]" | xargs -Iccc hg log --color=always --stat -r ccc' \
+  --bind 'enter:become:echo {} | grep -Eo "[ ]([0-f]{6,})[ ]" | xargs -Iccc hg update -r ccc' \
+  --bind 'alt-l:change-preview(echo {} | grep -Eo "[ ]([0-f]{6,})[ ]" | xargs -Iccc hg log --color=always --patch -r ccc)+change-header(alt+o: Open diff view / alt+s: Preview file stats / enter: Checkout commit)' \
+  --bind 'alt-s:change-preview(echo {} | grep -Eo "[ ]([0-f]{6,})[ ]" | xargs -Iccc hg log --color=always --stat -r ccc)+change-header(alt+o: Open diff view / alt+l: Preview diff / enter: Checkout commit)' \
+  --bind "alt-o:execute:echo {} | grep -Eo '[ ]([0-f]{6,})[ ]' | xargs -Iccc hg log --color=always -r ccc --patch | less -R"

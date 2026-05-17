@@ -47,7 +47,7 @@ export HISTFILESIZE=200000
 # history -a: append this session's new history elements to the history file
 # history -c: clear this session's history list
 # history -r: read the history file's entries and make them the current history list
-export PROMPT_COMMAND="${PROMPT_COMMAND:+$PROMPT_COMMAND$'\n'}history -a"
+export PROMPT_COMMAND="${PROMPT_COMMAND:+$PROMPT_COMMAND$'\n'}"
 
 # If set, the pattern "**" used in a pathname expansion context will
 # match all files and zero or more directories and subdirectories.
@@ -242,12 +242,18 @@ if [ "$(expr substr $(uname) 1 5)" == "Linux" ]; then
 fi
 
 if ! pgrep -af '.*emacs.*'"--daemon=${EMACS_TTY_SERVER}"'.*' &>/dev/null; then
-  if [[ -x /usr/bin/systemd-run ]]; then
-    (nohup /usr/bin/systemd-run --user /usr/bin/emacs --daemon="${EMACS_TTY_SERVER}") & disown
-
-  else
+  log_debug "No emacs daemon running. Starting one."
+#  if [[ -x /usr/bin/systemd-run ]]; then
+#    log_debug "systemd-run, found. Using systemd to start an emacs daemon named ${EMACS_TTY_SERVER}"
+#    (/usr/bin/systemd-run --user /usr/bin/emacs --daemon="${EMACS_TTY_SERVER}") &
+#
+#  else
+#    log_debug "systemd-run NOT found. Starting an emacs daemon named ${EMACS_TTY_SERVER}"
     (nohup /usr/bin/emacs --daemon="${EMACS_TTY_SERVER}" &> "/tmp/emacs-${EMACS_TTY_SERVER}-server.log") & disown
-  fi
+#  fi
+
+else
+  log_debug "Emacs daemon already running, not starting another one."
 fi
 
 # This loads nvm
