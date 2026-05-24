@@ -2,7 +2,9 @@
 # see /usr/share/doc/bash/examples/startup-files (in the package bash-doc)
 # for examples
 
-export EMACS_TTY_SERVER="tty-server"
+[[ -z "${DEBUG_BASHRC:-}" ]] && export DEBUG_BASHRC=
+[[ -z "${DEBUG:-}" ]] && export DEBUG=
+[[ -z "${EMACS_TTY_SERVER:-}" ]] && export EMACS_TTY_SERVER="tty-server"
 # enable 24-bit colors
 export COLORTERM=truecolor
 # If not running interactively, don't do anything
@@ -12,14 +14,14 @@ case $- in
 esac
 
 function log_debug() {
-  [ "${DEBUG_BASHRC}" != "" ] && echo "$(date +%H:%M:%S) $1"
+  [[ -n "${DEBUG_BASHRC:-}" ]] && echo "$(date +%H:%M:%S) $1"
 }
 
 function tmux_attach_or_create_initial_session() {
   local _tmux=tmux
   type tmx2 &>/dev/null && _tmux=tmx2
 
-  if [ "${TMUX_INIT_SESSION}" == "" ]; then
+  if [ -z "${TMUX_INIT_SESSION:-}" ]; then
     log_debug "tmux init: attaching to default session"
     "${_tmux}" new-session -s "default" >&/dev/null \
     || "${_tmux}" attach-session -d -t "default"
@@ -98,7 +100,7 @@ fi
 log_debug "Loaded .google* sources"
 
 # set a fancy prompt (non-color, unless we know we "want" color)
-case "${TERM}" in
+case "${TERM:-}" in
   xterm-color) color_prompt=yes;;
   wezterm) color_prompt=yes;;
   xterm-kitty) color_prompt=yes;;
@@ -110,7 +112,7 @@ esac
 # should be on the output of commands, not on the prompt
 #force_color_prompt=yes
 
-if [ -n "${force_color_prompt}" ]; then
+if [ -n "${force_color_prompt:-}" ]; then
   if [ -x /usr/bin/tput ] && tput setaf 1 >&/dev/null; then
     # We have color support; assume it's compliant with Ecma-48
     # (ISO/IEC-6429). (Lack of such support is extremely rare, and such
@@ -127,7 +129,7 @@ color_prompt=yes
 export TZ="US/Pacific"
 log_debug "Setting PS1 (prompt)"
 g4_functions_exist=$(type g4-client-name >&/dev/null && echo "yes")
-if [ "${g4_functions_exist}" == "yes" ] && ! [[ "${DISABLE_G4_PS1}" ]]; then
+if [ "${g4_functions_exist:-}" == "yes" ] && [[ -z "${DISABLE_G4_PS1:-}" ]]; then
   # NOTE: This requires 256 color support.
   PS1_SUFFIX='$(g4-client-ps1) \[\033[0m\[\033[38;5;237m\D{%H:%M:%S}\[\033[0;0m\n\$ '
   WORKDIR='$(g4-workdir-ps1)'
@@ -136,12 +138,12 @@ else
   WORKDIR='\w'
 fi
 
-if [[ -z "${PS1_HOST}" ]]; then
-  PS1_HOST=$(hostname)
+if [[ -z "${PS1_HOST:-}" ]]; then
+  export PS1_HOST="$(hostname)"
   PS1_HOST=${PS1_HOST/.mtv.*/}
 fi
 
-if [[ "${color_prompt}" == "yes" ]]; then
+if [[ "${color_prompt:-}" == "yes" ]]; then
   log_debug "Using color_prompt PS1"
   PS1="\[\033[00;1m[Exit: \[\033[1;31m\]\${PIPESTATUS[@]/#0/\[\033[0;1m\]\[\033[1;32m\]0\[\033[1;31m\]}\[\033[0;1m\]] "
 else
@@ -149,7 +151,7 @@ else
   PS1="[Exit: \${PIPESTATUS[@]/#0/0}] "
 fi
 
-if [ "${color_prompt}" = "yes" ]; then
+if [ "${color_prompt:-}" = "yes" ]; then
   PS1="${PS1}"'${debian_chroot:+($debian_chroot)}\[\033[01;32m\]@${PS1_HOST}\[\033[00m\]:\[\033[01;34m\]'${WORKDIR}'\[\033[00;1m\]'${PS1_SUFFIX}
 else
   PS1="${PS1}"'${debian_chroot:+($debian_chroot)}@${PS1_HOST}:\w'${PS1_SUFFIX}
@@ -158,7 +160,7 @@ fi
 unset color_prompt force_color_prompt
 
 # If this is an xterm set the title to user@host:dir
-case "${TERM}" in
+case "${TERM:-}" in
   xterm-kitty)
     # noop
   ;;
@@ -209,7 +211,7 @@ export BIN_UTILS_PASS_PHRASE_FILE="${HOME}/.bin-utils-pass-phrase"
 export SUBLIME_PROJECTS_FOLDER="${HOME}/sublime_projects"
 
 if [ "$(expr substr $(uname) 1 5)" == "Linux" ]; then
-  if [[ "${TERM}" =~ "eterm" ]]; then
+  if [[ "${TERM:-}" =~ "eterm" ]]; then
     export EDITOR="emacs-client"
     export GIT_EDITOR="${EDITOR}"
   else
@@ -217,7 +219,7 @@ if [ "$(expr substr $(uname) 1 5)" == "Linux" ]; then
     export GIT_EDITOR="${EDITOR}"
   fi
   # if the terminal has not been initialized yet
-  if [ -z "${TERMINAL_SESSION_INITIALIZED}" ]; then
+  if [ -z "${TERMINAL_SESSION_INITIALIZED:-}" ]; then
     # This is slow, so we do not want to do it for every TMUX pane
     DO_NOT_ADD_KEYS_TO_AGENT=1
     log_debug "Loading SSH session"
@@ -228,7 +230,7 @@ if [ "$(expr substr $(uname) 1 5)" == "Linux" ]; then
 
   # if we are not within tmux and not within an emacs ansi-term
   # start or join a tmux session
-  if [ "${TMUX}" == "" ] && [[ ! "${TERM}" =~ "eterm" ]] ; then
+  if [ "${TMUX:-}" == "" ] && [[ ! "${TERM:-}" =~ "eterm" ]] ; then
     # this will run once per non-eterm terminal opened
     tmux_attach_or_create_initial_session
   fi
