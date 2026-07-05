@@ -17,29 +17,49 @@ function dispatch {
   "$@" &>/dev/null & disown
 }
 
-# Triggers it ASAP
-NOTIFICATION_THRESHOLD_SECS=0
+# Threshold of time elapsed since the *prompt* began execution to decide if a
+# notification should be sent to the user.
+NOTIFICATION_THRESHOLD_SECS=10
 TMUX_SESSION="Unknown"
 TMUX_WINDOW="Unknown"
 # https://g3doc.corp.google.com/devtools/jetski/g3doc/features/agent/agent-hooks.md
 read -r -d '' PAYLOAD
-log::debug "PAYLOAD: ${PAYLOAD}"
-tool_name="$(echo "${PAYLOAD}" | run jq -r '.preToolHookArgs.toolCall.name')"
-log::debug "tool_name: ${tool_name}"
-tool_args="$(echo "${PAYLOAD}" | run jq -r '.preToolHookArgs.toolCall.args')"
-log::debug "tool_args: ${tool_args}"
-step_idx="$(echo "${PAYLOAD}" | run jq -r '.preToolHookArgs.stepIdx')"
-log::debug "step_idx: ${step_idx}"
+log::debug "PAYLOAD: $(echo "${PAYLOAD}" | run jq --monochrome-output)"
+# Example:
+# {
+#   "artifactDirectoryPath":"/usr/local/google/home/marcelvaldez/.gemini/jetski/brain/f13b6cc2-f2a7-4aac-8590-aa1a8db311b6",
+#   "conversationId":"f13b6cc2-f2a7-4aac-8590-aa1a8db311b6",
+#   "executionId":"992720db-22af-44df-a982-192a45415ad4",
+#   "modelName":"auto",
+#   "stepIdx":56,
+#   "toolCall":{
+#     "args":{
+#       "Message":"<message contents>",
+#       "Recipient":"fbb2007e-2f15-4db3-a828-0ef66400b785"
+#     },
+#     "name":"send_message"
+#   },
+#   "transcriptPath":"/usr/local/google/home/marcelvaldez/.gemini/jetski/brain/f13b6cc2-f2a7-4aac-8590-aa1a8db311b6/.system_generated/logs/transcript_full.jsonl",
+#   "workspacePaths":["/google/src/cloud/marcelvaldez/avid_tdp_datastore_monitoring"]
+# }
+conversation_id="$(echo "${PAYLOAD}" | run jq -r '.conversationId')"
+log::info "conversation_id: ${conversation_id}"
+execution_id="$(echo "${PAYLOAD}" | run jq -r '.executionId')"
+log::info "execution_id: ${execution_id}"
+step_idx="$(echo "${PAYLOAD}" | run jq .stepIdx)"
+log::info "step_idx: ${step_idx}"
+workspace_path="$(echo "${PAYLOAD}" | run jq -r '.workspacePaths[0]')"
+log::info "workspace_path: ${workspace_path}"
+tool_name="$(echo "${PAYLOAD}" | run jq -r '.toolCall.name')"
+log::info "tool_name: ${tool_name}"
+tool_args="$(echo "${PAYLOAD}" | run jq -r '.toolCall.args')"
+log::info "tool_args: ${tool_args}"
 
-TRACKER_FILE="/tmp/jetski_tool_use_req_${PPID}_${step_idx}.txt"
-log::debug "TRACKER_FILE: ${TRACKER_FILE}"
-TOOL_NAME_FILE="/tmp/jetski_tool_use_req_${PPID}_${step_idx}_tool_name.txt"
-log::debug "TOOL_NAME_FILE: ${TOOL_NAME_FILE}"
-TOOL_ARGS_FILE="/tmp/jetski_tool_use_req_${PPID}_${step_idx}_tool_args.txt"
-log::debug "TOOL_ARGS_FILE: ${TOOL_ARGS_FILE}"
-run date +%s > "${TRACKER_FILE}"
-echo "${tool_name}" > "${TOOL_NAME_FILE}"
-echo "${tool_args}" > "${TOOL_ARGS_FILE}"
+EXECUTION_TRACKER_FILE="/tmp/jetski_invocation_req_${PPID}_${execution_id}.txt"
+log::debug "EXECUTION_TRACKER_FILE: ${EXECUTION_TRACKER_FILE}"
+TOOL_TRACKER_FILE="/tmp/jetski_tool_use_req_${PPID}_${execution_id}_${step_idx}.txt"
+log::debug "TOOL_TRACKER_FILE: ${TOOL_TRACKER_FILE}"
+run date +%s > "${TOOL_TRACKER_FILE}"
 
 function populate_tmux_info {
   local cli_tty
@@ -56,9 +76,8 @@ function populate_tmux_info {
   fi
 }
 
-# Example input:
-#{
-#  "preToolHookArgs": {
+# Example input for question:
+#  {
 #    "toolCall": {
 #      "name": "ask_question",
 #      "args": {
@@ -76,7 +95,6 @@ function populate_tmux_info {
 #    },
 #    "stepIdx": 51
 #  }
-#}
 
 APPROVAL_TOOLS_REGX='.*(ask_question).*'
 function is_approval_tool {
@@ -84,16 +102,22 @@ function is_approval_tool {
 }
 
 function get_approval_prompt {
-  local question="$(echo "${PAYLOAD}" | run jq -r .preToolHookArgs.toolCall.args.questions[0].question)"
-  log::debug "${question}"
+  local question=
+  question="$(echo "${PAYLOAD}" | run jq -r .toolCall.args.questions[0].question)"
+  log::debug "question: ${question}"
   echo "${question}"
 }
 
-if [[ -f "${TRACKER_FILE}" ]] && is_approval_tool "${tool_name}"; then
+
+if is_approval_tool "${tool_name}"; then
   approval_prompt="$(get_approval_prompt)"
-  start_time="$(run cat "${TRACKER_FILE}")"
-  end_time=$(run date +%s)
-  elapsed=$((end_time-start_time))
+  # Force notification if we can't measure elapsed time
+  elapsed=$((NOTIFICATION_THRESHOLD_SECS+1))
+  if [[ -f "${EXECUTION_TRACKER_FILE}" ]]; then
+      start_time="$(run cat "${EXECUTION_TRACKER_FILE}")"
+      end_time=$(run date +%s)
+      elapsed=$((end_time-start_time))
+  fi
   log::debug "elapsed: ${elapsed}"
   if [[ "${elapsed}" -ge "${NOTIFICATION_THRESHOLD_SECS}" ]]; then
     title="Jetski CLI: Start Tool Use"

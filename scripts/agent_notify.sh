@@ -17,17 +17,36 @@ function run {
   "$@"
 }
 
+function populate_tmux_info {
+  local cli_tty=
+  cli_tty=$(run ps -p "${PPID}" -o tty= | run awk '{print $1}')
+
+  if [[ -n "${cli_tty}" ]] && [[ "${cli_tty}" != "?" ]]; then
+    local full_tty="/dev/${cli_tty}"
+    local tmux_info
+    tmux_info=$(run tmux list-panes -a -F '#{pane_tty} #{session_name} #{window_name}' 2>/dev/null | run grep "^${full_tty} ")
+    if [[ -n "${tmux_info}" ]]; then
+      TMUX_SESSION=$(echo "${tmux_info}" | run awk '{print $2}')
+      TMUX_WINDOW=$(echo "${tmux_info}" | run awk '{print $3}')
+    fi
+  fi
+}
+
 populate_tmux_info
 
 TITLE="$1"
-MSG="$2"
+shift
+BODY=$(cat<<EOF
+Tmux Session: ${TMUX_SESSION:-UNKNOWN} Window: ${TMUX_WINDOW:-UNKNOWN}
+$*
+EOF
+    )
 FULL_MSG=$(cat<<EOF
 
 ${TITLE}
-Tmux Session: ${TMUX_SESSION:-UNKNOWN} Window: ${TMUX_WINDOW:-UNKNOWN}
-${MSG}
+${BODY}
 EOF
-           )
+        )
 
 # Attempt to use knock to notify
 if [[ -e /google/bin/releases/knock/knock.sh ]]; then
@@ -39,11 +58,11 @@ else
   # Otherwise use local notifications on terminal & desktop.
   notified=
   if run type tmux-notify &>/dev/null; then
-    dispatch tmux-notify "${title}" "${msg}"
+    dispatch tmux-notify "${TITLE}" "${BODY}"
     notified=1
   fi
   if [[ -n "${DISPLAY}" ]] && run type notify-send &>/dev/null; then
-    dispatch notify-send "${title}" "${msg}"
+    dispatch notify-send "${TITLE}" "${BODY}"
     notified=1
   fi
   if [[ -z "${notified}" ]]; then

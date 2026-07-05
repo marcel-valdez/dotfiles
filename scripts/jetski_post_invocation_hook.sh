@@ -23,13 +23,34 @@ TMUX_WINDOW="Unknown"
 # https://geminicli.com/docs/hooks/reference/#afteragent
 read -r -d '' PAYLOAD
 log::debug "PAYLOAD: ${PAYLOAD}"
-invocation_num="$(echo "${PAYLOAD}" | run jq -r '.invocationHookArgs.invocationNum')"
+# Example:
+#{
+#  "artifactDirectoryPath": "/usr/local/google/home/marcelvaldez/.gemini/jetski/brain/f13b6cc2-f2a7-4aac-8590-aa1a8db311b6",
+#  "conversationId": "f13b6cc2-f2a7-4aac-8590-aa1a8db311b6",
+#  "executionId": "992720db-22af-44df-a982-192a45415ad4",
+#  "initialNumSteps": 54,
+#  "invocationNum": 25,
+#  "modelName": "auto",
+#  "transcriptPath": "/usr/local/google/home/marcelvaldez/.gemini/jetski/brain/f13b6cc2-f2a7-4aac-8590-aa1a8db311b6/.system_generated/logs/transcript_full.jsonl",
+#  "workspacePaths": [
+#    "/google/src/cloud/marcelvaldez/avid_tdp_datastore_monitoring"
+#  ]
+#}
+conversation_id="$(echo "${PAYLOAD}" | run jq -r '.conversationId')"
+log::debug "conversation_id: ${conversation_id}"
+execution_id="$(echo "${PAYLOAD}" | run jq -r '.executionId')"
+log::debug "execution_id: ${execution_id}"
+invocation_num="$(echo "${PAYLOAD}" | run jq .invocationNum)"
 log::debug "invocation_num: ${invocation_num}"
-initial_num_steps="$(echo "${PAYLOAD}" | run jq -r '.invocationHookArgs.initialNumSteps')"
+initial_num_steps="$(echo "${PAYLOAD}" | run jq .initialNumSteps)"
 log::debug "initial_num_steps: ${initial_num_steps}"
-
-TRACKER_FILE="/tmp/jetski_invocation_req_${PPID}_${invocation_num}.txt"
-log::debug "TRACKER_FILE: ${TRACKER_FILE}"
+workspace_path="$(echo "${PAYLOAD}" | run jq -r '.workspacePaths[0]')"
+log::debug "workspace_path: ${workspace_path}"
+workspace_dir="$(basename "${workspace_path}")"
+EXECUTION_TRACKER_FILE="/tmp/jetski_invocation_req_${PPID}_${execution_id}.txt"
+log::debug "EXECUTION_TRACKER_FILE: ${EXECUTION_TRACKER_FILE}"
+INVOCATION_TRACKER_FILE="/tmp/jetski_invocation_req_${PPID}_${execution_id}_${invocation_num}.txt"
+log::debug "INVOCATION_TRACKER_FILE: ${INVOCATION_TRACKER_FILE}"
 
 function populate_tmux_info {
   local cli_tty
@@ -48,8 +69,8 @@ function populate_tmux_info {
 
 log::info "Processing: $(echo "${PAYLOAD}" | run jq --monochrome-output)"
 
-if [[ -f "${TRACKER_FILE}" ]]; then
-  start_time="$(run cat "${TRACKER_FILE}")"
+if [[ -f "${INVOCATION_TRACKER_FILE}" ]]; then
+  start_time="$(run cat "${INVOCATION_TRACKER_FILE}")"
   end_time=$(run date +%s)
   elapsed=$((end_time-start_time))
   log::debug "elapsed: ${elapsed}"
@@ -58,7 +79,7 @@ if [[ -f "${TRACKER_FILE}" ]]; then
     populate_tmux_info
     msg=$(cat<<EOF
 
-Jestki CLI Tool Invocation done.
+Jestki CLI Tool Invocation on ${workspace_dir} done
 Tmux Session: ${TMUX_SESSION} Window: ${TMUX_WINDOW}
 EOF
        )

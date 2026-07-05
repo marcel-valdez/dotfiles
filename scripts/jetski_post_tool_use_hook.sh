@@ -23,26 +23,48 @@ TMUX_WINDOW="Unknown"
 # https://g3doc.corp.google.com/devtools/jetski/g3doc/features/agent/agent-hooks.md
 #  {"toolHookArgs":{"stepIdx":11}}
 read -r -d '' PAYLOAD
-log::debug "PAYLOAD: ${PAYLOAD}"
-step_idx="$(echo "${PAYLOAD}" | run jq -r '.toolHookArgs.stepIdx')"
-log::debug "step_idx: ${step_idx}"
+log::debug "PAYLOAD: $(echo "${PAYLOAD}" | run jq --monochrome-output)"
+# Example:
+# {
+#   "artifactDirectoryPath":"/usr/local/google/home/marcelvaldez/.gemini/jetski/brain/f13b6cc2-f2a7-4aac-8590-aa1a8db311b6",
+#   "conversationId":"f13b6cc2-f2a7-4aac-8590-aa1a8db311b6",
+#   "error":"",
+#   "executionId":"992720db-22af-44df-a982-192a45415ad4",
+#   "modelName":"auto",
+#   "stepIdx":56,
+#   "toolCall":{
+#     "args":{
+#       "Message":"<message contents>",
+#       "Recipient":"fbb2007e-2f15-4db3-a828-0ef66400b785",
+#       "toolAction":"Sending review report to parent agent",
+#       "toolSummary":"Send code review report to parent"
+#     },
+#     "name":"send_message"
+#   },
+#   "transcriptPath":"/usr/local/google/home/marcelvaldez/.gemini/jetski/brain/f13b6cc2-f2a7-4aac-8590-aa1a8db311b6/.system_generated/logs/transcript_full.jsonl",
+#   "workspacePaths":["/google/src/cloud/marcelvaldez/avid_tdp_datastore_monitoring"]
+# }
 
-TRACKER_FILE="/tmp/jetski_tool_use_req_${PPID}_${step_idx}.txt"
-log::debug "TRACKER_FILE: ${TRACKER_FILE}"
-TOOL_NAME_FILE="/tmp/jetski_tool_use_req_${PPID}_${step_idx}_tool_name.txt"
-log::debug "TOOL_NAME_FILE: ${TOOL_NAME_FILE}"
-TOOL_ARGS_FILE="/tmp/jetski_tool_use_req_${PPID}_${step_idx}_tool_args.txt"
-log::debug "TOOL_ARGS_FILE: ${TOOL_ARGS_FILE}"
+conversation_id="$(echo "${PAYLOAD}" | run jq -r '.conversationId')"
+log::info "conversation_id: ${conversation_id}"
+execution_id="$(echo "${PAYLOAD}" | run jq -r '.executionId')"
+log::info "execution_id: ${execution_id}"
+step_idx="$(echo "${PAYLOAD}" | run jq .stepIdx)"
+log::info "step_idx: ${step_idx}"
+workspace_path="$(echo "${PAYLOAD}" | run jq -r '.workspacePaths[0]')"
+log::info "workspace_path: ${workspace_path}"
+workspace_dir="$(basename "${workspace_path}")"
+tool_name="$(echo "${PAYLOAD}" | run jq -r '.toolCall.name')"
+log::info "tool_name: ${tool_name}"
+tool_args="$(echo "${PAYLOAD}" | run jq -r '.toolCall.args')"
+log::info "tool_args: ${tool_args}"
+tool_summary="$(echo "${PAYLOAD}" | run jq -r '.toolCall.args.toolSummary')"
+log::info "tool_summary: ${tool_summary}"
+tool_action="$(echo "${PAYLOAD}" | run jq -r '.toolCall.args.toolAction')"
+log::info "tool_action: ${tool_action}"
 
-tool_name="Unknown"
-if [[ -f "${TOOL_NAME_FILE}" ]]; then
-  tool_name="$(cat ${TOOL_NAME_FILE})"
-fi
-tool_args="Unknown Args"
-if [[ -f "${TOOL_ARGS_FILE}" ]]; then
-  tool_args="$(cat ${TOOL_ARGS_FILE})"
-fi
-
+TOOL_TRACKER_FILE="/tmp/jetski_tool_use_req_${PPID}_${execution_id}_${step_idx}.txt"
+log::debug "TOOL_TRACKER_FILE: ${TOOL_TRACKER_FILE}"
 
 function populate_tmux_info {
   local cli_tty
@@ -59,19 +81,23 @@ function populate_tmux_info {
   fi
 }
 
-if [[ -f "${TRACKER_FILE}" ]]; then
-  start_time="$(run cat "${TRACKER_FILE}")"
+if [[ -f "${TOOL_TRACKER_FILE}" ]]; then
+  start_time="$(run cat "${TOOL_TRACKER_FILE}")"
   end_time=$(run date +%s)
   elapsed=$((end_time-start_time))
   log::debug "elapsed: ${elapsed}"
   if [[ "${elapsed}" -ge "${NOTIFICATION_THRESHOLD_SECS}" ]]; then
+    body="Args: ${tool_args}"
+    if [[ -n "${tool_summary}" ]]; then
+      body="Summary: ${tool_summary}"
+    fi
     title="Jetski CLI: Tool ${tool_name} Done"
     populate_tmux_info
     msg=$(cat<<EOF
 
-Jestki CLI Tool ${tool_name} Done.
+Jestki CLI Tool ${tool_name} on ${workspace_dir} Done.
 Tmux Session: ${TMUX_SESSION} Window: ${TMUX_WINDOW}
-Args: ${tool_args}
+${body}
 EOF
        )
 
