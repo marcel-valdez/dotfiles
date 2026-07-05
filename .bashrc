@@ -34,7 +34,7 @@ function tmux_attach_or_create_initial_session() {
 
 # don't put duplicate lines or lines starting with space in the history.
 # See bash(1) for more options
-export HISTCONTROL=ignoreboth:erasedups
+export HISTCONTROL=ignoredups:erasedups
 
 # append to the history file, don't overwrite it
 shopt -s histappend
@@ -196,6 +196,10 @@ alias l='ls -CF'
 # Path additions
 if [ -d "${HOME}/bin" ]; then
   export PATH="${PATH}:${HOME}/bin"
+fi
+
+if [ -d "${HOME}/.cargo/bin" ]; then
+    export PATH="${PATH}:${HOME}/.cargo/bin"
 fi
 
 if [ -d "${HOME}/.local/bin" ]; then
