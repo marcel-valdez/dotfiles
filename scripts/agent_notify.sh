@@ -2,7 +2,7 @@
 
 export LOG_SCRIPT_NAME=
 LOG_SCRIPT_NAME="$(basename "$0")"
-[[ -z "${LOG_LEVEL:-}" ]] && export LOG_LEVEL=3
+[[ -z "${LOG_LEVEL:-}" ]] && export LOG_LEVEL=2
 [[ -z "${LOG_FILE:-}" ]] && export LOG_FILE="/tmp/agent_notify.log"
 
 source "${HOME}/lib/log_lib.sh"
