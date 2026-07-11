@@ -3,9 +3,11 @@
 # Path to this script so Genmon knows what to execute on click
 SCRIPT_PATH="$(realpath "$0")"
 CLI_TOOL="${HOME}/.cargo/bin/pbpctrl"
+TIMEOUT_SECS=10
 
 function get_eq_mode {
-  local settings="$("${CLI_TOOL}" get eq)"
+  local settings=
+  settings="$("${CLI_TOOL}" get eq)"
   if [[ "${settings}" == "[0.00, 0.00, 0.00, 0.00, 0.00]" ]]; then
     mode="default"
   elif [[ "${settings}" == "[5.00, 3.00, 0.00, 0.00, 0.00]" ]]; then
@@ -24,14 +26,35 @@ function get_eq_mode {
   echo "${mode}"
 }
 
-ANC_CURRENT="$("${CLI_TOOL}" get anc)"
-if [[ $? -ne 0 ]]; then
-cat<<EOF
+GET_ANC_STDOUT=$(mktemp)
+"${CLI_TOOL}" get anc > "${GET_ANC_STDOUT}" &
+GET_ANC_PID=$!
+
+# Setup timeout for the get command.
+(
+  sleep "${TIMEOUT_SECS}"
+  kill -15 "${GET_ANC_PID}" 2>/dev/null
+) &
+TIMEOUT_KILLER_PID=$!
+
+# Wait for the get to finish (with a timeout)
+wait "${GET_ANC_PID}"
+GET_ANC_STATUS=$?
+
+# Check if the command was successful.
+if [[ "${GET_ANC_STATUS}" -eq 0 ]]; then
+    ANC_CURRENT="$(cat "${GET_ANC_STDOUT}")"
+    # Clean-up timeout killer.
+    rm -f "${GET_ANC_STDOUT}"
+    kill -9 "${TIMEOUT_KILLER_PID}" 2>/dev/null
+    wait "${TIMEOUT_KILLER_PID}" 2>/dev/null
+else  # Do not proceed if get anc fails.
+  cat<<EOF
 <txt><span underline_color='#b8605a' overline_color='#b8605a' underline='single' overline='single'> 🎧 </span></txt>
 <tool>Pixel Buds Pro 2
 (Disconnected)</tool>
 EOF
-  exit 0
+  exit 1
 fi
 
 SPEECH_CURRENT="$("${CLI_TOOL}" get speech-detection)"
@@ -60,8 +83,14 @@ if [[ "$1" == "--menu" ]]; then
                 --width=300 --height=330)
             
             if [[ -n "$ANC_MODE" ]]; then
-                $CLI_TOOL set anc "$ANC_MODE"
-                notify-send -i audio-headphones "Pixel Buds Pro 2" "ANC set to: $ANC_MODE"
+              (
+                ${CLI_TOOL} set anc "$ANC_MODE"
+                if [ $? -eq 0 ]; then
+                  notify-send -i audio-headphones "Pixel Buds Pro 2" "ANC set to: $ANC_MODE"
+                else
+                  notify-send -i dialog-error "Pixel Buds Pro 2" "Error: Unable to set ANC set to: $ANC_MODE"
+                fi
+              ) &>/dev/null & disown
             fi
             ;;
             
@@ -71,9 +100,14 @@ if [[ "$1" == "--menu" ]]; then
                 --width=300 --height=200)
                 
             if [[ -n "$SPEECH_MODE" ]]; then
-                # Replace with specific DBus command if pbpctrl lacks speech-detection
+              (
                 $CLI_TOOL set speech-detection "$SPEECH_MODE"
-                notify-send -i audio-headphones "Pixel Buds Pro 2" "Speech Detection: $SPEECH_MODE"
+                if [ $? -eq 0 ]; then
+                  notify-send -i audio-headphones "Pixel Buds Pro 2" "Speech Detection set to: $SPEECH_MODE"
+                else
+                  notify-send -i dialog-error "Pixel Buds Pro 2" "Error: Unable to set Speech Detection to: $SPEECH_MODE"
+                fi
+              ) &>/dev/null & disown
             fi
             ;;
 
@@ -112,12 +146,16 @@ if [[ "$1" == "--menu" ]]; then
                   EQ_ARGS=(4.0 1.0 -2.0 1.0 4.0)
                   ;;
               esac
-                
+
               # Execute the tool with the expanded arguments
-              # (Notice EQ_ARGS is NOT quoted so Bash expands it into 5 separate arguments)
-              $CLI_TOOL set eq "${EQ_ARGS[@]}"
-              
-              notify-send -i audio-headphones "Pixel Buds Pro 2" "EQ Preset Applied: $EQ_MODE"
+              (
+                $CLI_TOOL set eq "${EQ_ARGS[@]}"
+                if [ $? -eq 0 ]; then
+                  notify-send -i audio-headphones "Pixel Buds Pro 2" "EQ Preset Applied: $EQ_MODE"
+                else
+                  notify-send -i dialog-error "Pixel Buds Pro 2" "Error: Unable to apply EQ Preset: $EQ_MODE"
+                fi
+              ) &>/dev/null & disown
             fi
             ;;
     esac
@@ -132,7 +170,7 @@ cat<<EOF
 <txt><span underline_color='#537562' overline_color='#537562' underline='single' overline='single'> 🎧 </span></txt>
 <txtclick>${SCRIPT_PATH} --menu</txtclick>
 <click>${SCRIPT_PATH} --menu</click>
-<tool>Pixel Buds Pro 2 Settings
+<tool>Pixel Buds Pro 2
 BATT: ${BATTERY}
 ANC: ${ANC_CURRENT}
 SPEECH: ${SPEECH_CURRENT}
