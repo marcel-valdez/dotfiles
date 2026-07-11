@@ -3,7 +3,7 @@
 # Log settings
 export LOG_SCRIPT_NAME=
 LOG_SCRIPT_NAME="$(basename "$0")"
-[[ -z "${LOG_LEVEL}" ]] && export LOG_LEVEL=3
+[[ -z "${LOG_LEVEL}" ]] && export LOG_LEVEL=2
 [[ -z "${LOG_FILE}" ]] && export LOG_FILE="/tmp/jetski_hook.log"
 source "${HOME}/lib/log_lib.sh"
 
@@ -24,7 +24,7 @@ TMUX_SESSION="Unknown"
 TMUX_WINDOW="Unknown"
 # https://g3doc.corp.google.com/devtools/jetski/g3doc/features/agent/agent-hooks.md
 read -r -d '' PAYLOAD
-log::debug "PAYLOAD: $(echo "${PAYLOAD}" | run jq --monochrome-output)"
+log::info "PAYLOAD: $(echo "${PAYLOAD}" | run jq --monochrome-output)"
 # Example:
 # {
 #   "artifactDirectoryPath":"/usr/local/google/home/marcelvaldez/.gemini/jetski/brain/f13b6cc2-f2a7-4aac-8590-aa1a8db311b6",
@@ -55,7 +55,7 @@ log::info "tool_name: ${tool_name}"
 tool_args="$(echo "${PAYLOAD}" | run jq -r '.toolCall.args')"
 log::info "tool_args: ${tool_args}"
 
-EXECUTION_TRACKER_FILE="/tmp/jetski_invocation_req_${PPID}_${execution_id}.txt"
+ EXECUTION_TRACKER_FILE="/tmp/jetski_invocation_req_${PPID}_${execution_id}.txt"
 log::debug "EXECUTION_TRACKER_FILE: ${EXECUTION_TRACKER_FILE}"
 TOOL_TRACKER_FILE="/tmp/jetski_tool_use_req_${PPID}_${execution_id}_${step_idx}.txt"
 log::debug "TOOL_TRACKER_FILE: ${TOOL_TRACKER_FILE}"

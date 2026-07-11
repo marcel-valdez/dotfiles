@@ -2,7 +2,7 @@
 # Log settings
 export LOG_SCRIPT_NAME=
 LOG_SCRIPT_NAME="$(basename "$0")"
-[[ -z "${LOG_LEVEL}" ]] && export LOG_LEVEL=3
+[[ -z "${LOG_LEVEL}" ]] && export LOG_LEVEL=2
 [[ -z "${LOG_FILE}" ]] && export LOG_FILE="/tmp/jetski_hook.log"
 source "${HOME}/lib/log_lib.sh"
 
@@ -17,7 +17,7 @@ function run {
 }
 
 read -r -d '' PAYLOAD
-log::debug "PAYLOAD: $(echo "${PAYLOAD}" | run jq --monochrome-output)"
+log::info "PAYLOAD: $(echo "${PAYLOAD}" | run jq --monochrome-output)"
 # Example:
 #{
 #  "artifactDirectoryPath": "/usr/local/google/home/marcelvaldez/.gemini/jetski/brain/fbb2007e-2f15-4db3-a828-0ef66400b785",

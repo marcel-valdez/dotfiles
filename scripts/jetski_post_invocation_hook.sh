@@ -3,7 +3,7 @@
 # Log settings
 export LOG_SCRIPT_NAME=
 LOG_SCRIPT_NAME="$(basename "$0")"
-[[ -z "${LOG_LEVEL}" ]] && export LOG_LEVEL=3
+[[ -z "${LOG_LEVEL}" ]] && export LOG_LEVEL=2
 [[ -z "${LOG_FILE}" ]] && export LOG_FILE="/tmp/jetski_hook.log"
 source "${HOME}/lib/log_lib.sh"
 
@@ -17,12 +17,12 @@ function dispatch {
   "$@" &>/dev/null & disown
 }
 
-NOTIFICATION_THRESHOLD_SECS=60
+NOTIFICATION_THRESHOLD_SECS=300
 TMUX_SESSION="Unknown"
 TMUX_WINDOW="Unknown"
 # https://geminicli.com/docs/hooks/reference/#afteragent
 read -r -d '' PAYLOAD
-log::debug "PAYLOAD: ${PAYLOAD}"
+log::info "PAYLOAD: ${PAYLOAD}"
 # Example:
 #{
 #  "artifactDirectoryPath": "/usr/local/google/home/marcelvaldez/.gemini/jetski/brain/f13b6cc2-f2a7-4aac-8590-aa1a8db311b6",
@@ -37,15 +37,15 @@ log::debug "PAYLOAD: ${PAYLOAD}"
 #  ]
 #}
 conversation_id="$(echo "${PAYLOAD}" | run jq -r '.conversationId')"
-log::debug "conversation_id: ${conversation_id}"
+log::info "conversation_id: ${conversation_id}"
 execution_id="$(echo "${PAYLOAD}" | run jq -r '.executionId')"
-log::debug "execution_id: ${execution_id}"
+log::info "execution_id: ${execution_id}"
 invocation_num="$(echo "${PAYLOAD}" | run jq .invocationNum)"
-log::debug "invocation_num: ${invocation_num}"
+log::info "invocation_num: ${invocation_num}"
 initial_num_steps="$(echo "${PAYLOAD}" | run jq .initialNumSteps)"
-log::debug "initial_num_steps: ${initial_num_steps}"
+log::info "initial_num_steps: ${initial_num_steps}"
 workspace_path="$(echo "${PAYLOAD}" | run jq -r '.workspacePaths[0]')"
-log::debug "workspace_path: ${workspace_path}"
+log::info "workspace_path: ${workspace_path}"
 workspace_dir="$(basename "${workspace_path}")"
 EXECUTION_TRACKER_FILE="/tmp/jetski_invocation_req_${PPID}_${execution_id}.txt"
 log::debug "EXECUTION_TRACKER_FILE: ${EXECUTION_TRACKER_FILE}"
