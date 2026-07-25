@@ -311,5 +311,13 @@ export GEMINI_SEARCH_TOOL="rg"
 # Or if the tool requires specific flags for readable output:
 export GEMINI_RG_FLAGS="--column --line-number --no-heading --color=never --smart-case"
 
+if [[ -f "${HOME}/.local/share/blesh/ble.sh" ]]; then
+  source -- "${HOME}/.local/share/blesh/ble.sh"
+elif [[ -f "/usr/share/blesh/ble.sh" ]]; then
+  source -- "/usr/share/blesh/ble.sh"
+else
+  echo "ble.sh not installed"
+fi
+
 #+begin_src sh [ -n "$EAT_SHELL_INTEGRATION_DIR" ] && \ source "$EAT_SHELL_INTEGRATION_DIR/bash"
 #+end_src sh
