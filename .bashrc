@@ -316,7 +316,7 @@ if [[ -f "${HOME}/.local/share/blesh/ble.sh" ]]; then
 elif [[ -f "/usr/share/blesh/ble.sh" ]]; then
   source -- "/usr/share/blesh/ble.sh"
 else
-  echo "ble.sh not installed"
+  echo "ble.sh not installed" >&2
 fi
 
 #+begin_src sh [ -n "$EAT_SHELL_INTEGRATION_DIR" ] && \ source "$EAT_SHELL_INTEGRATION_DIR/bash"
