@@ -311,13 +311,29 @@ export GEMINI_SEARCH_TOOL="rg"
 # Or if the tool requires specific flags for readable output:
 export GEMINI_RG_FLAGS="--column --line-number --no-heading --color=never --smart-case"
 
-if [[ -f "${HOME}/.local/share/blesh/ble.sh" ]]; then
-  source -- "${HOME}/.local/share/blesh/ble.sh"
-elif [[ -f "/usr/share/blesh/ble.sh" ]]; then
-  source -- "/usr/share/blesh/ble.sh"
+if [[ ${BLE_VERSION-} ]]; then
+  echo "BLE_VERSION SET!"
+  if type ble-attach &>/dev/null; then
+    ble-attach
+  fi
 else
-  echo "ble.sh not installed" >&2
+  echo "BLE_VERSION NOT SET!"
+  if [[ -f "${HOME}/.local/share/blesh/ble.sh" ]]; then
+    source -- "${HOME}/.local/share/blesh/ble.sh"
+  elif [[ -f "/usr/share/blesh/ble.sh" ]]; then
+    source -- "/usr/share/blesh/ble.sh"
+  fi
 fi
+
+## IMPORTANT: Carapace must be loaded AFTER ble.sh (or ble-attach)
+if type carapace &>/dev/null; then
+  # 1. Enable bridges so carapace can steal completions from other tools
+  export CARAPACE_BRIDGES='bash,zsh,fish,inshellisense'
+
+  # 2. Initialize the carapace engine for bash
+  eval "$(carapace _carapace)"
+fi
+
 
 #+begin_src sh [ -n "$EAT_SHELL_INTEGRATION_DIR" ] && \ source "$EAT_SHELL_INTEGRATION_DIR/bash"
 #+end_src sh
