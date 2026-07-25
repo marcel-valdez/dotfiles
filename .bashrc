@@ -312,12 +312,10 @@ export GEMINI_SEARCH_TOOL="rg"
 export GEMINI_RG_FLAGS="--column --line-number --no-heading --color=never --smart-case"
 
 if [[ ${BLE_VERSION-} ]]; then
-  echo "BLE_VERSION SET!"
   if type ble-attach &>/dev/null; then
     ble-attach
   fi
 else
-  echo "BLE_VERSION NOT SET!"
   if [[ -f "${HOME}/.local/share/blesh/ble.sh" ]]; then
     source -- "${HOME}/.local/share/blesh/ble.sh"
   elif [[ -f "/usr/share/blesh/ble.sh" ]]; then
