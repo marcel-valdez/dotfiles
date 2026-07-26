@@ -326,12 +326,11 @@ fi
 ## IMPORTANT: Carapace must be loaded AFTER ble.sh (or ble-attach)
 if type carapace &>/dev/null; then
   # 1. Enable bridges so carapace can steal completions from other tools
-  export CARAPACE_BRIDGES='bash,zsh,fish,inshellisense'
+  export CARAPACE_BRIDGES='zsh,fish,inshellisense'
 
   # 2. Initialize the carapace engine for bash
   eval "$(carapace _carapace)"
 fi
-
 
 #+begin_src sh [ -n "$EAT_SHELL_INTEGRATION_DIR" ] && \ source "$EAT_SHELL_INTEGRATION_DIR/bash"
 #+end_src sh
