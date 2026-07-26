@@ -1,0 +1,22 @@
+# 1. Force the emacs keymap (Optional, but ensures you aren't stuck in vi_imap)
+bleopt default_keymap=emacs
+
+# 2. Bind Ctrl+K to kill from cursor to end of line
+
+ble-bind -m emacs -k 'C-k' kill-line
+# ble-bind -m vi_imap -k 'C-k' kill-line   # Just in case you use vi insert mode
+
+# 3. Bind Alt+Backspace to kill word backward
+# We bind both DEL and BS to catch terminal variance
+ble-bind -m 'emacs' -f 'M-DEL' 'kill-backward-cword'
+ble-bind -m 'emacs' -f 'M-BS' 'kill-backward-cword'
+ble-bind -m 'emacs' -f 'C-M-h' 'kill-backward-cword'
+ble-bind -m 'emacs' -f 'C-M-?' 'kill-backward-cword'
+
+ble-bind -m 'vi_imap' -f 'M-DEL' 'kill-backward-cword'
+ble-bind -m 'vi_imap' -f 'M-BS' 'kill-backward-cword'
+ble-bind -m 'vi_imap' -f 'C-M-h' 'kill-backward-cword'
+ble-bind -m 'vi_imap' -f 'C-M-?' 'kill-backward-cword'
+
+ble-bind -m 'emacs' -f 'M-delete' kill-forward-cword
+ble-bind -m vi_imap -f 'M-delete' kill-forward-cword
