@@ -20,3 +20,43 @@ ble-bind -m 'vi_imap' -f 'C-M-?' 'kill-backward-cword'
 
 ble-bind -m 'emacs' -f 'M-delete' kill-forward-cword
 ble-bind -m vi_imap -f 'M-delete' kill-forward-cword
+
+# Bind M-x to trigger our custom tmux popup function
+# ble-bind -m 'emacs' -x 'M-x' 'run_ble_widget_popup'
+
+# Cache widgets in the background on startup so it doesn't slow down shell load
+mkdir -p ~/.cache/blesh
+(ble-bind -L | sed 's/\x1b\[[0-9;]*m//g' > "$HOME/.cache/blesh/widgets.txt" 2>/dev/null &)
+
+# Define the popup as a native ble.sh widget
+# 2. Define the widget exactly as ble.sh expects
+ble/widget/tmux-m-x() {
+    local cache_in="$HOME/.cache/blesh/widgets.txt"
+    local cache_out="$HOME/.cache/blesh/selected_widget.txt"
+    
+    # Temporarily release ble.sh's lock on the terminal
+    ble/term/leave
+    
+    # Open the tmux popup
+    tmux display-popup -E -w 40 -h 10 -x P -y P -T " Ble.sh Widget Executor " \
+        "fzf --reverse --prompt='Widget > ' < \"$cache_in\" | awk '{print \$1}' > \"$cache_out\""
+
+    # Retake terminal control
+    ble/term/enter
+
+    if [[ -s "$cache_out" ]]; then
+        local widget
+        widget=$(tr -d '\r\n ' < "$cache_out")
+        rm -f "$cache_out"
+        
+        if [[ -n "$widget" ]]; then
+            # Execute the widget natively in the MAIN shell thread
+            "ble/widget/$widget"
+        fi
+    fi
+    
+    # Redraw the screen to reflect the changes immediately
+    ble/textarea#invalidate
+}
+
+ble-bind -m 'emacs' -f 'M-x' 'tmux-m-x'
