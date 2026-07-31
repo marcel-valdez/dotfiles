@@ -18,6 +18,41 @@ function now() {
   date "+%H:%M:%S"
 }
 
+# Universal hook appender
+# Usage:
+#   # Define your custom logic function anywhere
+#   ```bash
+#   my_git_tracker() {
+#       echo "Executing command in a git repo: $1"
+#   }
+#   ```
+#   
+#   # Append it to some hook like `preexec` safely. Example:
+#   `add_to_hook preexec my_git_tracker`
+function _add_to_hook() {
+    local hook_name="$1"
+    local new_func="$2"
+    
+    if [[ "$(type -t "$hook_name")" == "function" ]]; then
+        local old_body
+        old_body=$(declare -f "$hook_name")
+        local internal_name="__chained_${hook_name}_$RANDOM"
+        
+        # Rename the existing function internally
+        eval "${old_body/#$hook_name/$internal_name}"
+        
+        # Create the new combined hook
+        eval "$hook_name() {
+            $internal_name \"\$@\"
+            $new_func \"\$@\"
+        }"
+    else
+        eval "$hook_name() {
+            $new_func \"\$@\"
+        }"
+    fi
+}
+
 function diff-lines() {
   local path=
   local line=

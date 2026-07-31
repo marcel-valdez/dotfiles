@@ -63,6 +63,32 @@ if [ -z "${debian_chroot:-}" ] && [ -r /etc/debian_chroot ]; then
   debian_chroot=$(cat /etc/debian_chroot)
 fi
 
+log_debug "Loading bash-preexec"
+# Because bash-preexec relies on low-level traps (DEBUG and PROMPT_COMMAND) to
+# monitor command execution, make sure it is initialized before ble.sh takes
+# over your line editor, allowing both tools to hook into the shell's event loop
+# without interfering with your prompt rendering.
+if [[ -f /usr/share/bash-preexec/bash_preexec.sh ]]; then
+    source /usr/share/bash-preexec/bash_preexec.sh
+elif [[ -f ~/.bash-preexec/bash_preexec.sh ]]; then
+    source ~/.bash-preexec/bash_preexec.sh
+fi
+log_debug "Loaded bash-preexec"
+
+# This runs right before your prompt appears
+precmd() {
+  return 0
+}
+
+# The preexec function runs automatically just after you hit Enter, capturing
+# the exact command-line string you typed right before the shell executes it.
+# It passes the command string as an argument ($1).
+preexec() {
+  return 0
+}
+
+
+
 log_debug "Loading bash_completion"
 # enable programmable completion features (you don't need to enable
 # this, if it's already enabled in /etc/bash.bashrc and /etc/profile
@@ -300,7 +326,6 @@ fi
 [ -s "${HOME}/.bat.conf" ] && export BAT_CONFIG_PATH="${HOME}/.bat.conf"
 
 [ -s "${HOME}/.cargo/env" ] && . "${HOME}/.cargo/env"
-
 
 if [ -s "${HOME}/.gemini.key" ]; then
   GEMINI_API_KEY="$(cat "${HOME}/.gemini.key")"
