@@ -1,9 +1,25 @@
+# Set color / theme options
+if [[ -f "${HOME}/res/dracula_blesh_color_scheme.sh" ]]; then
+  source "${HOME}/res/dracula_blesh_color_scheme.sh"
+  ble/contrib/scheme:dracula/initialize
+else
+  bleopt color_scheme=catppuccin_mocha
+fi
+
 # 1. Force the emacs keymap (Optional, but ensures you aren't stuck in vi_imap)
 bleopt default_keymap=emacs
+bleopt editor="${EDITOR:nano}"
+
+bleopt complete_menu_style=desc
+ble-import core-complete -C '
+    bleopt complete_menu_style=desc
+'
+
+ble-bind -m 'emacs' -f M-_ 'emacs/redo'
 
 # 2. Bind Ctrl+K to kill from cursor to end of line
 
-ble-bind -m emacs -k 'C-k' kill-line
+ble-bind -m 'emacs' -k 'C-k' 'kill-line'
 # ble-bind -m vi_imap -k 'C-k' kill-line   # Just in case you use vi insert mode
 
 # 3. Bind Alt+Backspace to kill word backward
@@ -18,8 +34,8 @@ ble-bind -m 'vi_imap' -f 'M-BS' 'kill-backward-cword'
 ble-bind -m 'vi_imap' -f 'C-M-h' 'kill-backward-cword'
 ble-bind -m 'vi_imap' -f 'C-M-?' 'kill-backward-cword'
 
-ble-bind -m 'emacs' -f 'M-delete' kill-forward-cword
-ble-bind -m vi_imap -f 'M-delete' kill-forward-cword
+ble-bind -m 'emacs' -f 'M-delete' 'kill-forward-cword'
+ble-bind -m 'vi_imap' -f 'M-delete' 'kill-forward-cword'
 
 # Bind M-x to trigger our custom tmux popup function
 # ble-bind -m 'emacs' -x 'M-x' 'run_ble_widget_popup'
@@ -60,3 +76,11 @@ ble/widget/tmux-m-x() {
 }
 
 ble-bind -m 'emacs' -f 'M-x' 'tmux-m-x'
+
+# Note: If you want to combine fzf-completion with bash_completion, you need to
+# load bash_completion earlier than fzf-completion.  This is required
+# regardless of whether to use ble.sh or not.
+
+ble-import -d integration/fzf-completion
+ble-import -d integration/fzf-key-bindings
+ble-import -d integration/fzf-menu
