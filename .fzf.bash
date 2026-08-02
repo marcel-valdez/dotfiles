@@ -27,10 +27,6 @@ export FZF_DEFAULT_OPTS="-m
 --bind 'ctrl-space:select-all'
 "
 
-if [[ -n "${TMUX}" ]]; then
-    export FZF_DEFAULT_OPTS="${FZF_DEFAULT_OPTS}"
-fi
-
 export FZF_CTRL_R_OPTS="-m
   --preview 'echo {}' --preview-window up:3:hidden:wrap
   --bind 'ctrl-/:toggle-preview'
