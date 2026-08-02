@@ -87,12 +87,11 @@ preexec() {
   return 0
 }
 
-
-
 log_debug "Loading bash_completion"
 # enable programmable completion features (you don't need to enable
 # this, if it's already enabled in /etc/bash.bashrc and /etc/profile
 # sources /etc/bash.bashrc).
+# This MUST be sourced BEFORE fzf completions.
 if ! shopt -oq posix; then
   if [ -f /usr/share/bash-completion/bash_completion ]; then
     . /usr/share/bash-completion/bash_completion
@@ -100,9 +99,7 @@ if ! shopt -oq posix; then
     . /etc/bash_completion
   fi
 fi
-
 log_debug "Loaded bash_completion"
-
 
 # Alias definitions.
 # You may want to put all your additions into a separate file like
@@ -113,7 +110,6 @@ log_debug "Loading .bash* sources"
 if [ -s "${HOME}/.bash_aliases" ]; then
   . "${HOME}/.bash_aliases"
 fi
-
 if [ -s "${HOME}/.bash_functions" ]; then
   . "${HOME}/.bash_functions"
 fi
@@ -231,6 +227,10 @@ fi
 if [ -d "${HOME}/.local/bin" ]; then
   export PATH="${PATH}:${HOME}/.local/bin"
 fi
+
+export PAGER="less -R"
+export MANPAGER="sh -c 'col -bx | batcat -l man -p'"
+
 # Add RVM to PATH for scripting
 # custom environment variables
 # export J2D_PIXMAPS="shared"
@@ -314,15 +314,6 @@ export https_proxy=''
 export ftp_proxy=''
 export socks_proxy=''
 
-# Enable fzf keybindings for Bash:
-[ -s /usr/share/doc/fzf/examples/key-bindings.bash ] && . /usr/share/doc/fzf/examples/key-bindings.bash
-# Enable fuzzy auto-completion for Bash:
-if [ -s /usr/share/doc/fzf/examples/completion.bash ]; then
-  . /usr/share/doc/fzf/examples/completion.bash
-fi
-
-[ -s "${HOME}/.fzf.bash" ] && . "${HOME}/.fzf.bash"
-
 [ -s "${HOME}/.bat.conf" ] && export BAT_CONFIG_PATH="${HOME}/.bat.conf"
 
 [ -s "${HOME}/.cargo/env" ] && . "${HOME}/.cargo/env"
@@ -336,25 +327,40 @@ export GEMINI_SEARCH_TOOL="rg"
 # Or if the tool requires specific flags for readable output:
 export GEMINI_RG_FLAGS="--column --line-number --no-heading --color=never --smart-case"
 
-if [[ ${BLE_VERSION-} ]]; then
+BLE_FIRST_LOAD=
+if [[ ${BLE_VERSION:-} ]]; then
+  log_debug "START: Attach ble.sh."
   if type ble-attach &>/dev/null; then
     ble-attach
   fi
+  log_debug "END: Attach ble.sh."
 else
+  BLE_FIRST_LOAD=1
+  log_debug "START: Load ble.sh."
   if [[ -f "${HOME}/.local/share/blesh/ble.sh" ]]; then
     source -- "${HOME}/.local/share/blesh/ble.sh"
   elif [[ -f "/usr/share/blesh/ble.sh" ]]; then
     source -- "/usr/share/blesh/ble.sh"
   fi
+  log_debug "END: Load ble.sh."
 fi
 
-## IMPORTANT: Carapace must be loaded AFTER ble.sh (or ble-attach)
-if type carapace &>/dev/null; then
-  # 1. Enable bridges so carapace can steal completions from other tools
-  export CARAPACE_BRIDGES='zsh,fish,inshellisense'
 
-  # 2. Initialize the carapace engine for bash
-  eval "$(carapace _carapace)"
+if [[ ${BLE_FIRST_LOAD:-} ]]; then
+  log_debug "START: Load carapace."
+  ## IMPORTANT: Carapace must be loaded AFTER ble.sh (or ble-attach)
+  if type carapace &>/dev/null; then
+    # 1. Enable bridges so carapace can steal completions from other tools
+    export CARAPACE_BRIDGES='zsh,fish,inshellisense'
+    # 2. Initialize the carapace engine for bash
+    eval "$(carapace _carapace)"
+  fi
+  log_debug "END: Load carapace."
+
+  # These MUST be added after carapace.
+  log_debug "START: Load fzf keybindings and completions."
+  [ -s "${HOME}/.fzf.bash" ] && . "${HOME}/.fzf.bash"
+  log_debug "END: Load fzf keybindings and completions."
 fi
 
 #+begin_src sh [ -n "$EAT_SHELL_INTEGRATION_DIR" ] && \ source "$EAT_SHELL_INTEGRATION_DIR/bash"
