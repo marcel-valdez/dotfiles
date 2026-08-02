@@ -16,10 +16,10 @@ function ble/contrib/scheme:dracula/initialize {
   local basic4='#BD93F9' # Purple
   local basic5='#FF79C6' # Pink
   local basic6='#8BE9FD' # Cyan
-  local basic7='#F8F8F2' # Foreground
+  local basic7='#DDEEDD' # Foreground
   local basic8='#6272A4' # Comment
-  local custom1='#282A36' # Background
-  local custom2='#44475A' # Current
+  local custom1='#1C1C1C' # Background
+  local custom2='#4D4D4D' # Current
   local custom3='#FFB86C' # Orange
 
   # Базовий синтаксис
@@ -105,6 +105,8 @@ function ble/contrib/scheme:dracula/initialize {
   # Вимкнені/неактивні елементи
   ble-face -s disabled                  "fg=${basic8}"
   # Очищення екрана візуального дзвінка
+  ble-face -s vbell "fg=#EEDD82,bold"
   ble-face -s vbell_erase               "bg=${custom1}"
+  ble-face -s vbell_flash "bg=#EEDD82,fg=${custom1},bold"
   return 0
 }
