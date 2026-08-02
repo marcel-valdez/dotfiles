@@ -77,6 +77,74 @@ ble/widget/tmux-m-x() {
 
 ble-bind -m 'emacs' -f 'M-x' 'tmux-m-x'
 
+# Ergonomic Options
+
+# Permits reducing the completion list dynamically as you type.
+bleopt complete_allow_reduction=1
+# Shows a menu when completions are ambiguous.
+bleopt complete_ambiguous=1
+# Enables fish-shell style inline ghost text suggestions.
+bleopt complete_auto_complete=1
+# Milliseconds to wait before showing ghost text.
+bleopt complete_auto_delay=1
+# Uses history as the primary source for inline ghost text.
+bleopt complete_auto_history=1
+# Contracts long function names to save space
+bleopt complete_contract_function_names=1
+# Item limit for auto-complete background processing.
+bleopt complete_limit_auto=2000
+# Item limit specifically for the auto-menu
+bleopt complete_limit_auto_menu=100
+# Colored output in the completion menu
+bleopt complete_menu_color=on
+# Highlights the exact typed substring in the menu list
+bleopt complete_menu_color_match=on
+# Allows cycling through the menu items with TAB
+bleopt complete_menu_complete=1
+# Behavior when navigating the menu.
+# insert-selection allows you to press enter immediately without secondary confirmation
+bleopt complete_menu_complete_opts=insert-selection
+# Allows typing to filter the menu while it is open
+bleopt complete_menu_filter=1
+# What it does: Timeout (ms) before giving up on an auto-complete calculation.
+bleopt complete_timeout_auto=2000
+# What it does: Timeout (ms) specifically for bash compgen variables.
+bleopt complete_timeout_compvar=200
+# Verifies bash syntax before executing.
+# verify-syntax prevents running malformed loops.
+bleopt edit_magic_accept=verify-syntax
+#  What it does: Auto-expands things like history (!!) before execution.
+# history:sabbrev let's you see what !! evaluates to before it runs.
+bleopt edit_magic_expand=history:sabbrev
+bleopt indent_offset=2
+bleopt indent_tabs=2
+bleopt highlight_syntax=1
+bleopt highlight_variable=1
+bleopt highlight_filename=1
+bleopt highlight_eval_word_limit=200
+bleopt highlight_timeout_async=5000
+bleopt highlight_timeout_sync=250
+# Note: Make sure this works even when executing remotely through SSH
+bleopt term_modifyOtherKeys_passthrough_kitty_protocol=1
+# Differentiates manual typing from clipboard pasting
+# Protects you from accidentaly executing multi-line clipboard payloads.
+bleopt term_bracketed_paste_mode=on
+# Let ble.sh query the terminfo.
+bleopt term_index_colors=auto
+# Action on editing errors. vbell=visual bell, abell=audible bell
+bleopt edit_bell=vbell
+bleopt vbell_default_message='.oO( ! )Oo.'
+bleopt vbell_duration=500
+bleopt vbell_align=center
+# Syncs history across multiple parallel terminal sessions
+bleopt history_share=1
+# Automatically prints how long a command took if it exceeded a threshold.
+# usr+sys time of 10 sec or more.
+bleopt exec_elapsed_enabled='usr+sys>=10000'
+# Polling interval for background tasks (ms).
+# Slightly higher limits background CPU usage without noticeable UI lag.
+bleopt idle_interval=50
+
 # Note: If you want to combine fzf-completion with bash_completion, you need to
 # load bash_completion earlier than fzf-completion.  This is required
 # regardless of whether to use ble.sh or not.
