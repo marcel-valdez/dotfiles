@@ -15,6 +15,7 @@ ble-import core-complete -C '
     bleopt complete_menu_style=desc
 '
 
+ble-bind -m 'emacs' -f C-S-- 'emacs/undo'
 ble-bind -m 'emacs' -f M-_ 'emacs/redo'
 
 # 2. Bind Ctrl+K to kill from cursor to end of line
@@ -124,8 +125,6 @@ bleopt highlight_filename=1
 bleopt highlight_eval_word_limit=200
 bleopt highlight_timeout_async=5000
 bleopt highlight_timeout_sync=250
-# Note: Make sure this works even when executing remotely through SSH
-bleopt term_modifyOtherKeys_passthrough_kitty_protocol=1
 # Differentiates manual typing from clipboard pasting
 # Protects you from accidentaly executing multi-line clipboard payloads.
 bleopt term_bracketed_paste_mode=on
@@ -144,6 +143,13 @@ bleopt exec_elapsed_enabled='usr+sys>=10000'
 # Polling interval for background tasks (ms).
 # Slightly higher limits background CPU usage without noticeable UI lag.
 bleopt idle_interval=50
+
+# Disable advanced key protocols in ble.sh so it plays nice with standard tmux
+# Note: Make sure this works even when executing remotely through SSH
+bleopt term_modifyOtherKeys_passthrough_kitty_protocol=0
+bleopt term_modifyOtherKeys_internal=0
+bleopt term_modifyOtherKeys_external=0
+
 
 # Note: If you want to combine fzf-completion with bash_completion, you need to
 # load bash_completion earlier than fzf-completion.  This is required
