@@ -21,25 +21,27 @@ function run {
 
 # Read JSON payload from stdin
 DATA=$(cat)
-log::debug "PAYLOAD: $(echo ${DATA} | run jq --monochrome-output)"
+PAYLOAD_DUMP_FILE="/tmp/jetski_payload_$$.json"
+echo "$DATA" > "${PAYLOAD_DUMP_FILE}"
+log::debug "PAYLOAD: $(echo "${DATA}" | run jq --monochrome-output)"
 
 # Extract fields using jq
-eval $(echo "$DATA" | jq -r '
-  "STATE=\"\(.agent_state // "idle")\"
-   CWD=\"\(.workspace.current_dir // "")\"
-   USED_PCT=\"\(.context_window.used_percentage // 0)\"
-   COST=\"\(.cost.total_cost_usd // 0)\"
-   VCS_BRANCH=\"\(.vcs.branch // "")\"
-   VCS_DIRTY=\"\(.vcs.dirty // false)\"
-   SANDBOX=\"\(.sandbox.enabled // false)\"
-   TASKS_COUNT=\"\(.background_tasks | length)\"
-   ARTIFACTS_COUNT=\"\(.artifacts | length)\"
-   MODEL_NAME=\"\(.model.display_name // "")\"
-   COLS=\"\(.terminal_width // 80)\"
-   CONFIRMATION_DIALOG_PENDING=\"\(.tool_confirmation_pending // false)\"
-   CONVERSATION_ID=\"\(.conversation_id // "")\"
+eval "$(echo "$DATA" | jq -r '
+  "STATE=\(.agent_state // "idle" | @sh)
+   CWD=\(.workspace.current_dir // "" | @sh)
+   USED_PCT=\(.context_window.used_percentage // 0 | @sh)
+   COST=\(.cost.total_cost_usd // 0 | @sh)
+   VCS_BRANCH=\(.vcs.branch // "" | @sh)
+   VCS_DIRTY=\(.vcs.dirty // false | @sh)
+   SANDBOX=\(.sandbox.enabled // false | @sh)
+   TASKS_COUNT=\(.task_count // 0 | @sh)
+   ARTIFACTS_COUNT=\(.artifact_count // 0 | @sh)
+   MODEL_NAME=\(.model.display_name // "" | @sh)
+   COLS=\(.terminal_width // 80 | @sh)
+   CONFIRMATION_DIALOG_PENDING=\(.tool_confirmation_pending // false | @sh)
+   CONVERSATION_ID=\(.conversation_id // "" | @sh)
   "
-' 2>/dev/null || echo 'STATE="idle" CWD="" USED_PCT="0" COST="0" VCS_BRANCH="" VCS_DIRTY="false" SANDBOX="false" TASKS_COUNT="0" ARTIFACTS_COUNT="0" MODEL_NAME="" CONFIRMATION_DIALOG_PENDING="false" CONVERSATION_ID=""')
+' 2>/dev/null || echo "STATE='idle' CWD='' USED_PCT='0' COST='0' VCS_BRANCH='' VCS_DIRTY='false' SANDBOX='false' TASKS_COUNT='0' ARTIFACTS_COUNT='0' MODEL_NAME='' CONFIRMATION_DIALOG_PENDING='false' CONVERSATION_ID=''")"
 
 log::debug "STATE=${STATE}"
 log::debug "CWD=${CWD}"
@@ -80,7 +82,8 @@ function populate_tmux_info {
 DIALOG_NOTIFICATION_THRESHOLD_SECS=60
 function handle_dialog_notification {
   local start_time=
-  start_time="$(run cat "${DIALOG_TRACKER_FILE}")"
+  start_time="$(run cat "${DIALOG_TRACKER_FILE}" 2>/dev/null)"
+  start_time=${start_time:-0}
   local end_time=
   end_time=$(run date '+%s')
   local elapsed=
@@ -91,12 +94,12 @@ function handle_dialog_notification {
     should_notify=1
     # No more notifications after the threshold
     run echo -n 9999999999 > "${DIALOG_TRACKER_FILE}"
-  elif [ ${elapsed} -eq 0 ] || [ ${elapsed} -eq 1 ]; then
+  elif [ "${elapsed}" -eq 0 ] || [ "${elapsed}" -eq 1 ]; then
     should_notify=1
     run echo -n $((start_time-2)) > "${DIALOG_TRACKER_FILE}"
   fi
      
-  if [ ${should_notify} -eq 1 ]; then
+  if [ "${should_notify}" -eq 1 ]; then
     log::info "Notifying user about dialog"
     # TODO: Do all of this in a dispatched script, instead of doing it here inline.
     local title="Jetski CLI: User approval required"
@@ -108,17 +111,19 @@ function handle_dialog_notification {
 
 # Handle async (fire & forget) processing
 dialog_tracker_size=$(run stat "${DIALOG_TRACKER_FILE}" --format '%s' 2>/dev/null)
+dialog_tracker_size=${dialog_tracker_size:-0}
 log::debug "dialog_tracker_size=${dialog_tracker_size}"
 if [[ "${CONFIRMATION_DIALOG_PENDING}" == "true" ]]; then
-  if [ ${dialog_tracker_size} -eq 0 ]; then
+  if [ "${dialog_tracker_size}" -eq 0 ]; then
     date '+%s' > "${DIALOG_TRACKER_FILE}"
   fi
   handle_dialog_notification
-elif [ ${dialog_tracker_size} -ne 0 ]; then
+elif [ "${dialog_tracker_size}" -ne 0 ]; then
   log::debug "clearing ${DIALOG_TRACKER_FILE}"
   echo -n > "${DIALOG_TRACKER_FILE}"
 fi
 
+USED_PCT=${USED_PCT:-0}
 USED_PCT_FMT=$(printf "%.2f" "$USED_PCT")
 USED_PCT_INT=${USED_PCT%.*}
 USED_PCT_INT=${USED_PCT_INT:-0}
@@ -154,7 +159,8 @@ if ! [[ -f "${CONTEXT_PCT_TRACKER_FILE}" ]]; then
   echo "${USED_PCT_INT}" > "${CONTEXT_PCT_TRACKER_FILE}"
 fi
 
-PREV_USED_PCT_INT="$(cat ${CONTEXT_PCT_TRACKER_FILE})"
+PREV_USED_PCT_INT="$(run cat "${CONTEXT_PCT_TRACKER_FILE}" 2>/dev/null)"
+PREV_USED_PCT_INT=${PREV_USED_PCT_INT:-0}
 BAR_COLOR="\033[32m"
 if [ "${USED_PCT_INT}" -ge 85 ]; then
   if [ "${PREV_USED_PCT_INT}" -lt 85 ]; then
@@ -205,3 +211,4 @@ else
   echo -e "\033[90m╭─\033[0m $STATE_FMT \033[90m│\033[0m \033[35m$MODEL_NAME\033[0m$VCS_FMT \033[90m│\033[0m $SANDBOX_FMT"
   echo -e "\033[90m╰─\033[0m \033[90mContext:\033[0m ${BAR_COLOR}${BAR}\033[0m \033[33m${USED_PCT_FMT}%\033[0m \033[90m│\033[0m Tasks: \033[36m$TASKS_COUNT\033[0m \033[90m│\033[0m Artifacts: \033[35m$ARTIFACTS_COUNT\033[0m"
 fi
+rm -f "${PAYLOAD_DUMP_FILE}"
