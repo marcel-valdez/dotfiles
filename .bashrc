@@ -85,6 +85,30 @@ if [[ -z "${debian_chroot:-}" ]] && [[ -r /etc/debian_chroot ]]; then
   debian_chroot=$(cat /etc/debian_chroot)
 fi
 
+log_debug "Loading bash-preexec"
+# Because bash-preexec relies on low-level traps (DEBUG and PROMPT_COMMAND) to
+# monitor command execution, make sure it is initialized before ble.sh takes
+# over your line editor, allowing both tools to hook into the shell's event loop
+# without interfering with your prompt rendering.
+if [[ -f /usr/share/bash-preexec/bash_preexec.sh ]]; then
+    source /usr/share/bash-preexec/bash_preexec.sh
+elif [[ -f ~/.bash-preexec/bash_preexec.sh ]]; then
+    source ~/.bash-preexec/bash_preexec.sh
+fi
+log_debug "Loaded bash-preexec"
+
+# This runs right before your prompt appears
+precmd() {
+  return 0
+}
+
+# The preexec function runs automatically just after you hit Enter, capturing
+# the exact command-line string you typed right before the shell executes it.
+# It passes the command string as an argument ($1).
+preexec() {
+  return 0
+}
+
 log_debug "Loading bash_completion"
 # enable programmable completion features (you don't need to enable
 # this, if it's already enabled in /etc/bash.bashrc and /etc/profile
@@ -192,6 +216,10 @@ if [ -d "${HOME}/bin" ]; then
   export PATH="${PATH}:${HOME}/bin"
 fi
 
+if [ -d "${HOME}/.cargo/bin" ]; then
+    export PATH="${PATH}:${HOME}/.cargo/bin"
+fi
+
 if [ -d "${HOME}/.local/bin" ]; then
   export PATH="${PATH}:${HOME}/.local/bin"
 fi
@@ -296,20 +324,59 @@ export socks_proxy=''
 
 [[ -d "${HOME}/modules/fzf/bin" ]] && export PATH="${PATH}:${HOME}/modules/fzf/bin"
 
-# Enable fzf keybindings for Bash:
-if [[ -f "${HOME}/.fzf.bash" ]]; then
-    source "${HOME}/.fzf.bash"
+[ -s "${HOME}/.cargo/env" ] && source "${HOME}/.cargo/env"
+
+export GEMINI_SEARCH_TOOL="rg"
+# Or if the tool requires specific flags for readable output:
+export GEMINI_RG_FLAGS="--column --line-number --no-heading --color=never --smart-case"
+
+BLE_FIRST_LOAD=
+if [[ ${BLE_VERSION:-} ]]; then
+  log_debug "START: Attach ble.sh."
+  if type ble-attach &>/dev/null; then
+    ble-attach
+  fi
+  log_debug "END: Attach ble.sh."
 else
-    if [[ -f "${HOME}/modules/fzf/shell/key-bindings.bash" ]]; then
-        source "${HOME}/modules/fzf/shell/key-bindings.bash"
-    elif [[ -f "/usr/share/doc/fzf/examples/key-bindings.bash" ]]; then
-        source "/usr/share/doc/fzf/examples/key-bindings.bash"
-    fi
-    if [[ -f "${HOME}/modules/fzf/shell/completion.bash" ]]; then
-        source "${HOME}/modules/fzf/shell/completion.bash"
-    elif [[ -f "/usr/share/doc/fzf/examples/completion.bash" ]]; then
-        source "/usr/share/doc/fzf/examples/completion.bash"
-    fi
+  BLE_FIRST_LOAD=1
+  log_debug "START: Load ble.sh."
+  if [[ -f "${HOME}/.local/share/blesh/ble.sh" ]]; then
+    source -- "${HOME}/.local/share/blesh/ble.sh"
+  elif [[ -f "/usr/share/blesh/ble.sh" ]]; then
+    source -- "/usr/share/blesh/ble.sh"
+  fi
+  log_debug "END: Load ble.sh."
+fi
+
+if [[ ${BLE_FIRST_LOAD:-} ]]; then
+  log_debug "START: Load carapace."
+  ## IMPORTANT: Carapace must be loaded AFTER ble.sh (or ble-attach)
+  if type carapace &>/dev/null; then
+    # 1. Enable bridges so carapace can steal completions from other tools
+    export CARAPACE_BRIDGES='zsh,fish,inshellisense'
+    # 2. Initialize the carapace engine for bash
+    eval "$(carapace _carapace)"
+  fi
+  log_debug "END: Load carapace."
+
+  # These MUST be added after carapace.
+  log_debug "START: Load fzf keybindings and completions."
+  # Enable fzf keybindings for Bash:
+  if [[ -f "${HOME}/.fzf.bash" ]]; then
+      source "${HOME}/.fzf.bash"
+  else
+      if [[ -f "${HOME}/modules/fzf/shell/key-bindings.bash" ]]; then
+          source "${HOME}/modules/fzf/shell/key-bindings.bash"
+      elif [[ -f "/usr/share/doc/fzf/examples/key-bindings.bash" ]]; then
+          source "/usr/share/doc/fzf/examples/key-bindings.bash"
+      fi
+      if [[ -f "${HOME}/modules/fzf/shell/completion.bash" ]]; then
+          source "${HOME}/modules/fzf/shell/completion.bash"
+      elif [[ -f "/usr/share/doc/fzf/examples/completion.bash" ]]; then
+          source "/usr/share/doc/fzf/examples/completion.bash"
+      fi
+  fi
+  log_debug "END: Load fzf keybindings and completions."
 fi
 
 # This loads nvm bash_completion
