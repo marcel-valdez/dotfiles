@@ -51,7 +51,7 @@ function initialize_environment() {
 
 [[ -f "${HOME}/bin/functions" ]] && source "${HOME}/bin/functions"
 [[ -f "${HOME}/bin/reinstall_modules" ]] && source "${HOME}/bin/reinstall_modules"
-[[ -f "${HOME}/lib/git-prompt" ]] && source "${HOME}/lib/git-prompt"
+[[ -f "${HOME}/lib/git-prompt.sh" ]] && source "${HOME}/lib/git-prompt.sh"
 
 # don't put duplicate lines or lines starting with space in the history.
 # See bash(1) for more options

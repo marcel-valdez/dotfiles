@@ -213,6 +213,15 @@
       (with-library helm-dash
         (setq helm-dash-browser-func 'eww)))))
 
+(use-package gptel
+  :ensure t
+  :config
+  (setq gptel-api-key (getenv "OPENAI_API_KEY")
+        gptel-backend (gptel-make-openai
+                          "chatgpt"
+                        :key (getenv "OPENAI_API_KEY")
+                        :models '("gpt-5-mini" "gpt-5" "gpt-5-nano" "gpt-4.1-nano"  "gpt-4.1-mini" "gpt-4.1" "gpt-4o" "gpt-4o-mini"))))
+
 (use-package fzf
   :ensure t
   :config
@@ -803,6 +812,7 @@
  '(font-lock-function-name-face ((t (:foreground "dodgerblue2"))))
  '(font-lock-string-face ((t (:foreground "tan"))))
  '(fringe ((t (:background "gray15"))))
+ '(gptel-context-highlight-face ((t (:extend t :background "#000020"))))
  '(helm-selection ((t (:background "gray1" :foreground "cornflowerblue"))))
  '(help-key-binding ((t (:background "gray10" :foreground "royalblue" :box (:line-width (1 . -1) :color "gray5")))))
  '(highlight ((t (:background "midnightblue"))))
