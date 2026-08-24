@@ -384,3 +384,4 @@ fi
 
 export BAT_CONFIG_PATH="${HOME}/.bat.conf"
 export OPENAI_API_KEY="$(cat "${HOME}/.openaikey")"
+export ANTHROPIC_API_KEY="$(cat "${HOME}/.anthropic_api_key")"
