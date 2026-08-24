@@ -20,6 +20,12 @@
 ;; initialize packages
 (require 'cl)
 (require 'marcel-macros)
+(with-library action-logger
+  (with-eval-after-load 'action-logger
+    (action-logger-start)))
+;; Loads office-only helpers when available; effectively a no-op here since
+;; the corp-only bits it used to configure have been stripped out of it.
+(with-library at-office)
 ;; initialize use-package
 (unless (package-installed-p 'use-package)
   (package-refresh-contents)
