@@ -120,7 +120,7 @@ function stop_and_exit {
     exit 1
 }
 
-trap stop_and_exit SIGINT SIGKILL
+trap stop_and_exit SIGINT
 
 function main {
     parse_args "$@"

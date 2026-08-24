@@ -15,23 +15,23 @@ count=10
 stdout="true"
 while [ $# -gt 0 ]; do
   arg="$1"
-  shift
-  case ${arg} in
+  case $arg in
     --help|-h)
-      usage
-      exit 0
-      ;;
+    usage
+    exit 0
+    ;;
     --count|-c)
-      count=$1
-      shift
-      ;;
+    shift
+    count=$1
+    ;;
     --n|--nostdout)
-      stdout="false"
-      ;;
+    stdout="false"
+    ;;
     *)
-      break
-      ;;
+    break
+    ;;
   esac
+  shift
 done
 
 title=""
@@ -45,7 +45,7 @@ if [[ "${message}" == "" ]] && [[ "$#" -lt 2 ]]; then
   exit 1
 fi
 
-if [[ "$2" != "" ]]; then
+if [ "$2" != "" ]; then
   title="$1 "
   message="$2"
 fi
@@ -60,4 +60,4 @@ do
   sleep 2
 done
 
-tmux display-message -p "${display_message}" &
+tmux display-message -p "${display_message}"
