@@ -315,36 +315,44 @@ function ps-nice() {
 }
 
 function emacs() {
-  local emacs_bin="$(which emacs)"
-  # prioritize the snap installation of emacs
-  if [[ -x "/snap/bin/emacs" ]]; then
-      emacs_bin="/snap/bin/emacs"
-  fi
-  # prioritize user-local install of emacs
-  if [[ -x "${HOME}/.local/bin/emacs" ]]; then
-      emacs_bin="${HOME}/.local/bin/emacs"
-  fi
+    local emacs_bin="$(which emacs)"
+    # prioritize the snap installation of emacs
+    if [[ -x "/snap/bin/emacs" ]]; then
+        emacs_bin="/snap/bin/emacs"
+    fi
+    # prioritize user-local install of emacs
+    if [[ -x "${HOME}/.local/bin/emacs" ]]; then
+        emacs_bin="${HOME}/.local/bin/emacs"
+    fi
 
-  if [[ "${EMACS_VERSION}" != "" ]]; then
-     if [[ -x "/usr/local/bin/emacs-${EMACS_VERSION}" ]]; then
-         emacs_bin="/usr/local/bin/emacs-${EMACS_VERSION}"
-     elif [[ -x "/usr/snap/bin/emacs-${EMACS_VERSION}" ]]; then
-         emacs_bin="/snap/bin/emacs-${EMACS_VERSION}"
-     else
-         echo "Emacs binary for version ${EMACS_VERSION} not found. Using ${emacs_bin} instead." >&2
-     fi
-  fi
-  "${emacs_bin}" -nw "$@"
+    if [[ "${EMACS_VERSION}" != "" ]]; then
+        if [[ -x "/usr/local/bin/emacs-${EMACS_VERSION}" ]]; then
+            emacs_bin="/usr/local/bin/emacs-${EMACS_VERSION}"
+        elif [[ -x "/usr/snap/bin/emacs-${EMACS_VERSION}" ]]; then
+            emacs_bin="/snap/bin/emacs-${EMACS_VERSION}"
+        else
+            echo "Emacs binary for version ${EMACS_VERSION} not found. Using ${emacs_bin} instead." >&2
+        fi
+    fi
+    "${emacs_bin}" -nw "$@"
 }
 
 function emacs-client() {
-  local editor_cmd=(/usr/bin/emacsclient --create-frame --tty --socket-name=${EMACS_TTY_SERVER})
+  local _emacs_client_bin
+  local _emacs_client_candidates=("/usr/bin/emacsclient" "/snap/bin/emacsclient" "${HOME}/.local/bin/emacsclient")
+  for _emacs_client_candidate in "${_emacs_client_candidates[@]}"; do
+      if [[ -x "${_emacs_client_candidate}"  ]]; then
+          _emacs_client_bin="${_emacs_client_candidate}"
+      fi
+  done
+  local editor_cmd=("${_emacs_client_bin}" --create-frame --tty --socket-name="${EMACS_TTY_SERVER}")
   if ! EDITOR="'""${editor_cmd[@]}""'" "${editor_cmd[@]}" "$@"; then
-    if type at &>/dev/null; then
-      echo "emacs --daemon=${EMACS_TTY_SERVER}" | at NOW
-    else
-      (emacs --bg-daemon=${EMACS_TTY_SERVER} &)
-    fi
+    #if type at &>/dev/null; then
+    #  echo "emacs --daemon=${EMACS_TTY_SERVER}" | at NOW
+    #else
+    nohup emacs --bg-daemon=${EMACS_TTY_SERVER} >/tmp/${EMACS_TTY_SERVER}.log 2>&1 &
+    disown
+    #fi
     # Give the server 125ms to start listening for connections.
     sleep 0.125
     EDITOR="'""${editor_cmd[@]}""'" "${editor_cmd[@]}" "$@"
