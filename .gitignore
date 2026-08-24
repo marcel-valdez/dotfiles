@@ -7,6 +7,7 @@
 !.bash_functions
 !.bash_aliases
 !.bash_profile
+!.profile
 !.inputrc
 !.minttyrc
 !.nanorc
@@ -16,10 +17,19 @@
 !.gitignore
 !.emacs
 !.xbindkeysrc.scm
+!.XCompose
+!.Xmodmap
+!.xinitrc
+!.xsession
+!.xprofile
+!.xsessionrc
+!.quotes
 !.quotes.conkyrc
 !.wezterm.lua
 !.fzf.bash
 !lib/
+!res/
+!res/*
 
 # include the bin folder
 !bin/
@@ -34,7 +44,6 @@ bin/dex
 !.emacs.d/
 !.emacs.d/lisp/
 !.emacs.d/lisp/*
-.emacs.d/lisp/at-office.el
 !.emacs.d/lisp/external
 !.emacs.d/lisp/external/*
 .emacs.d/lisp/external/helm/
@@ -56,6 +65,18 @@ bin/dex
 !.fluxbox/
 !.fluxbox/keys
 !.fluxbox/startup
+
+!.config/
+!.config/kitty/
+!.config/kitty/*
+!.config/termit/
+!.config/termit/*
+!.config/rofi/
+!.config/rofi/*
+
+!.local/
+!.local/bin/
+!.local/bin/pixel-buds-plugin.sh
 
 !.pomodororc
 # Ignore nano backup files
