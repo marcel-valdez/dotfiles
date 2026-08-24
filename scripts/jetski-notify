@@ -1,0 +1,32 @@
+#!/usr/bin/env bash
+
+# jetski-notify: Displays a tmux popup notification and focuses the target pane upon dismissal.
+# Usage: jetski-notify [title] message
+
+TARGET_PANE="${TARGET_PANE:-${TMUX_PANE}}"
+TITLE="$1"
+shift
+MESSAGE="$*"
+
+if [[ -z "${MESSAGE}" ]]; then
+  MESSAGE="${TITLE}"
+  TITLE="JETSKI NOTIFICATION"
+fi
+
+line_count=$(echo -e "${MESSAGE}" | wc -l)
+line_count=$((line_count+5))
+
+SCRIPT=$(cat<<EOF
+tput civis;
+echo -e "${MESSAGE}";
+echo "";
+echo "--------------------------------------------------";
+echo "Press any key to dismiss and jump to Jetski pane...";
+read -n 1 -s;
+if [[ -n "${TARGET_PANE}" ]]; then
+  tmux select-pane -t "${TARGET_PANE}" 2>/dev/null || true
+fi
+EOF
+      )
+
+tmux display-popup -T " ${TITLE} " -w 80 -h "${line_count}" -E "${SCRIPT}"
