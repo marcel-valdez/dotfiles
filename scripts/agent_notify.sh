@@ -69,3 +69,8 @@ else
     log::error "neither tmux-notify nor notify-send where available to notify the user."
   fi
 fi
+
+# Send OSC 99 terminal notification (Kitty, etc.) if enabled
+if [[ "${JETSKI_ENABLE_OSC99:-true}" == "true" ]]; then
+  dispatch "${HOME}/scripts/osc99_notify.sh" "${TITLE}" "${BODY}"
+fi
