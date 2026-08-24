@@ -1,4 +1,4 @@
-a#!/usr/bin/env bash
+#!/usr/bin/env bash
 
 # Log settings
 export LOG_SCRIPT_NAME=
