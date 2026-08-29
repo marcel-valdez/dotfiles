@@ -70,15 +70,76 @@ function populate_tmux_info {
   fi
 }
 
+function is_main_conversation {
+  local cid="$1"
+  local brain_base="${HOME}/.gemini/jetski"
+
+  # 1. Check if the conversation has an annotation file (explicitly created for user/main sessions)
+  if [[ -f "${brain_base}/annotations/${cid}.pbtxt" ]]; then
+    return 0
+  fi
+
+  # 2. Check if the parent CLI process command line explicitly specifies this conversation ID
+  local cli_args
+  cli_args=$(run ps -p "${PPID}" -o args= 2>/dev/null)
+  if [[ "${cli_args}" == *"--conversation=${cid}"* ]]; then
+    return 0
+  fi
+
+  # 3. Check if this process has a recorded main conversation tracker matching this ID
+  local cli_tracker="/tmp/jetski_cli_main_${PPID}.txt"
+  if [[ -f "${cli_tracker}" ]]; then
+    local tracked_cid
+    tracked_cid=$(cat "${cli_tracker}" 2>/dev/null)
+    if [[ "${tracked_cid}" == "${cid}" ]]; then
+      return 0
+    fi
+  fi
+
+  return 1
+}
+
+function is_subagent_conversation {
+  local cid="$1"
+
+  # If it is confirmed to be the main conversation, it CANNOT be a subagent
+  if is_main_conversation "${cid}"; then
+    return 1
+  fi
+
+  return 0
+}
+
 log::info "Processing: $(echo "${PAYLOAD}" | run jq --monochrome-output)"
 
+transcript_path="$(echo "${PAYLOAD}" | run jq -r '.transcriptPath')"
+
+# Route Subagent vs Main-Agent Notifications
+if is_subagent_conversation "${conversation_id}"; then
+  log::info "Handling stop event for subagent: ${conversation_id}"
+  populate_tmux_info
+
+  # Subagent notification: ONLY a 1-second tmux display-message, no knock, no popup, no notify-send
+  if [[ -n "${TMUX}" ]]; then
+    if [[ "${TMUX_SESSION}" != "Unknown" ]]; then
+      dispatch tmux display-message -t "${TMUX_SESSION}" -d 1000 "Jetski [${workspace_dir}]: Sub-agent turn finished (${TMUX_WINDOW})"
+    else
+      dispatch tmux display-message -d 1000 "Jetski [${workspace_dir}]: Sub-agent turn finished"
+    fi
+  fi
+
+  echo '{"decision": "", "reason": ""}'
+  exit 0
+fi
+
+# Main Agent Notification: Only when fully idle (ready for human) or on error
 if [[ -f "${EXECUTION_TRACKER_FILE}" ]]; then
   start_time="$(run cat "${EXECUTION_TRACKER_FILE}")"
   end_time=$(run date +%s)
   elapsed=$((end_time-start_time))
   log::debug "elapsed: ${elapsed}"
-  if [[ "${elapsed}" -ge "${NOTIFICATION_THRESHOLD_SECS}" ]]; then
-    if [[ "${fully_idle}" == "true"  ]] || [[ -n "${error}" ]]; then
+  if [[ "${elapsed}" -ge "${NOTIFICATION_THRESHOLD_SECS}" ]] || [[ -n "${error}" ]]; then
+    if [[ "${fully_idle}" == "true" ]] || [[ -n "${error}" ]]; then
       populate_tmux_info
       if [[ -n "${error}" ]]; then
         title="Jetski CLI: Error"

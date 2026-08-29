@@ -48,6 +48,12 @@ if ! [[ -f "${EXECUTION_TRACKER_FILE}" ]]; then
   run date +%s > "${EXECUTION_TRACKER_FILE}"
 fi
 
+# Track the main conversation ID for this CLI PID
+MAIN_CONV_FILE="/tmp/jetski_cli_main_${PPID}.txt"
+if [[ -f "${HOME}/.gemini/jetski/annotations/${conversation_id}.pbtxt" ]] || ! [[ -f "${MAIN_CONV_FILE}" ]]; then
+  echo "${conversation_id}" > "${MAIN_CONV_FILE}"
+fi
+
 INVOCATION_TRACKER_FILE="/tmp/jetski_invocation_req_${PPID}_${execution_id}_${invocation_num}.txt"
 log::debug "INVOCATION_TRACKER_FILE: ${INVOCATION_TRACKER_FILE}"
 if ! [[ -f "${INVOCATION_TRACKER_FILE}" ]]; then
