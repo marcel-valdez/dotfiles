@@ -1,196 +1,157 @@
 #!/usr/bin/env bash
+# jetski_stop_hook.sh: Stop hook for Jetski agents.
+# Implements dual-tier notification protocol for intermediate vs. final completion,
+# routes subagent lifecycles, and executes hermetic session cleanup.
 
-# Log settings
-export LOG_SCRIPT_NAME=
-LOG_SCRIPT_NAME="$(basename "$0")"
+export LOG_SCRIPT_NAME="$(basename "$0")"
 [[ -z "${LOG_LEVEL}" ]] && export LOG_LEVEL=2
 [[ -z "${LOG_FILE}" ]] && export LOG_FILE="/tmp/jetski_hook.log"
-source "${HOME}/lib/log_lib.sh"
+source "${HOME}/scripts/jetski_hook_utils.sh"
 
-function run {
-  log::debug "run $*"
-  "$@"
-}
-
-function dispatch {
-  log::debug "dispatch $*"
-  "$@" &>/dev/null & disown
-}
-
-# The tracker file is the one from the first invocation.
-NOTIFICATION_THRESHOLD_SECS=60
-TMUX_SESSION="Unknown"
-TMUX_WINDOW="Unknown"
-# http://g3doc/devtools/jetski/g3doc/features/agent/agent-hooks.md
 read -r -d '' PAYLOAD
-log::info "PAYLOAD: $(echo "${PAYLOAD}" | run jq --monochrome-output)"
-# {
-#   "artifactDirectoryPath":"/usr/local/google/home/marcelvaldez/.gemini/jetski/brain/fbb2007e-2f15-4db3-a828-0ef66400b785",
-#   "conversationId":"fbb2007e-2f15-4db3-a828-0ef66400b785",
-#   "error":"",
-#   "executionId":"4c52e06a-7e22-4d51-90d6-8264e08e2c30",
-#   "executionNum":0,
-#   "fullyIdle":false,
-#   "modelName":"auto",
-#   "terminationReason":"NO_TOOL_CALL",
-#   "transcriptPath":"/usr/local/google/home/marcelvaldez/.gemini/jetski/brain/fbb2007e-2f15-4db3-a828-0ef66400b785/.system_generated/logs/transcript_full.jsonl",
-#   "workspacePaths":["/google/src/cloud/marcelvaldez/avid_tdp_datastore_monitoring"]
-# }
-conversation_id="$(echo "${PAYLOAD}" | run jq -r '.conversationId')"
-log::info "conversation_id: ${conversation_id}"
-execution_id="$(echo "${PAYLOAD}" | run jq -r '.executionId')"
-log::info "execution_id: ${execution_id}"
-execution_num="$(echo "${PAYLOAD}" | run jq -r '.executionNum')"
-log::info "execution_num: ${execution_num}"
-termination_reason="$(echo "${PAYLOAD}" | run jq -r '.terminationReason')"
-log::info "termination_reason: ${termination_reason}"
-error="$(echo "${PAYLOAD}" | run jq -r '.error')"
-log::info "error: ${error}"
-fully_idle="$(echo "${PAYLOAD}" | run jq -r '.fullyIdle')"
-log::info "fully_idle: ${fully_idle}"
-workspace_path="$(echo "${PAYLOAD}" | run jq -r '.workspacePaths[0]')"
-log::info "workspace_path: ${workspace_path}"
+log::info "PAYLOAD: $(printf '%s' "${PAYLOAD}" | run jq -c . 2>/dev/null)"
+
+{
+  read -r conversation_id
+  read -r execution_id
+  read -r execution_num
+  read -r termination_reason
+  read -r error
+  read -r fully_idle
+  read -r workspace_path
+  read -r transcript_path
+} < <(
+  printf '%s' "${PAYLOAD}" | run jq -r '
+    (.conversationId // ""),
+    (.executionId // ""),
+    ((.executionNum // "") | tostring),
+    (.terminationReason // ""),
+    (.error // ""),
+    ((.fullyIdle // false) | tostring),
+    (.workspacePaths[0] // ""),
+    (.transcriptPath // "")
+  ' 2>/dev/null
+)
+
 workspace_dir="$(basename "${workspace_path}")"
+state_dir=$(get_session_state_dir "${JETSKI_PPID:-${PPID}}")
+now=$(get_now_seconds)
 
-EXECUTION_TRACKER_FILE="/tmp/jetski_invocation_req_${PPID}_${execution_id}.txt"
-log::debug "EXECUTION_TRACKER_FILE: ${EXECUTION_TRACKER_FILE}"
+log::info "Stop hook: cid=${conversation_id} exec=${execution_id} fully_idle=${fully_idle} error=${error}"
 
-function populate_tmux_info {
-  local cli_tty
-  cli_tty=$(run ps -p "${PPID}" -o tty= | run awk '{print $1}')
-
-  if [[ -n "${cli_tty}" ]] && [[ "${cli_tty}" != "?" ]]; then
-    local full_tty="/dev/${cli_tty}"
-    local tmux_info
-    tmux_info=$(run tmux list-panes -a -F '#{pane_tty} #{session_name} #{window_name}' 2>/dev/null | run grep "^${full_tty} ")
-    if [[ -n "${tmux_info}" ]]; then
-      TMUX_SESSION=$(echo "${tmux_info}" | run awk '{print $2}')
-      TMUX_WINDOW=$(echo "${tmux_info}" | run awk '{print $3}')
-    fi
-  fi
-}
-
-function is_main_conversation {
-  local cid="$1"
-  local brain_base="${HOME}/.gemini/jetski"
-
-  # 1. Check if the conversation has an annotation file (explicitly created for user/main sessions)
-  if [[ -f "${brain_base}/annotations/${cid}.pbtxt" ]]; then
-    return 0
-  fi
-
-  # 2. Check if the parent CLI process command line explicitly specifies this conversation ID
-  local cli_args
-  cli_args=$(run ps -p "${PPID}" -o args= 2>/dev/null)
-  if [[ "${cli_args}" == *"--conversation=${cid}"* ]]; then
-    return 0
-  fi
-
-  # 3. Check if this process has a recorded main conversation tracker matching this ID
-  local cli_tracker="/tmp/jetski_cli_main_${PPID}.txt"
-  if [[ -f "${cli_tracker}" ]]; then
-    local tracked_cid
-    tracked_cid=$(cat "${cli_tracker}" 2>/dev/null)
-    if [[ "${tracked_cid}" == "${cid}" ]]; then
-      return 0
-    fi
-  fi
-
-  return 1
-}
-
-function is_subagent_conversation {
-  local cid="$1"
-
-  # If it is confirmed to be the main conversation, it CANNOT be a subagent
-  if is_main_conversation "${cid}"; then
-    return 1
-  fi
-
-  return 0
-}
-
-log::info "Processing: $(echo "${PAYLOAD}" | run jq --monochrome-output)"
-
-transcript_path="$(echo "${PAYLOAD}" | run jq -r '.transcriptPath')"
-
-# Route Subagent vs Main-Agent Notifications
-if is_subagent_conversation "${conversation_id}"; then
+# Route Subagent vs Main Agent
+if is_subagent_conversation "${conversation_id}" "${transcript_path}" "${JETSKI_PPID:-${PPID}}"; then
   log::info "Handling stop event for subagent: ${conversation_id}"
-  populate_tmux_info
+  if [[ -n "${error}" ]]; then
+    populate_tmux_info "${JETSKI_PPID:-${PPID}}"
+    title="Jetski Subagent Error"
+    msg=$(cat <<EOF
 
-  # Subagent notification: ONLY a 1-second tmux display-message, no knock, no popup, no notify-send
-  if [[ -n "${TMUX}" ]]; then
-    if [[ "${TMUX_SESSION}" != "Unknown" ]]; then
-      dispatch tmux display-message -t "${TMUX_SESSION}" -d 1000 "Jetski [${workspace_dir}]: Sub-agent turn finished (${TMUX_WINDOW})"
-    else
-      dispatch tmux display-message -d 1000 "Jetski [${workspace_dir}]: Sub-agent turn finished"
-    fi
-  fi
-
-  echo '{"decision": "", "reason": ""}'
-  exit 0
-fi
-
-# Main Agent Notification: Only when fully idle (ready for human) or on error
-if [[ -f "${EXECUTION_TRACKER_FILE}" ]]; then
-  start_time="$(run cat "${EXECUTION_TRACKER_FILE}")"
-  end_time=$(run date +%s)
-  elapsed=$((end_time-start_time))
-  log::debug "elapsed: ${elapsed}"
-  if [[ "${elapsed}" -ge "${NOTIFICATION_THRESHOLD_SECS}" ]] || [[ -n "${error}" ]]; then
-    if [[ "${fully_idle}" == "true" ]] || [[ -n "${error}" ]]; then
-      populate_tmux_info
-      if [[ -n "${error}" ]]; then
-        title="Jetski CLI: Error"
-        msg=$(cat<<EOF
-
-Jestki CLI Error on ${workspace_dir}
+Jetski Subagent Error on ${workspace_dir}
 Tmux Session: ${TMUX_SESSION} Window: ${TMUX_WINDOW}
 Termination Reason: ${termination_reason}
 Error: ${error}
 EOF
-           )
-      else
-        title="Jetski CLI: Response Ready"
-        msg=$(cat<<EOF
-
-Jestki CLI response ready on ${workspace_dir}
-Tmux Session: ${TMUX_SESSION} Window: ${TMUX_WINDOW}
-EOF
-           )
-      fi
-
-      # Attempt to use knock to notify
-      if [[ -e /google/bin/releases/knock/knock.sh ]]; then
-        source /google/bin/releases/knock/knock.sh &>/dev/null
-        dispatch knock "${msg}"
-      else
-        # Otherwise use local notifications on terminal & desktop.
-        notified=
-        if run type tmux-notify &>/dev/null; then
-          dispatch tmux-notify "${title}" "${msg}"
-          notified=1
-        fi
-        if [[ -n "${DISPLAY}" ]] && run type notify-send &>/dev/null; then
-          dispatch notify-send "${title}" "${msg}"
-          notified=1
-        fi
-        if [[ -z "${notified}" ]]; then
-          log::error "neither tmux-notify nor notify-send where available to notify the user."
-        fi
-      fi
-
-      # Send OSC 99 terminal notification (Kitty, etc.) if enabled
-      if [[ "${JETSKI_ENABLE_OSC99:-true}" == "true" ]]; then
-        dispatch "${HOME}/scripts/osc99_notify.sh" "${title}" "${msg}"
-      fi
+)
+    dispatch_notification "${title}" "${msg}" "critical"
+  elif [[ -n "${TMUX:-}" ]]; then
+    populate_tmux_info "${JETSKI_PPID:-${PPID}}"
+    target="${TARGET_PANE:-${TMUX_SESSION}}"
+    status_msg=""
+    if [[ "${target}" != "Unknown" && -n "${target}" ]]; then
+      status_msg="Jetski [${workspace_dir}]: Sub-agent turn finished (${TMUX_WINDOW})"
+      dispatch tmux display-message -t "${target}" -d 1000 "${status_msg}"
+    else
+      status_msg="Jetski [${workspace_dir}]: Sub-agent turn finished"
+      dispatch tmux display-message -d 1000 "${status_msg}"
     fi
+    if [[ -n "${JETSKI_TEST_TMUX_LOG:-}" ]]; then
+      printf 'TMUX_MSG\t%s\t%s\n' "${target}" "${status_msg}" >> "${JETSKI_TEST_TMUX_LOG}"
+    fi
+  fi
+
+  # Purge turn tracker files for this subagent execution
+  rm -f "${state_dir}/invocation_req_${execution_id}.txt" "${state_dir}/invocation_step_${execution_id}_"*.txt
+  echo '{"decision": "", "reason": ""}'
+  exit 0
+fi
+
+# Main Agent: Intermediate yield vs Final completion
+if [[ "${fully_idle}" != "true" && -z "${error}" ]]; then
+  log::info "Main agent intermediate yield (fully_idle=${fully_idle})"
+  if [[ -n "${TMUX:-}" ]]; then
+    populate_tmux_info "${JETSKI_PPID:-${PPID}}"
+    target="${TARGET_PANE:-${TMUX_SESSION}}"
+    status_msg=""
+    if [[ "${target}" != "Unknown" && -n "${target}" ]]; then
+      status_msg="Jetski [${workspace_dir}]: Step completed, continuing in background (${TMUX_WINDOW})"
+      dispatch tmux display-message -t "${target}" -d 1000 "${status_msg}"
+    else
+      status_msg="Jetski [${workspace_dir}]: Step completed, continuing in background"
+      dispatch tmux display-message -d 1000 "${status_msg}"
+    fi
+    if [[ -n "${JETSKI_TEST_TMUX_LOG:-}" ]]; then
+      printf 'TMUX_MSG\t%s\t%s\n' "${target}" "${status_msg}" >> "${JETSKI_TEST_TMUX_LOG}"
+    fi
+  fi
+  # Purge intermediate turn trackers, but preserve request_start_${conversation_id}.txt
+  rm -f "${state_dir}/invocation_req_${execution_id}.txt" "${state_dir}/invocation_step_${execution_id}_"*.txt
+  echo '{"decision": "", "reason": ""}'
+  exit 0
+fi
+
+# Main Agent: Final Completion or Fatal Error
+start_time=""
+read -r req_start_time _ < <(read_request_origin_state "${state_dir}/request_start_${conversation_id}.txt")
+if [[ -n "${req_start_time}" && "${req_start_time}" =~ ^[0-9]+$ ]]; then
+  start_time="${req_start_time}"
+else
+  exec_start_time=$(read_numeric_state "${state_dir}/invocation_req_${execution_id}.txt")
+  if [[ -n "${exec_start_time}" && "${exec_start_time}" =~ ^[0-9]+$ ]]; then
+    start_time="${exec_start_time}"
   fi
 fi
 
-if [[ -n "${notified}" ]]; then
-  echo '{"decision": "", "reason": "Notified user of failure."}'
+if [[ -n "${start_time}" && "${start_time}" =~ ^[0-9]+$ ]]; then
+  total_elapsed=$((now - start_time))
 else
-  echo '{"decision": "", "reason": ""}'
+  total_elapsed=0
 fi
+log::debug "total_elapsed: ${total_elapsed}"
+
+if [[ "${total_elapsed}" -ge "${JETSKI_STOP_NOTIFY_THRESHOLD_SECS}" ]] || [[ -n "${error}" ]]; then
+  populate_tmux_info "${JETSKI_PPID:-${PPID}}"
+  if [[ -n "${error}" ]]; then
+    title="Jetski CLI: Error"
+    msg=$(cat <<EOF
+
+Jetski CLI Error on ${workspace_dir}
+Tmux Session: ${TMUX_SESSION} Window: ${TMUX_WINDOW}
+Termination Reason: ${termination_reason}
+Error: ${error}
+EOF
+)
+    dispatch_notification "${title}" "${msg}" "critical"
+  else
+    title="Jetski CLI: Response Ready"
+    msg=$(cat <<EOF
+
+Jetski CLI response ready on ${workspace_dir}
+Tmux Session: ${TMUX_SESSION} Window: ${TMUX_WINDOW}
+Elapsed: ${total_elapsed}s
+EOF
+)
+    dispatch_notification "${title}" "${msg}" "normal"
+  fi
+fi
+
+# Scoped Session Cleanup
+rm -f "${state_dir}/invocation_req_"*.txt \
+      "${state_dir}/invocation_step_"*.txt \
+      "${state_dir}/request_start_${conversation_id}.txt"
+
+# Age-gated background dead PID pruning
+prune_dead_sessions & disown
+
+echo '{"decision": "", "reason": ""}'
+exit 0

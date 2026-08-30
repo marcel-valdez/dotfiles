@@ -25,10 +25,20 @@ else
   osc_seq=$(printf "\e]99;i=jetski;d=0;%b\a" "${CONTENT}")
 fi
 
-# Find the target TTY of the parent/Jetski process to write directly to it
-cli_tty=$(ps -p "${PPID}" -o tty= 2>/dev/null | awk '{print $1}')
-if [[ -n "${cli_tty}" ]] && [[ "${cli_tty}" != "?" ]] && [[ -w "/dev/${cli_tty}" ]]; then
-  printf "%s" "${osc_seq}" > "/dev/${cli_tty}"
+# Check for explicit TARGET_TTY or discover from PPID
+target_tty="${TARGET_TTY}"
+if [[ -n "${target_tty}" && "${target_tty}" != /* ]]; then
+  target_tty="/dev/${target_tty}"
+fi
+if [[ -z "${target_tty}" ]]; then
+  cli_tty=$(ps -p "${PPID}" -o tty= 2>/dev/null | awk '{print $1}')
+  if [[ -n "${cli_tty}" && "${cli_tty}" != "?" ]]; then
+    target_tty="/dev/${cli_tty#/dev/}"
+  fi
+fi
+
+if [[ -n "${target_tty}" && -w "${target_tty}" ]]; then
+  printf "%s" "${osc_seq}" > "${target_tty}"
 else
   # Fallback to stderr
   printf "%s" "${osc_seq}" >&2

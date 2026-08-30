@@ -1,114 +1,51 @@
 #!/usr/bin/env bash
+# jetski_post_invocation_hook.sh: PostInvocation hook for Jetski agents.
+# Monitors long-running invocation turns (>=300s) and emits strict output contract.
 
-# Log settings
-export LOG_SCRIPT_NAME=
-LOG_SCRIPT_NAME="$(basename "$0")"
+export LOG_SCRIPT_NAME="$(basename "$0")"
 [[ -z "${LOG_LEVEL}" ]] && export LOG_LEVEL=2
 [[ -z "${LOG_FILE}" ]] && export LOG_FILE="/tmp/jetski_hook.log"
-source "${HOME}/lib/log_lib.sh"
+source "${HOME}/scripts/jetski_hook_utils.sh"
 
-function run {
-  log::debug "run $*"
-  "$@"
-}
-
-function dispatch {
-  log::debug "dispatch $*"
-  "$@" &>/dev/null & disown
-}
-
-NOTIFICATION_THRESHOLD_SECS=300
-TMUX_SESSION="Unknown"
-TMUX_WINDOW="Unknown"
-# https://geminicli.com/docs/hooks/reference/#afteragent
 read -r -d '' PAYLOAD
-log::info "PAYLOAD: ${PAYLOAD}"
-# Example:
-#{
-#  "artifactDirectoryPath": "/usr/local/google/home/marcelvaldez/.gemini/jetski/brain/f13b6cc2-f2a7-4aac-8590-aa1a8db311b6",
-#  "conversationId": "f13b6cc2-f2a7-4aac-8590-aa1a8db311b6",
-#  "executionId": "992720db-22af-44df-a982-192a45415ad4",
-#  "initialNumSteps": 54,
-#  "invocationNum": 25,
-#  "modelName": "auto",
-#  "transcriptPath": "/usr/local/google/home/marcelvaldez/.gemini/jetski/brain/f13b6cc2-f2a7-4aac-8590-aa1a8db311b6/.system_generated/logs/transcript_full.jsonl",
-#  "workspacePaths": [
-#    "/google/src/cloud/marcelvaldez/avid_tdp_datastore_monitoring"
-#  ]
-#}
-conversation_id="$(echo "${PAYLOAD}" | run jq -r '.conversationId')"
-log::info "conversation_id: ${conversation_id}"
-execution_id="$(echo "${PAYLOAD}" | run jq -r '.executionId')"
-log::info "execution_id: ${execution_id}"
-invocation_num="$(echo "${PAYLOAD}" | run jq .invocationNum)"
-log::info "invocation_num: ${invocation_num}"
-initial_num_steps="$(echo "${PAYLOAD}" | run jq .initialNumSteps)"
-log::info "initial_num_steps: ${initial_num_steps}"
-workspace_path="$(echo "${PAYLOAD}" | run jq -r '.workspacePaths[0]')"
-log::info "workspace_path: ${workspace_path}"
+log::info "PAYLOAD: $(printf '%s' "${PAYLOAD}" | run jq -c . 2>/dev/null)"
+
+{
+  read -r conversation_id
+  read -r execution_id
+  read -r invocation_num
+  read -r workspace_path
+} < <(
+  printf '%s' "${PAYLOAD}" | run jq -r '
+    (.conversationId // ""),
+    (.executionId // ""),
+    ((.invocationNum // 0) | tostring),
+    (.workspacePaths[0] // "")
+  ' 2>/dev/null
+)
 workspace_dir="$(basename "${workspace_path}")"
-EXECUTION_TRACKER_FILE="/tmp/jetski_invocation_req_${PPID}_${execution_id}.txt"
-log::debug "EXECUTION_TRACKER_FILE: ${EXECUTION_TRACKER_FILE}"
-INVOCATION_TRACKER_FILE="/tmp/jetski_invocation_req_${PPID}_${execution_id}_${invocation_num}.txt"
-log::debug "INVOCATION_TRACKER_FILE: ${INVOCATION_TRACKER_FILE}"
+state_dir=$(get_session_state_dir "${JETSKI_PPID:-${PPID}}")
+now=$(get_now_seconds)
 
-function populate_tmux_info {
-  local cli_tty
-  cli_tty=$(run ps -p "${PPID}" -o tty= | run awk '{print $1}')
+step_tracker="${state_dir}/invocation_step_${execution_id}_${invocation_num}.txt"
+start_time=$(read_numeric_state "${step_tracker}")
 
-  if [[ -n "${cli_tty}" ]] && [[ "${cli_tty}" != "?" ]]; then
-    local full_tty="/dev/${cli_tty}"
-    local tmux_info
-    tmux_info=$(run tmux list-panes -a -F '#{pane_tty} #{session_name} #{window_name}' 2>/dev/null | run grep "^${full_tty} ")
-    if [[ -n "${tmux_info}" ]]; then
-      TMUX_SESSION=$(echo "${tmux_info}" | run awk '{print $2}')
-      TMUX_WINDOW=$(echo "${tmux_info}" | run awk '{print $3}')
-    fi
-  fi
-}
+if [[ -n "${start_time}" && "${start_time}" =~ ^[0-9]+$ ]]; then
+  elapsed=$((now - start_time))
+  log::debug "invocation step elapsed: ${elapsed}"
+  if [[ "${elapsed}" -ge "${JETSKI_TOOL_NOTIFY_THRESHOLD_SECS}" ]]; then
+    populate_tmux_info "${JETSKI_PPID:-${PPID}}"
+    title="Jetski Long Invocation"
+    msg=$(cat <<EOF
 
-log::info "Processing: $(echo "${PAYLOAD}" | run jq --monochrome-output)"
-
-if [[ -f "${INVOCATION_TRACKER_FILE}" ]]; then
-  start_time="$(run cat "${INVOCATION_TRACKER_FILE}")"
-  end_time=$(run date +%s)
-  elapsed=$((end_time-start_time))
-  log::debug "elapsed: ${elapsed}"
-  if [[ "${elapsed}" -ge "${NOTIFICATION_THRESHOLD_SECS}" ]]; then
-    title="Jetski CLI: Tool Invocation Done"
-    populate_tmux_info
-    msg=$(cat<<EOF
-
-Jestki CLI Tool Invocation on ${workspace_dir} done
+Jetski CLI Tool Invocation on ${workspace_dir} done
 Tmux Session: ${TMUX_SESSION} Window: ${TMUX_WINDOW}
+Elapsed: ${elapsed}s
 EOF
-       )
-
-    # Attempt to use knock to notify
-    if [[ -e /google/bin/releases/knock/knock.sh ]]; then
-      source /google/bin/releases/knock/knock.sh &>/dev/null
-      dispatch knock "${msg}"
-    else
-      # Otherwise use local notifications on terminal & desktop.
-      notified=
-      if run type tmux-notify &>/dev/null; then
-        dispatch tmux-notify "${title}" "${msg}"
-        notified=1
-      fi
-      if [[ -n "${DISPLAY}" ]] && run type notify-send &>/dev/null; then
-        dispatch notify-send "${title}" "${msg}"
-        notified=1
-      fi
-      if [[ -z "${notified}" ]]; then
-        log::error "neither tmux-notify nor notify-send where available to notify the user."
-      fi
-    fi
-
-    # Send OSC 99 terminal notification (Kitty, etc.) if enabled
-    if [[ "${JETSKI_ENABLE_OSC99:-true}" == "true" ]]; then
-      dispatch "${HOME}/scripts/osc99_notify.sh" "${title}" "${msg}"
-    fi
+)
+    dispatch_notification "${title}" "${msg}" "normal"
   fi
 fi
 
 echo '{"injectSteps": [], "terminationBehavior": ""}'
+exit 0

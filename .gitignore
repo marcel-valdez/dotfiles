@@ -33,6 +33,8 @@
 # 2. unignore the set of files
 !bin/*
 !scripts/*
+!scripts/tests/
+!scripts/tests/*
 # Optionally, re-ignore files you don't want from the set
 bin/dex
 bin/mail-notify-data
