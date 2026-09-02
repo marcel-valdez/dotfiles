@@ -143,18 +143,23 @@ start_ssh_tunnel() {
         gcert_warned=0
       fi
 
-      echo "[$(get_timestamp)] [Tunnel] Starting reverse SSH tunnel on port ${PORT} to ${REMOTE_HOST}..." >> "${LOG_FILE}"
-      # -o BatchMode=yes prevents interactive hanging under systemd
+      # -o ControlMaster=no -o ControlPath=none isolates daemon from interactive multiplex sockets
       ssh -N -T -R "${PORT}:127.0.0.1:${PORT}" \
+          -o ControlMaster=no \
+          -o ControlPath=none \
           -o ExitOnForwardFailure=yes \
           -o ServerAliveInterval=15 \
           -o ServerAliveCountMax=3 \
-          -o BatchMode=yes \
           -o ConnectTimeout=10 \
           "${REMOTE_HOST}" >> "${LOG_FILE}" 2>&1
       exit_code=$?
-      echo "[$(get_timestamp)] [Tunnel] SSH tunnel exited (code ${exit_code}). Reconnecting in 10s..." >> "${LOG_FILE}"
-      sleep 10
+      if tail -n 10 "${LOG_FILE}" 2>/dev/null | grep -q "remote port forwarding failed"; then
+        echo "[$(get_timestamp)] [Tunnel] Port ${PORT} is currently bound on ${REMOTE_HOST} (another active SSH session is likely already forwarding it). Backing off for 60s..." >> "${LOG_FILE}"
+        sleep 60
+      else
+        echo "[$(get_timestamp)] [Tunnel] SSH tunnel exited (code ${exit_code}). Reconnecting in 10s..." >> "${LOG_FILE}"
+        sleep 10
+      fi
     done
   ) &
   TUNNEL_PID=$!
