@@ -77,27 +77,17 @@ get_timestamp() {
   echo "${d} $(date '+%H:%M:%S')"
 }
 
-LAST_NOTIF_TIME=0
-
 send_desktop_notification() {
   local title="$1"
   local body="$2"
-  local now
-  now=$(date +%s)
-  # Debounce: Do not display notification again until 10 minutes (600s) have passed
-  if (( now - LAST_NOTIF_TIME < 600 )); then
-    return 0
-  fi
-  LAST_NOTIF_TIME="${now}"
-
   if command -v notify-send &>/dev/null; then
-    # -u normal and -t 10000 (10s) ensures it automatically disappears
-    # instead of staying permanently pinned on screen (which critical does)
-    notify-send -u normal -t 10000 -a "Clipboard Daemon" -i dialog-warning "${title}" "${body}" 2>/dev/null || true
+    # -u normal -t 600000 makes the notification stay on screen for exactly
+    # 10 minutes (600,000 ms) before automatically disappearing
+    notify-send -u normal -t 600000 -a "Clipboard Daemon" -i dialog-warning "${title}" "${body}" 2>/dev/null || true
     local displays
     displays=$(ls /tmp/.X11-unix/ 2>/dev/null | sed 's/X//g')
     for d in ${displays}; do
-      [[ -n "${d}" ]] && DISPLAY=":${d}" notify-send -u normal -t 10000 -a "Clipboard Daemon" -i dialog-warning "${title}" "${body}" 2>/dev/null || true
+      [[ -n "${d}" ]] && DISPLAY=":${d}" notify-send -u normal -t 600000 -a "Clipboard Daemon" -i dialog-warning "${title}" "${body}" 2>/dev/null || true
     done
   fi
 }
