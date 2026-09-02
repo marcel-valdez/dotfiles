@@ -1,0 +1,28 @@
+#!/usr/bin/env bash
+# tmux-detach-other-clients: Detaches other clients attached to the current (or specified) session.
+
+set -euo pipefail
+
+cur_session="${1:-$(tmux display-message -p '#S' 2>/dev/null || true)}"
+cur_client="$(tmux display-message -p '#{client_tty}' 2>/dev/null || true)"
+
+if [[ -z "${cur_session}" ]]; then
+  echo "Error: Not inside a tmux session and no session specified." >&2
+  exit 1
+fi
+
+detached_count=0
+while read -r client_tty; do
+  [[ -z "${client_tty}" ]] && continue
+  if [[ "${client_tty}" != "${cur_client}" ]]; then
+    echo "Detaching client on ${client_tty} from session '${cur_session}'..."
+    tmux detach-client -t "${client_tty}"
+    ((detached_count++)) || true
+  fi
+done < <(tmux list-clients -t "${cur_session}" -F '#{client_tty}' 2>/dev/null || true)
+
+if [[ ${detached_count} -eq 0 ]]; then
+  echo "No other clients are attached to session '${cur_session}'."
+else
+  echo "Successfully detached ${detached_count} other client(s) from session '${cur_session}'."
+fi
