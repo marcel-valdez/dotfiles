@@ -1,0 +1,77 @@
+#!/usr/bin/env bash
+# clear-clipboard-port: Frees the remote clipboard tunnel port on Cloudtop.
+# Detaches any tmux client attached via a direct SSH session holding the port,
+# and terminates lingering background sshd sessions holding the port.
+
+set -euo pipefail
+
+PORT="${1:-${CLIPBOARD_PORT:-3333}}"
+HOST="127.0.0.1"
+
+echo "Checking port ${PORT} on ${HOST}..."
+
+if ! ss -tln | grep -q "${HOST}:${PORT} "; then
+  echo "Port ${PORT} is already free! Nothing to clean up."
+  exit 0
+fi
+
+echo "Port ${PORT} is currently in use."
+
+# Step 1: Check for any tmux clients running under a direct SSH session (not mosh)
+echo "Scanning tmux clients for direct SSH connections..."
+if command -v tmux &>/dev/null && tmux info &>/dev/null; then
+  while read -r c_pid c_tty c_session; do
+    [[ -z "${c_pid}" ]] && continue
+    # Trace parent process of the tmux client
+    if [[ -f "/proc/${c_pid}/stat" ]]; then
+      ppid=$(awk '{print $4}' "/proc/${c_pid}/stat" 2>/dev/null || true)
+      if [[ -n "${ppid}" && -f "/proc/${ppid}/cmdline" ]]; then
+        pcmd=$(tr '\0' ' ' < "/proc/${ppid}/cmdline" 2>/dev/null || true)
+        if [[ "${pcmd}" =~ sshd ]]; then
+          echo "Found tmux client attached via SSH on ${c_tty} (Session: ${c_session}, Client PID: ${c_pid}, SSH PID: ${ppid})"
+          echo "Detaching tmux client on ${c_tty}..."
+          tmux detach-client -t "${c_tty}" 2>/dev/null || true
+          echo "Terminating SSH session PID ${ppid}..."
+          kill -TERM "${ppid}" 2>/dev/null || true
+          sleep 1
+        fi
+      fi
+    fi
+  done < <(tmux list-clients -F '#{client_pid} #{client_tty} #{client_session}' 2>/dev/null || true)
+fi
+
+# Step 2: Check if port is now free
+if ! ss -tln | grep -q "${HOST}:${PORT} "; then
+  echo "Port ${PORT} successfully freed by detaching SSH tmux client!"
+  exit 0
+fi
+
+# Step 3: Terminate lingering non-interactive sshd sessions owned by the user
+echo "Port ${PORT} is still bound. Scanning lingering background sshd sessions..."
+sshd_pids=$(pgrep -u "${USER}" -f "sshd-session" 2>/dev/null || true)
+
+for pid in ${sshd_pids}; do
+  [[ -z "${pid}" ]] && continue
+  tty_val=$(ps -o tty= -p "${pid}" 2>/dev/null | tr -d ' ' || true)
+  # Background/no-tty sessions have '?'
+  if [[ "${tty_val}" == "?" ]]; then
+    cmd=$(tr '\0' ' ' < "/proc/${pid}/cmdline" 2>/dev/null || ps -o cmd= -p "${pid}" 2>/dev/null || true)
+    echo "Terminating lingering sshd session PID ${pid} (${cmd})..."
+    kill -TERM "${pid}" 2>/dev/null || true
+    sleep 0.5
+    if ! ss -tln | grep -q "${HOST}:${PORT} "; then
+      echo "Port ${PORT} successfully freed by terminating PID ${pid}!"
+      exit 0
+    fi
+  fi
+done
+
+# Step 4: Final verification
+sleep 1
+if ! ss -tln | grep -q "${HOST}:${PORT} "; then
+  echo "Port ${PORT} is now completely free!"
+  exit 0
+else
+  echo "Warning: Port ${PORT} is still in use."
+  exit 1
+fi

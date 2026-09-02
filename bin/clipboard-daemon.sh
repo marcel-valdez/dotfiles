@@ -172,14 +172,14 @@ start_ssh_tunnel() {
 
 Logs: ${LOG_FILE}
 
-To fix: Close the conflicting SSH session on ${REMOTE_HOST} and run:
+To fix: Close the conflicting SSH session on ${REMOTE_HOST} or run ~/bin/clear-clipboard-port, then:
 systemctl --user restart clipboard-daemon@${PORT}"
 
         echo "[$(get_timestamp)] [Tunnel] Port ${PORT} is currently in use on ${REMOTE_HOST}." >> "${LOG_FILE}"
         echo "[$(get_timestamp)] [Tunnel] Sending desktop notification with log instructions." >> "${LOG_FILE}"
         send_desktop_notification "Clipboard Tunnel: Port ${PORT} Conflict" "${conflict_msg}"
-        echo "[$(get_timestamp)] [Tunnel] Pausing tunnel creation until service restart." >> "${LOG_FILE}"
-        sleep infinity
+        echo "[$(get_timestamp)] [Tunnel] Pausing tunnel creation for 10 minutes before re-checking..." >> "${LOG_FILE}"
+        sleep 600
       else
         echo "[$(get_timestamp)] [Tunnel] SSH tunnel exited (code ${exit_code}). Reconnecting in 10s..." >> "${LOG_FILE}"
         sleep 10
