@@ -154,8 +154,11 @@ start_ssh_tunnel() {
           "${REMOTE_HOST}" >> "${LOG_FILE}" 2>&1
       exit_code=$?
       if tail -n 10 "${LOG_FILE}" 2>/dev/null | grep -q "remote port forwarding failed"; then
-        echo "[$(get_timestamp)] [Tunnel] Port ${PORT} is currently bound on ${REMOTE_HOST} (another active SSH session is likely already forwarding it). Backing off for 60s..." >> "${LOG_FILE}"
-        sleep 60
+        echo "[$(get_timestamp)] [Tunnel] Port ${PORT} is currently in use on ${REMOTE_HOST} (an existing SSH session is already forwarding it)." >> "${LOG_FILE}"
+        echo "[$(get_timestamp)] [Tunnel] Clipboard syncing is active via that session. Pausing tunnel retries to avoid gnubby touch popups." >> "${LOG_FILE}"
+        echo "[$(get_timestamp)] [Tunnel] Close the conflicting SSH session and run 'systemctl --user restart clipboard-daemon@${PORT}' when ready." >> "${LOG_FILE}"
+        # Sleep indefinitely to keep local listener active without repeatedly prompting gnubby
+        sleep infinity
       else
         echo "[$(get_timestamp)] [Tunnel] SSH tunnel exited (code ${exit_code}). Reconnecting in 10s..." >> "${LOG_FILE}"
         sleep 10
