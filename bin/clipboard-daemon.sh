@@ -77,6 +77,19 @@ get_timestamp() {
   echo "${d} $(date '+%H:%M:%S')"
 }
 
+send_desktop_notification() {
+  local title="$1"
+  local body="$2"
+  if command -v notify-send &>/dev/null; then
+    notify-send -u critical -a "Clipboard Daemon" -i dialog-warning "${title}" "${body}" 2>/dev/null || true
+    local displays
+    displays=$(ls /tmp/.X11-unix/ 2>/dev/null | sed 's/X//g')
+    for d in ${displays}; do
+      [[ -n "${d}" ]] && DISPLAY=":${d}" notify-send -u critical -a "Clipboard Daemon" -i dialog-warning "${title}" "${body}" 2>/dev/null || true
+    done
+  fi
+}
+
 kill_existing_daemon() {
   local pids
   pids=$(pgrep -f "clipboard-daemon.*${PORT}" 2>/dev/null | grep -v "^$$$" || true)
@@ -153,11 +166,19 @@ start_ssh_tunnel() {
           -o ConnectTimeout=10 \
           "${REMOTE_HOST}" >> "${LOG_FILE}" 2>&1
       exit_code=$?
+
       if tail -n 10 "${LOG_FILE}" 2>/dev/null | grep -q "remote port forwarding failed"; then
-        echo "[$(get_timestamp)] [Tunnel] Port ${PORT} is currently in use on ${REMOTE_HOST} (an existing SSH session is already forwarding it)." >> "${LOG_FILE}"
-        echo "[$(get_timestamp)] [Tunnel] Clipboard syncing is active via that session. Pausing tunnel retries to avoid gnubby touch popups." >> "${LOG_FILE}"
-        echo "[$(get_timestamp)] [Tunnel] Close the conflicting SSH session and run 'systemctl --user restart clipboard-daemon@${PORT}' when ready." >> "${LOG_FILE}"
-        # Sleep indefinitely to keep local listener active without repeatedly prompting gnubby
+        local conflict_msg="Port ${PORT} on ${REMOTE_HOST} is already in use by another session.
+
+Logs: ${LOG_FILE}
+
+To fix: Close the conflicting SSH session on ${REMOTE_HOST} and run:
+systemctl --user restart clipboard-daemon@${PORT}"
+
+        echo "[$(get_timestamp)] [Tunnel] Port ${PORT} is currently in use on ${REMOTE_HOST}." >> "${LOG_FILE}"
+        echo "[$(get_timestamp)] [Tunnel] Sending desktop notification with log instructions." >> "${LOG_FILE}"
+        send_desktop_notification "Clipboard Tunnel: Port ${PORT} Conflict" "${conflict_msg}"
+        echo "[$(get_timestamp)] [Tunnel] Pausing tunnel creation until service restart." >> "${LOG_FILE}"
         sleep infinity
       else
         echo "[$(get_timestamp)] [Tunnel] SSH tunnel exited (code ${exit_code}). Reconnecting in 10s..." >> "${LOG_FILE}"
