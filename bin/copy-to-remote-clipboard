@@ -1,10 +1,73 @@
 #!/usr/bin/env bash
+# copy-to-remote-clipboard: Sends clipboard payload from Cloudtop tmux to the local
+# workstation/laptop clipboard daemon via reverse SSH tunnels.
 
 HOST="127.0.0.1"
-PORT="3333"
 
+# Source .googlerc to inherit configurations like CLIPBOARD_PORT
+if [[ -z "${CLIPBOARD_PORT:-}" ]]; then
+  if [[ -f "${HOME}/.googlerc" ]]; then
+    source "${HOME}/.googlerc" 2>/dev/null || true
+  elif [[ -f "${HOME}/.googlerc.d/.googlerc" ]]; then
+    source "${HOME}/.googlerc.d/.googlerc" 2>/dev/null || true
+  fi
+fi
+
+# Parse optional -p [PORT] or numeric argument
+PORT_OVERRIDE=""
+if [[ "$1" == "-p" || "$1" == "--port" ]]; then
+  PORT_OVERRIDE="$2"
+  shift 2
+elif [[ "$1" =~ ^[0-9]{4,5}$ ]]; then
+  PORT_OVERRIDE="$1"
+  shift
+fi
+
+# Read payload from stdin (e.g. piped from tmux) or remaining arguments
 if [[ $# -eq 0 ]]; then
-  cat >/dev/tcp/127.0.0.1/3333
+  payload="$(cat)"
 else
-  echo "$@" >/dev/tcp/127.0.0.1/3333
+  payload="$*"
+fi
+
+# Nothing to copy
+if [[ -z "${payload}" ]]; then
+  exit 0
+fi
+
+# Determine target ports:
+# 1. CLI argument override
+# 2. Environment variable CLIPBOARD_PORT
+# 3. Dynamic scan: check known ports (3333=workstation, 3334=laptop, 3335, 3336)
+#    and broadcast to all active listening reverse SSH tunnels!
+target_ports=()
+if [[ -n "${PORT_OVERRIDE}" ]]; then
+  target_ports=("${PORT_OVERRIDE}")
+elif [[ -n "${CLIPBOARD_PORT:-}" ]]; then
+  target_ports=("${CLIPBOARD_PORT}")
+else
+  for p in 3333 3334 3335 3336; do
+    if ss -tln | grep -q "${HOST}:${p} "; then
+      target_ports+=("$p")
+    fi
+  done
+fi
+
+if [[ ${#target_ports[@]} -eq 0 ]]; then
+  # Fallback default if no active tunnel was detected
+  target_ports=(3333)
+fi
+
+sent_any=0
+for port in "${target_ports[@]}"; do
+  # Send payload with 1s timeout to prevent hanging if tunnel is half-broken
+  if timeout 1 bash -c "echo -n \"\$1\" > \"/dev/tcp/${HOST}/${port}\"" _ "${payload}" 2>/dev/null; then
+    sent_any=1
+  fi
+done
+
+if [[ ${sent_any} -eq 1 ]]; then
+  exit 0
+else
+  exit 1
 fi

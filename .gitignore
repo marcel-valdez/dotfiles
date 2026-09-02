@@ -82,6 +82,11 @@ bin/verify-packages
 
 !.pomodororc
 
+!.config/
+!.config/systemd/
+!.config/systemd/user/
+!.config/systemd/user/clipboard-daemon*.service
+
 # Common backup/generated files
 .*~
 **/.*~

@@ -1,0 +1,16 @@
+[Unit]
+Description=Remote Clipboard Reverse Tunnel Daemon
+After=network.target
+Wants=network.target
+
+[Service]
+Type=simple
+EnvironmentFile=-%h/.config/clipboard-daemon.env
+ExecStart=/usr/local/google/home/marcelvaldez/bin/clipboard-daemon.sh
+Restart=always
+RestartSec=5s
+Environment=PATH=/usr/local/google/home/marcelvaldez/bin:/google/bin/releases/editor-devtools:/usr/local/bin:/usr/bin:/bin
+KillMode=control-group
+
+[Install]
+WantedBy=default.target
