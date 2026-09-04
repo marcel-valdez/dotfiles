@@ -21,8 +21,6 @@ function run {
 
 # Read JSON payload from stdin
 DATA=$(cat)
-PAYLOAD_DUMP_FILE="/tmp/jetski_payload_$$.json"
-echo "$DATA" > "${PAYLOAD_DUMP_FILE}"
 log::debug "PAYLOAD: $(echo "${DATA}" | run jq --monochrome-output)"
 
 # Extract fields using jq
@@ -211,4 +209,3 @@ else
   echo -e "\033[90m╭─\033[0m $STATE_FMT \033[90m│\033[0m \033[35m$MODEL_NAME\033[0m$VCS_FMT \033[90m│\033[0m $SANDBOX_FMT"
   echo -e "\033[90m╰─\033[0m \033[90mContext:\033[0m ${BAR_COLOR}${BAR}\033[0m \033[33m${USED_PCT_FMT}%\033[0m \033[90m│\033[0m Tasks: \033[36m$TASKS_COUNT\033[0m \033[90m│\033[0m Artifacts: \033[35m$ARTIFACTS_COUNT\033[0m"
 fi
-rm -f "${PAYLOAD_DUMP_FILE}"
