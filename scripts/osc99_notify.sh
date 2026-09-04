@@ -14,15 +14,19 @@ fi
 # If message is provided, combine them with a newline as required by Kitty OSC 99 spec
 CONTENT="${TITLE}"
 if [[ -n "${MESSAGE}" ]]; then
-  CONTENT="${TITLE}\n${MESSAGE}"
+  CONTENT="${TITLE}"$'\n'"${MESSAGE}"
 fi
+
+# Sanitize BEL (\a) from content to prevent premature sequence termination
+CONTENT="${CONTENT//$'\a'/ }"
 
 # Construct the OSC 99 escape sequence: ESC ] 99 ; i=jetski ; d=0 ; CONTENT BEL
 # Inside tmux, we wrap the sequence with ESC P tmux ; and double the ESC character (\e -> \e\e)
+# Use %s instead of %b to prevent printf from interpreting backslashes in user text
 if [[ -n "${TMUX}" ]]; then
-  osc_seq=$(printf "\ePtmux;\e\e]99;i=jetski;d=0;%b\a\e\\\\" "${CONTENT}")
+  osc_seq=$(printf "\ePtmux;\e\e]99;i=jetski;d=0;%s\a\e\\\\" "${CONTENT}")
 else
-  osc_seq=$(printf "\e]99;i=jetski;d=0;%b\a" "${CONTENT}")
+  osc_seq=$(printf "\e]99;i=jetski;d=0;%s\a" "${CONTENT}")
 fi
 
 # Check for explicit TARGET_TTY or discover from PPID

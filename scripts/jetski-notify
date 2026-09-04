@@ -13,20 +13,12 @@ if [[ -z "${MESSAGE}" ]]; then
   TITLE="JETSKI NOTIFICATION"
 fi
 
-line_count=$(echo -e "${MESSAGE}" | wc -l)
+line_count=$(printf "%s\n" "${MESSAGE}" | wc -l)
 line_count=$((line_count+5))
 
-SCRIPT=$(cat<<EOF
-tput civis;
-echo -e "${MESSAGE}";
-echo "";
-echo "--------------------------------------------------";
-echo "Press any key to dismiss and jump to Jetski pane...";
-read -n 1 -s;
-if [[ -n "${TARGET_PANE}" ]]; then
-  tmux select-pane -t "${TARGET_PANE}" 2>/dev/null || true
-fi
-EOF
-      )
+b64_msg=$(printf "%s" "${MESSAGE}" | base64 -w0)
+b64_pane=$(printf "%s" "${TARGET_PANE}" | base64 -w0)
+
+SCRIPT="tput civis; echo \"${b64_msg}\" | base64 -d; echo; echo '--------------------------------------------------'; echo 'Press any key to dismiss and jump to Jetski pane...'; read -n 1 -s; target=\$(echo \"${b64_pane}\" | base64 -d); if [[ -n \"\${target}\" ]]; then tmux select-pane -t \"\${target}\" 2>/dev/null || true; fi"
 
 tmux display-popup -T " ${TITLE} " -w 80 -h "${line_count}" -E "${SCRIPT}"

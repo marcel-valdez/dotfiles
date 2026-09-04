@@ -96,7 +96,10 @@ function notify_new {
   if [[ "${USE_DESKTOP_NOTIFY}" ]]; then
     notify-send "tmux-monitor" "${message}"
   fi
-  tmux display-popup -y 1 -w "${popup_width}" -h "${popup_height}" "echo" "-e" "\e[1m\e[5m\033[1;93m${message}"
+  local b64_msg
+  b64_msg=$(printf "%s" "${message}" | base64 -w0)
+  tmux display-popup -y 1 -w "${popup_width}" -h "${popup_height}" \
+    "echo -ne '\e[1m\e[5m\033[1;93m'; echo '${b64_msg}' | base64 -d"
 }
 
 
