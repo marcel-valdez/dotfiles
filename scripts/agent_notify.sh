@@ -48,26 +48,21 @@ ${BODY}
 EOF
         )
 
-# Attempt to use knock to notify
+# 1. Send push notification via Google Knock if available
 if [[ -e /google/bin/releases/knock/knock.sh ]]; then
   log::debug "source /google/bin/releases/knock/knock.sh"
   source /google/bin/releases/knock/knock.sh &>/dev/null
   dispatch knock "${FULL_MSG}"
-else
-  log::debug "Notifying on terminal."
-  # Otherwise use local notifications on terminal & desktop.
-  notified=
-  if run type tmux-notify &>/dev/null; then
-    dispatch tmux-notify "${TITLE}" "${BODY}"
-    notified=1
-  fi
-  if [[ -n "${DISPLAY}" ]] && run type notify-send &>/dev/null; then
-    dispatch notify-send "${TITLE}" "${BODY}"
-    notified=1
-  fi
-  if [[ -z "${notified}" ]]; then
-    log::error "neither tmux-notify nor notify-send where available to notify the user."
-  fi
+fi
+
+# 2. Send in-tmux modal popup notification if available
+if run type tmux-notify &>/dev/null; then
+  dispatch tmux-notify "${TITLE}" "${BODY}"
+fi
+
+# 3. Send desktop notification via notify-send if local X11 display is available
+if [[ -n "${DISPLAY:-}" ]] && run type notify-send &>/dev/null; then
+  dispatch notify-send "${TITLE}" "${BODY}"
 fi
 
 # Send OSC 99 terminal notification (Kitty, etc.) if enabled
