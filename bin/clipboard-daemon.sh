@@ -101,8 +101,53 @@ kill_existing_daemon() {
   fuser -k "${PORT}/tcp" 2>/dev/null || true
 }
 
+RUNTIME_DIR="${XDG_RUNTIME_DIR:-/tmp}"
+PID_FILE="${RUNTIME_DIR}/clipboard-tunnel-${PORT}.pid"
+ERR_LOG="${RUNTIME_DIR}/clipboard-ssh-${PORT}.log"
+
+find_local_tunnel_pids() {
+  local target_port="$1"
+  local matching_pids=()
+  local ssh_pids
+  ssh_pids=$(pgrep -u "$(id -u)" -x ssh 2>/dev/null || true)
+  local regex_r="(^|[[:space:]])-R[[:space:]]*(${target_port}:|[0-9a-zA-Z.*_-]+:${target_port}:)"
+  local regex_rf="(^|[[:space:]])-o[[:space:]]+RemoteForward([=[:space:]]+)(${target_port}[:[:space:]]|[0-9a-zA-Z.*_-]+:${target_port}[:[:space:]])"
+
+  for pid in ${ssh_pids}; do
+    [[ -z "${pid}" ]] && continue
+    if [[ -r "/proc/${pid}/status" ]]; then
+      local state
+      state=$(awk '/^State:/ {print $2}' "/proc/${pid}/status" 2>/dev/null || true)
+      if [[ "${state}" == "Z" || "${state}" == "T" ]]; then
+        continue
+      fi
+    fi
+
+    if [[ -r "/proc/${pid}/cmdline" ]]; then
+      local cmdline
+      cmdline=$(tr '\0' ' ' < "/proc/${pid}/cmdline" 2>/dev/null || true)
+      if [[ "${cmdline}" =~ ${regex_r} ]] || [[ "${cmdline}" =~ ${regex_rf} ]]; then
+        matching_pids+=("${pid}")
+      fi
+    fi
+  done
+  echo "${matching_pids[@]}"
+}
+
 kill_existing_tunnel() {
-  pkill -f "ssh.*-R.*${PORT}:.*${REMOTE_HOST}" 2>/dev/null || true
+  if [[ -f "${PID_FILE}" ]]; then
+    local pid
+    pid=$(cat "${PID_FILE}" 2>/dev/null || true)
+    if [[ -n "${pid}" ]] && kill -0 "${pid}" 2>/dev/null; then
+      kill -TERM "${pid}" 2>/dev/null || true
+      for _ in {1..10}; do
+        kill -0 "${pid}" 2>/dev/null || break
+        sleep 0.1
+      done
+      kill -KILL "${pid}" 2>/dev/null || true
+    fi
+    rm -f "${PID_FILE}" 2>/dev/null || true
+  fi
 }
 
 cleanup() {
@@ -125,11 +170,12 @@ fi
 # Check if another daemon is already actively listening on this port
 if ss -tln | grep -q "${HOST}:${PORT} "; then
   echo "clipboard-daemon is already listening on ${HOST}:${PORT}."
-  if ! pgrep -f "ssh.*-R.*${PORT}:.*${REMOTE_HOST}" >/dev/null; then
+  local_tunnels=($(find_local_tunnel_pids "${PORT}"))
+  if [[ ${#local_tunnels[@]} -eq 0 ]]; then
     echo "Reverse SSH tunnel was down; starting tunnel to ${REMOTE_HOST} on port ${PORT}..."
     start_ssh_tunnel
   else
-    echo "Reverse SSH tunnel is also running."
+    echo "Reverse SSH tunnel is also running (PID ${local_tunnels[0]})."
   fi
   exit 0
 fi
@@ -138,10 +184,45 @@ fi
 start_ssh_tunnel() {
   kill_existing_tunnel
   (
-    gcert_warned=0
+    local gcert_warned=0
+    local consecutive_drain_retries=0
+    local reconnect_backoff=5
+    local ssh_child_pid=""
+
+    subshell_cleanup() {
+      if [[ -n "${ssh_child_pid}" ]] && kill -0 "${ssh_child_pid}" 2>/dev/null; then
+        kill -TERM "${ssh_child_pid}" 2>/dev/null || true
+        sleep 0.1
+        kill -KILL "${ssh_child_pid}" 2>/dev/null || true
+      fi
+      rm -f "${PID_FILE}" 2>/dev/null || true
+      exit 0
+    }
+    trap subshell_cleanup SIGINT SIGTERM EXIT
+
     while true; do
-      # Gracefully handle when gcert is down or expired:
-      # If gcertstatus indicates expired credentials, wait quietly without failing
+      # 1. Check if an active local reverse SSH tunnel is already running on this port
+      local local_pids
+      local_pids=($(find_local_tunnel_pids "${PORT}"))
+
+      if [[ ${#local_pids[@]} -gt 0 ]]; then
+        local ext_pid="${local_pids[0]}"
+        echo "[$(get_timestamp)] [Tunnel] Active local reverse SSH tunnel detected (PID ${ext_pid}). Monitoring existing tunnel." >> "${LOG_FILE}"
+
+        local stable_polls=0
+        while kill -0 "${ext_pid}" 2>/dev/null; do
+          sleep 15
+          ((stable_polls++)) || true
+          if [[ ${stable_polls} -ge 4 ]]; then # > 60s
+            consecutive_drain_retries=0
+            reconnect_backoff=5
+          fi
+        done
+        echo "[$(get_timestamp)] [Tunnel] Monitored local SSH tunnel (PID ${ext_pid}) exited. Resuming keeper loop..." >> "${LOG_FILE}"
+        continue
+      fi
+
+      # 2. Check gcert credentials before attempting connection
       if command -v gcertstatus &>/dev/null; then
         if ! gcertstatus --nocheck_loas2 --quiet 2>/dev/null; then
           if [[ ${gcert_warned} -eq 0 ]]; then
@@ -158,33 +239,73 @@ start_ssh_tunnel() {
         gcert_warned=0
       fi
 
-      # -o ControlMaster=no -o ControlPath=none isolates daemon from interactive multiplex sockets
+      # 3. Spawn daemon-managed SSH tunnel
+      > "${ERR_LOG}"
+      local start_time
+      start_time=$(date +%s)
+
       ssh -N -T -R "${PORT}:127.0.0.1:${PORT}" \
           -o ControlMaster=no \
           -o ControlPath=none \
           -o ExitOnForwardFailure=yes \
-          -o ServerAliveInterval=15 \
-          -o ServerAliveCountMax=3 \
+          -o ServerAliveInterval=10 \
+          -o ServerAliveCountMax=6 \
           -o ConnectTimeout=10 \
-          "${REMOTE_HOST}" >> "${LOG_FILE}" 2>&1
-      exit_code=$?
+          "${REMOTE_HOST}" >> "${LOG_FILE}" 2> "${ERR_LOG}" &
+      ssh_child_pid=$!
+      echo "${ssh_child_pid}" > "${PID_FILE}"
 
-      if tail -n 10 "${LOG_FILE}" 2>/dev/null | grep -q "remote port forwarding failed"; then
-        local conflict_msg="Port ${PORT} on ${REMOTE_HOST} is already in use by another session.
+      wait "${ssh_child_pid}" 2>/dev/null || true
+      local exit_code=$?
+      local end_time
+      end_time=$(date +%s)
+      local duration=$(( end_time - start_time ))
+      ssh_child_pid=""
+      rm -f "${PID_FILE}" 2>/dev/null || true
+
+      if [[ ${duration} -ge 60 ]]; then
+        consecutive_drain_retries=0
+        reconnect_backoff=5
+      fi
+
+      # 4. Evaluate exit error output
+      if grep -q "remote port forwarding failed" "${ERR_LOG}" 2>/dev/null; then
+        local current_local_pids
+        current_local_pids=($(find_local_tunnel_pids "${PORT}"))
+        if [[ ${#current_local_pids[@]} -gt 0 ]]; then
+          echo "[$(get_timestamp)] [Tunnel] Port taken by local process (PID ${current_local_pids[0]}). Attaching to monitor." >> "${LOG_FILE}"
+          consecutive_drain_retries=0
+          reconnect_backoff=5
+          continue
+        fi
+
+        ((consecutive_drain_retries++)) || true
+        if [[ ${consecutive_drain_retries} -le 6 ]]; then
+          local drain_sleep=$(( consecutive_drain_retries * 5 ))
+          echo "[$(get_timestamp)] [Tunnel] Remote port forwarding failed (attempt ${consecutive_drain_retries}/6). Waiting ${drain_sleep}s for remote socket to clear..." >> "${LOG_FILE}"
+          sleep "${drain_sleep}"
+        else
+          local conflict_msg="Port ${PORT} on ${REMOTE_HOST} is already in use by another session.
 
 Logs: ${LOG_FILE}
 
-To fix: Close the conflicting SSH session on ${REMOTE_HOST} or run ~/bin/clear-clipboard-port, then:
+To fix: Close conflicting sessions on ${REMOTE_HOST} or run ~/bin/clear-clipboard-port, then:
 systemctl --user restart clipboard-daemon@${PORT}"
-
-        echo "[$(get_timestamp)] [Tunnel] Port ${PORT} is currently in use on ${REMOTE_HOST}." >> "${LOG_FILE}"
-        echo "[$(get_timestamp)] [Tunnel] Sending desktop notification with log instructions." >> "${LOG_FILE}"
-        send_desktop_notification "Clipboard Tunnel: Port ${PORT} Conflict" "${conflict_msg}"
-        echo "[$(get_timestamp)] [Tunnel] Pausing tunnel creation for 10 minutes before re-checking..." >> "${LOG_FILE}"
-        sleep 600
+          echo "[$(get_timestamp)] [Tunnel] Persistent port ${PORT} conflict on ${REMOTE_HOST} after 6 retries." >> "${LOG_FILE}"
+          echo "[$(get_timestamp)] [Tunnel] Sending desktop notification with log instructions." >> "${LOG_FILE}"
+          send_desktop_notification "Clipboard Tunnel: Port ${PORT} Conflict" "${conflict_msg}"
+          echo "[$(get_timestamp)] [Tunnel] Pausing tunnel creation for 10 minutes before re-checking..." >> "${LOG_FILE}"
+          sleep 600
+          consecutive_drain_retries=0
+        fi
       else
-        echo "[$(get_timestamp)] [Tunnel] SSH tunnel exited (code ${exit_code}). Reconnecting in 10s..." >> "${LOG_FILE}"
-        sleep 10
+        echo "[$(get_timestamp)] [Tunnel] SSH tunnel exited (code ${exit_code}, ran for ${duration}s). Reconnecting in ${reconnect_backoff}s..." >> "${LOG_FILE}"
+        sleep "${reconnect_backoff}"
+        if [[ ${reconnect_backoff} -lt 15 ]]; then
+          reconnect_backoff=$(( reconnect_backoff + 5 ))
+        elif [[ ${reconnect_backoff} -lt 30 ]]; then
+          reconnect_backoff=30
+        fi
       fi
     done
   ) &
