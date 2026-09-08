@@ -1,8 +1,23 @@
 #!/usr/bin/env bash
-# copy-to-remote-clipboard: Sends clipboard payload from Cloudtop tmux to the local
-# workstation/laptop clipboard daemon via reverse SSH tunnels.
+# copy-to-remote-clipboard: Sends clipboard payload from Cloudtop tmux to the
+# local workstation/laptop clipboard daemon via reverse SSH tunnels.
 
 HOST="127.0.0.1"
+LOG_FILE="${LOG_FILE:-/tmp/copy-to-remote-clipboard.log}"
+
+# Timestamped logging helper: writes to LOG_FILE and echoes to stderr when
+# running in an interactive terminal or when verbose mode is requested.
+log() {
+  local timestamp
+  timestamp="$(date '+%Y-%m-%d %H:%M:%S')"
+  local msg="[${timestamp}] [copy-to-remote-clipboard/$$] $*"
+  if [[ -n "${LOG_FILE:-}" ]]; then
+    echo "${msg}" >> "${LOG_FILE}" 2>/dev/null || true
+  fi
+  if [[ -t 2 || -n "${VERBOSE:-}" || -n "${LOG_TO_STDERR:-}" ]]; then
+    echo "${msg}" >&2
+  fi
+}
 
 # Source .googlerc to inherit configurations like CLIPBOARD_PORT
 if [[ -z "${CLIPBOARD_PORT:-}" ]]; then
@@ -13,15 +28,29 @@ if [[ -z "${CLIPBOARD_PORT:-}" ]]; then
   fi
 fi
 
-# Parse optional -p [PORT] or numeric argument
+# Parse CLI arguments (optional -p/--port [PORT], -v/--verbose, or numeric port)
 PORT_OVERRIDE=""
-if [[ "$1" == "-p" || "$1" == "--port" ]]; then
-  PORT_OVERRIDE="$2"
-  shift 2
-elif [[ "$1" =~ ^[0-9]{4,5}$ ]]; then
-  PORT_OVERRIDE="$1"
-  shift
-fi
+VERBOSE="${VERBOSE:-}"
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    -p|--port)
+      PORT_OVERRIDE="$2"
+      shift 2
+      ;;
+    -v|--verbose)
+      VERBOSE=1
+      shift
+      ;;
+    [0-9][0-9][0-9][0-9]|[0-9][0-9][0-9][0-9][0-9])
+      PORT_OVERRIDE="$1"
+      shift
+      ;;
+    *)
+      break
+      ;;
+  esac
+done
 
 # Read payload from stdin (e.g. piped from tmux) or remaining arguments
 if [[ $# -eq 0 ]]; then
@@ -32,8 +61,13 @@ fi
 
 # Nothing to copy
 if [[ -z "${payload}" ]]; then
+  log "[Payload] Received empty payload. Nothing to copy, exiting."
   exit 0
 fi
+
+byte_count=$(printf "%s" "${payload}" | wc -c | tr -d ' ')
+line_count=$(printf "%s\n" "${payload}" | wc -l | tr -d ' ')
+log "[Payload] Processing clipboard payload: ${byte_count} bytes (${line_count} lines)."
 
 # Determine target ports:
 # 1. CLI argument override
@@ -42,32 +76,54 @@ fi
 #    and broadcast to all active listening reverse SSH tunnels!
 target_ports=()
 if [[ -n "${PORT_OVERRIDE}" ]]; then
+  status=$(ss -tln | grep -q "${HOST}:${PORT_OVERRIDE} " && echo "ACTIVE (listening)" || echo "INACTIVE (not listening)")
+  log "[Tunnel] Port override specified: ${PORT_OVERRIDE}. Tunnel status: ${status} on ${HOST}:${PORT_OVERRIDE}."
   target_ports=("${PORT_OVERRIDE}")
 elif [[ -n "${CLIPBOARD_PORT:-}" ]]; then
+  status=$(ss -tln | grep -q "${HOST}:${CLIPBOARD_PORT} " && echo "ACTIVE (listening)" || echo "INACTIVE (not listening)")
+  log "[Tunnel] Environment CLIPBOARD_PORT specified: ${CLIPBOARD_PORT}. Tunnel status: ${status} on ${HOST}:${CLIPBOARD_PORT}."
   target_ports=("${CLIPBOARD_PORT}")
 else
+  log "[Tunnel] Scanning known reverse SSH tunnel ports (3333=workstation, 3334=laptop, 3335, 3336)..."
   for p in 3333 3334 3335 3336; do
     if ss -tln | grep -q "${HOST}:${p} "; then
+      log "[Tunnel] -> Port ${p}: ACTIVE (reverse SSH tunnel listening on ${HOST}:${p})"
       target_ports+=("$p")
+    else
+      log "[Tunnel] -> Port ${p}: INACTIVE (no listener on ${HOST}:${p})"
     fi
   done
 fi
 
 if [[ ${#target_ports[@]} -eq 0 ]]; then
   # Fallback default if no active tunnel was detected
+  log "[Tunnel] WARNING: No active reverse SSH tunnels found on scanned ports. Falling back to default port 3333."
   target_ports=(3333)
+else
+  log "[Tunnel] Target port(s) selected for broadcast: ${target_ports[*]}"
 fi
 
 sent_any=0
 for port in "${target_ports[@]}"; do
+  log "[Send] Transmitting payload (${byte_count} bytes) to reverse SSH tunnel on ${HOST}:${port}..."
   # Send payload with 1s timeout to prevent hanging if tunnel is half-broken
-  if timeout 1 bash -c "echo -n \"\$1\" > \"/dev/tcp/${HOST}/${port}\"" _ "${payload}" 2>/dev/null; then
+  if printf "%s" "${payload}" | timeout 1 bash -c "cat > \"/dev/tcp/${HOST}/${port}\"" 2>/dev/null; then
+    log "[Send] -> Port ${port}: SUCCESS (payload delivered, tunnel accepted data)"
     sent_any=1
+  else
+    send_rc="${PIPESTATUS[1]}"
+    if [[ ${send_rc} -eq 124 ]]; then
+      log "[Send] -> Port ${port}: FAILED (timed out after 1s; tunnel is unresponsive or hung)"
+    else
+      log "[Send] -> Port ${port}: FAILED (exit code ${send_rc}; connection refused or broken tunnel)"
+    fi
   fi
 done
 
 if [[ ${sent_any} -eq 1 ]]; then
+  log "[Done] SUCCESS: Clipboard payload delivered to at least one active remote tunnel."
   exit 0
 else
+  log "[Done] FAILED: Could not deliver clipboard payload to any remote tunnel."
   exit 1
 fi
