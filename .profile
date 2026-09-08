@@ -26,6 +26,18 @@ else
     export PATH="${PATH}:${HOME}/bin"
   fi
 
+  if [ -d "${HOME}/.local/bin" ]; then
+    export PATH="${PATH}:${HOME}/.local/bin"
+  fi
+
+  if [ -d "${HOME}/.cargo/bin" ]; then
+    export PATH="${PATH}:${HOME}/.cargo/bin"
+  fi
+
+  if [ -d "${HOME}/.rvm/bin" ]; then
+    export PATH="${PATH}:${HOME}/.rvm/bin" # Add RVM to PATH for scripting
+  fi
+
   # NOTE: I am uncertain if NVM can be run like this in a non-interactive
   # shell session.
   [ -s "${NVM_DIR}/nvm.sh" ] && . "${NVM_DIR}/nvm.sh"
