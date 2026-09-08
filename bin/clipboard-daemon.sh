@@ -4,7 +4,7 @@
 # Designed to run as a user systemd service (clipboard-daemon.service).
 
 HOST="127.0.0.1"
-REMOTE_HOST="${REMOTE_HOST:-gcloud}"
+REMOTE_HOST="${REMOTE_HOST:-gcloud_clipboard_tunnel}"
 LOG_FILE="/tmp/clipboard-daemon.log"
 
 RESTART=0
