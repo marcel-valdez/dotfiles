@@ -1,0 +1,215 @@
+#!/usr/bin/env python3
+"""top-ram-usage: Reports top RAM-consuming processes and attributes them to tmux sessions and windows."""
+
+import argparse
+import os
+import subprocess
+import sys
+
+
+def run_cmd(cmd: str) -> str:
+    try:
+        return subprocess.check_output(cmd, shell=True, text=True)
+    except Exception:
+        return ""
+
+
+def get_tmux_panes():
+    panes = []
+    out = run_cmd(
+        "tmux list-panes -a -F "
+        "'#{session_name}\t#{window_index}\t#{window_name}\t#{pane_id}\t#{pane_pid}\t#{pane_tty}'"
+    ).strip()
+    if not out:
+        return panes
+    for line in out.splitlines():
+        parts = line.split("\t")
+        if len(parts) >= 6:
+            panes.append({
+                "session": parts[0],
+                "win_idx": parts[1],
+                "win_name": parts[2],
+                "pane_id": parts[3],
+                "pane_pid": int(parts[4]) if parts[4].isdigit() else -1,
+                "pane_tty": parts[5],
+            })
+    return panes
+
+
+def get_processes():
+    out = run_cmd("ps -eo pid,ppid,rss,tty,args --sort=-rss").strip()
+    procs = []
+    lines = out.splitlines()
+    if len(lines) <= 1:
+        return procs
+    for line in lines[1:]:
+        parts = line.split(None, 4)
+        if len(parts) >= 5:
+            procs.append({
+                "pid": int(parts[0]),
+                "ppid": int(parts[1]),
+                "rss_kb": int(parts[2]),
+                "tty": parts[3],
+                "cmd": parts[4],
+            })
+    return procs
+
+
+def format_bytes(kb: int) -> str:
+    mb = kb / 1024.0
+    if mb >= 1024.0:
+        return f"{mb / 1024.0:.2f} GB"
+    return f"{mb:.1f} MB"
+
+
+def print_system_memory():
+    free_raw = run_cmd("free -h")
+    lines = [l for l in free_raw.splitlines() if l.strip()]
+    if lines:
+        headers = lines[0].split()
+        print(f"{'TYPE':<8}", end="")
+        for h in headers:
+            print(f"{h:>11}", end="")
+        print()
+        print("-" * (8 + 11 * len(headers)))
+
+        for line in lines[1:]:
+            parts = line.split()
+            row_type = parts[0]
+            vals = parts[1:]
+            print(f"{row_type:<8}", end="")
+            for v in vals:
+                print(f"{v:>11}", end="")
+            print()
+    else:
+        print("Could not query system memory via free.")
+
+
+def main():
+    parser = argparse.ArgumentParser(
+        description="Inspect top RAM usage and map processes to tmux sessions/windows."
+    )
+    parser.add_argument(
+        "-n",
+        "--top",
+        type=int,
+        default=20,
+        help="Number of top processes to show (default: 20)",
+    )
+    parser.add_argument(
+        "-s",
+        "--session",
+        type=str,
+        default=None,
+        help="Filter results by specific tmux session name",
+    )
+    parser.add_argument(
+        "-w",
+        "--wide",
+        action="store_true",
+        help="Do not truncate long command lines",
+    )
+    args = parser.parse_args()
+
+    tmux_panes = get_tmux_panes()
+    procs = get_processes()
+    if not procs:
+        print("Error: Could not retrieve process list.", file=sys.stderr)
+        sys.exit(1)
+
+    parent_map = {p["pid"]: p["ppid"] for p in procs}
+
+    def resolve_tmux(proc):
+        # 1. Match by TTY
+        if proc["tty"] and proc["tty"] != "?":
+            tty_dev = "/dev/" + proc["tty"]
+            for tp in tmux_panes:
+                if tp["pane_tty"] == tty_dev or tp["pane_tty"].endswith(proc["tty"]):
+                    return tp["session"], f"{tp['win_idx']}:{tp['win_name']}"
+
+        # 2. Match by PID ancestor chain
+        curr = proc["pid"]
+        visited = set()
+        while curr in parent_map and curr not in visited and curr != 0:
+            visited.add(curr)
+            for tp in tmux_panes:
+                if tp["pane_pid"] == curr:
+                    return tp["session"], f"{tp['win_idx']}:{tp['win_name']}"
+            curr = parent_map[curr]
+
+        return None, None
+
+    for p in procs:
+        sess, win = resolve_tmux(p)
+        p["session"] = sess
+        p["window"] = win
+
+    print("=" * 80)
+    print(" SYSTEM MEMORY OVERVIEW")
+    print("=" * 80)
+    print_system_memory()
+    print()
+
+    # Session & Window Aggregates
+    session_totals = {}
+    win_totals = {}
+    daemon_kb = 0
+
+    for p in procs:
+        if p["session"]:
+            sess = p["session"]
+            win_key = (sess, p["window"])
+            session_totals[sess] = session_totals.get(sess, 0) + p["rss_kb"]
+            win_totals[win_key] = win_totals.get(win_key, 0) + p["rss_kb"]
+        else:
+            daemon_kb += p["rss_kb"]
+
+    print("=" * 80)
+    print(" AGGREGATED RAM BY TMUX SESSION")
+    print("=" * 80)
+    print(f"{'TMUX SESSION':<30} {'TOTAL RAM':<15} {'PRIMARY WINDOWS'}")
+    print("-" * 80)
+
+    for sess, tot_kb in sorted(session_totals.items(), key=lambda x: x[1], reverse=True):
+        if args.session and args.session.lower() not in sess.lower():
+            continue
+        # Find top windows for this session
+        sess_wins = [
+            (w[1], kb) for w, kb in win_totals.items() if w[0] == sess
+        ]
+        sess_wins.sort(key=lambda x: x[1], reverse=True)
+        win_summary = ", ".join(f"{w} ({format_bytes(kb)})" for w, kb in sess_wins[:3])
+        print(f"{sess:<30} {format_bytes(tot_kb):<15} {win_summary}")
+
+    if not args.session:
+        print(f"{'Non-tmux / System Daemons':<30} {format_bytes(daemon_kb):<15} N/A")
+    print()
+
+    # Top Individual Processes
+    print("=" * 80)
+    print(f" TOP {args.top} RAM CONSUMING PROCESSES")
+    print("=" * 80)
+    print(f"{'PID':<8} {'RSS':<12} {'TMUX LOCATION':<32} {'COMMAND'}")
+    print("-" * 80)
+
+    filtered_procs = procs
+    if args.session:
+        filtered_procs = [
+            p for p in procs if p["session"] and args.session.lower() in p["session"].lower()
+        ]
+
+    for p in filtered_procs[: args.top]:
+        loc = (
+            f"{p['session']}:{p['window']}"
+            if p["session"]
+            else "Non-tmux (Daemon/Service)"
+        )
+        cmd = p["cmd"]
+        if not args.wide and len(cmd) > 65:
+            cmd = cmd[:62] + "..."
+        print(f"{p['pid']:<8} {format_bytes(p['rss_kb']):<12} {loc:<32} {cmd}")
+    print()
+
+
+if __name__ == "__main__":
+    main()
