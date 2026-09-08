@@ -1,4 +1,9 @@
 # Set color / theme options
+
+if [[ -f "${HOME}/projects/blesh-extra/hg-sabbrev.sh" ]]; then
+  source "${HOME}/projects/blesh-extra/hg-sabbrev.sh"
+fi
+
 if [[ -f "${HOME}/res/dracula_blesh_color_scheme.sh" ]]; then
   source "${HOME}/res/dracula_blesh_color_scheme.sh"
   ble/contrib/scheme:dracula/initialize
