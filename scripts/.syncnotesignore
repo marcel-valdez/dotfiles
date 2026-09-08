@@ -1,0 +1,67 @@
+# .syncnotesignore
+# Ignore rules for sync_notes_to_company
+# Lines starting with '#' are comments, blank lines are ignored.
+
+# --- Excluded Directories ---
+personal/
+interviews/
+meetings/
+.git/
+.hg/
+.citc/
+.sync_state/
+.jetski/
+.jetskicli/
+.lumbergh/
+.snapshot/
+
+# --- Dynamic Exclude Patterns (Directories & Files) ---
+meetings
+meetings_*
+meetings.*
+personal
+personal_*
+personal.*
+interviews
+interviews_*
+interviews.*
+*calibration*
+*callibration*
+*one_on_one*
+*1_on_1*
+*1-on-1*
+*one-on-one*
+*perf_review*
+*grad_review*
+*expectations_ddraft*
+
+# --- Specific Sensitive / Personal Notes ---
+ali_one_on_one.md
+contacts.md
+peak_performance.md
+perf_and_callibrations_knowledge.md
+expectations_ddraft_2023.md
+draft_calibration_notes_q4_2020
+avid_perf_test_quality_for_2024.md
+avid_perf_test_highlights_lowlights.md
+q1_2022_okrs.md
+q1_2025_okrs.md
+career.md
+separation_progress.md
+team_wins.md
+playground.org
+TODO.org
+misc.org
+archive.org
+
+# --- Editor Locks, Backups & Non-Doc Files ---
+.#*
+#*#
+*~
+*.swp
+*.tmp
+*.org_archive
+*.py
+*.csv
+*.odt
+*.~undo-tree~
