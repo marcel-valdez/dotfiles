@@ -13,7 +13,7 @@ fi
 
 # 1. Force the emacs keymap (Optional, but ensures you aren't stuck in vi_imap)
 bleopt default_keymap=emacs
-bleopt editor="${EDITOR:nano}"
+bleopt editor="${HOME}/scripts/emacs-client.sh"
 
 bleopt complete_menu_style=desc
 ble-import core-complete -C '
