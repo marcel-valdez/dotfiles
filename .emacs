@@ -79,6 +79,8 @@
 (setq visible-bell t)
 (setq mouse-wheel-scroll-amount '(3 ((shift) . 3))) ;; 3 lines at a time
 (setq mouse-wheel-progressive-speed t) ;; accelerate scrolling
+;; Enable recentf mode so we can easily open recently close files
+(recentf-mode)
 
 (if window-system
     (progn
@@ -125,6 +127,8 @@
       "Keymap for tab-related actions.")
     (define-key tab-bar-key-map (kbd "M-<right>") 'custom/switch-to-next-tab)
     (define-key tab-bar-key-map (kbd "M-<left>") 'tab-bar-switch-to-prev-tab)
+    (define-key tab-bar-key-map (kbd "C-n") 'custom/switch-to-next-tab)
+    (define-key tab-bar-key-map (kbd "C-p") 'tab-bar-switch-to-prev-tab)
     (define-key tab-bar-key-map (kbd "C-<right>") 'custom/move-tab-right)
     (define-key tab-bar-key-map (kbd "C-<left>") 'custom/move-tab-left)
     (define-key tab-bar-key-map (kbd "M-q") 'tab-bar-close-tab)
@@ -398,8 +402,8 @@
 (global-set-key (kbd "M-j") (lambda () (interactive) (other-window -1)))
 (global-unset-key (kbd "M-k"))
 (global-set-key (kbd "M-k") (lambda () (interactive) (other-window 1)))
-(global-set-key (kbd "M-W") 'copy-to-remote-clipboard)
-(global-set-key (kbd "C-x M-w") 'copy-to-tmux)
+(global-set-key (kbd "M-W") 'async-copy-to-all-clipboards)
+(global-set-key (kbd "C-x M-w") 'async-copy-to-all-clipboards)
 
 ;; Wezterm Fixes: Ctrl+Alt+i (complete-symbol) registers as ESC <C-tab>
 (global-set-key (kbd "ESC <C-tab>") 'complete-symbol)
@@ -645,14 +649,32 @@
  ;; Your init file should contain only one such instance.
  ;; If there is more than one, they won't work right.
  '(c-basic-offset 2)
+ '(cider-agent-complex-task-model "agent_gemini_3_pro_preview")
+ '(cider-agent-simple-coding-model "chat_with_edits_gemini_for_google_2_5_pro")
  '(column-number-mode t)
  '(custom-enabled-themes '(tango-dark))
  '(custom-safe-themes
-   '("6068d911f0ad3f9e6834d4849038ef3a317510f23683ff9656da7d49a5ab3ed5" "d4890c4d8d262c61decb7c0e43b1dc5c92b378e9acada6c04d9e94f00cc70ead" "4badd47b5ba16df46b849137903f2210d344f3c7021e979ff8ed68b8c3827d84" default))
+   '("6068d911f0ad3f9e6834d4849038ef3a317510f23683ff9656da7d49a5ab3ed5"
+     "d4890c4d8d262c61decb7c0e43b1dc5c92b378e9acada6c04d9e94f00cc70ead"
+     "4badd47b5ba16df46b849137903f2210d344f3c7021e979ff8ed68b8c3827d84" default))
  '(graphviz-dot-indent-width 2 t)
  '(line-number-mode t)
  '(package-selected-packages
-   '(jedi elpy rotate lua-mode telephone-line use-package multiple-cursors multi-term helm-flycheck helm-xref windresize async xclip undo-tree))
+   '(apache-mode async bar-cursor beframe bind-chord bm boxquote browse-kill-ring
+                 centaur-tabs color-theme-approximate color-theme-modern
+                 comany-mode company company-mode dart-mode dash
+                 default-text-scale diminish eat editorconfig eglot epl eproject
+                 ess f flycheck flymake flymake-pyrefly flymake-shellcheck
+                 folding fzf git-modes goto-chg graphviz-dot-mode helm helm-core
+                 helm-flycheck helm-lsp helm-xref ht htmlize
+                 ido-completing-read+ imenu-list initsplit llm-goose lsp-mode
+                 lsp-treemacs lsp-ui lv markdown-mode memoize multi-term
+                 multiple-cursors nav-flash ox-gfm ox-html5slide ox-pandoc
+                 perspective pkg-info popup puppet-mode rotate rust-mode s
+                 session tabbar telephone-line term-run treemacs-perspective
+                 undo-tree use-package use-package-chords vterm w3m which-key
+                 windresize xclip yaml-mode yasnippet yasnippet-snippets
+                 zenburn-theme))
  '(show-paren-mode t)
  '(tool-bar-mode nil)
  '(warning-suppress-types '((comp))))

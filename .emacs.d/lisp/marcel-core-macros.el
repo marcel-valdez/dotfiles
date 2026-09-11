@@ -21,37 +21,57 @@ If the BODY fails during execution, the error is allowed to bubble up, it is not
 
 (put 'with-library 'lisp-indent-function 1)
 
-(defvar copy-to-remote-clipboard-exe-str)
+(defvar async-clipboard-copy-exe-str
+  (expand-file-name "~/.googlerc.d/scripts/async_clipboard_copy.sh")
+  "Path to the unified asynchronous multi-target clipboard copy script.")
 
-(setq copy-to-remote-clipboard-exe-str "~/bin/copy-to-remote-clipboard")
+(defun async-copy-to-all-clipboards (&optional beg end)
+  "Asynchronously copy active region or latest kill-ring text to all clipboards.
+Dispatches to tmux buffer, local desktop clipboard, and remote reverse SSH
+tunnel via `async_clipboard_copy.sh`. Fully non-blocking via `make-process`."
+  (interactive
+   (if (use-region-p)
+       (list (region-beginning) (region-end))
+     (list nil nil)))
+  (let* ((text (cond
+                ((and beg end)
+                 (buffer-substring-no-properties beg end))
+                ((use-region-p)
+                 (buffer-substring-no-properties (region-beginning) (region-end)))
+                ((and kill-ring (car kill-ring))
+                 (current-kill 0 t))
+                (t nil))))
+    (cond
+     ((or (null text) (string-empty-p text))
+      (message "Nothing to copy (no active region or kill-ring entry)."))
+     ((not (file-executable-p async-clipboard-copy-exe-str))
+      (message "Clipboard copy script '%s' is not executable."
+               async-clipboard-copy-exe-str))
+     (t
+      (condition-case err
+          (let* ((char-count (length text))
+                 (line-count (length (split-string text "\n" nil)))
+                 (proc (make-process
+                        :name "async-clipboard-copy"
+                        :buffer nil
+                        :command (list async-clipboard-copy-exe-str "--sync" "--notify-none")
+                        :connection-type 'pipe
+                        :sentinel
+                        (lambda (_proc event)
+                          (if (string-prefix-p "finished" event)
+                              (message "Copied %d chars (%d lines) to all clipboards (tmux, desktop, remote)."
+                                       char-count line-count)
+                            (message "Clipboard copy failed: %s"
+                                     (string-trim event)))))))
+            (process-send-string proc text)
+            (process-send-eof proc))
+        (error
+         (message "Clipboard copy process error: %s" (error-message-string err))))))))
 
-(defun copy-to-remote-clipboard(&optional beg end)
-  "Send contents of region bounded by BEG and END to the remote clipboard.
-The command used to copy to the remote clipboard is the script defined by the
-variable copy-to-remote-clipboard-exe-str"
+;; Backward compatibility aliases
+(defalias 'copy-to-remote-clipboard 'async-copy-to-all-clipboards)
+(defalias 'copy-to-tmux 'async-copy-to-all-clipboards)
 
-  (interactive "r")
-  (let ((return-code
-        (shell-command-on-region beg end copy-to-remote-clipboard-exe-str nil nil "*Errors*" t)))
-    (if
-        (eq return-code 0)
-        (display-message-or-buffer "Copied to remote clipboard"))))
-
-(defvar copy-to-tmux-exe-str)
-
-(setq copy-to-tmux-exe-str "~/scripts/copy-to-tmux-paste-buffer.sh")
-
-(defun copy-to-tmux(&optional beg end)
-  "Send contents of region bounded by BEG and END to the tmux paste buffer.
-The command used to copy to the tmux clipboard is the script defined by the
-variable copy-to-tmux-exe-str"
-
-  (interactive "r")
-  (let ((return-code
-        (shell-command-on-region beg end copy-to-tmux-exe-str nil nil "*Errors*" t)))
-    (if
-        (eq return-code 0)
-        (display-message-or-buffer "Copied to tmux paste buffer"))))
 
 
 (defun show-file-name ()
