@@ -4,7 +4,7 @@
 # Designed to run as a user systemd service (clipboard-daemon.service).
 
 HOST="127.0.0.1"
-REMOTE_HOST="${REMOTE_HOST:-gcloud_clipboard_tunnel}"
+REMOTE_CLIPBOARD_HOST="${REMOTE_CLIPBOARD_HOST:-${USER}@marcelvaldez.c.googlers.com}"
 LOG_FILE="/tmp/clipboard-daemon.log"
 
 RESTART=0
@@ -172,7 +172,7 @@ if ss -tln | grep -q "${HOST}:${PORT} "; then
   echo "clipboard-daemon is already listening on ${HOST}:${PORT}."
   local_tunnels=($(find_local_tunnel_pids "${PORT}"))
   if [[ ${#local_tunnels[@]} -eq 0 ]]; then
-    echo "Reverse SSH tunnel was down; starting tunnel to ${REMOTE_HOST} on port ${PORT}..."
+    echo "Reverse SSH tunnel was down; starting tunnel to ${REMOTE_CLIPBOARD_HOST} on port ${PORT}..."
     start_ssh_tunnel
   else
     echo "Reverse SSH tunnel is also running (PID ${local_tunnels[0]})."
@@ -244,14 +244,28 @@ start_ssh_tunnel() {
       local start_time
       start_time=$(date +%s)
 
-      ssh -N -T -R "${PORT}:127.0.0.1:${PORT}" \
+      if type autossh; then
+      command autossh -M 0 -N -T \
+          -o ControlMaster=no \
+          -o ControlPath=none \
+          -o TCPKeepAlive=no \
+          -o ExitOnForwardFailure=yes \
+          -o ServerAliveInterval=15 \
+          -o ServerAliveCountMax=6 \
+          -o ConnectTimeout=10 \
+          -R "${PORT}:127.0.0.1:${PORT}" \
+          "${REMOTE_CLIPBOARD_HOST}" >> "${LOG_FILE}" 2> "${ERR_LOG}" &
+      else
+        ssh -N -T -R "${PORT}:127.0.0.1:${PORT}" \
           -o ControlMaster=no \
           -o ControlPath=none \
           -o ExitOnForwardFailure=yes \
-          -o ServerAliveInterval=10 \
+          -o ServerAliveInterval=15 \
           -o ServerAliveCountMax=6 \
           -o ConnectTimeout=10 \
-          "${REMOTE_HOST}" >> "${LOG_FILE}" 2> "${ERR_LOG}" &
+          "${REMOTE_CLIPBOARD_HOST}" >> "${LOG_FILE}" 2> "${ERR_LOG}" &
+      fi
+
       ssh_child_pid=$!
       echo "${ssh_child_pid}" > "${PID_FILE}"
 
@@ -285,13 +299,13 @@ start_ssh_tunnel() {
           echo "[$(get_timestamp)] [Tunnel] Remote port forwarding failed (attempt ${consecutive_drain_retries}/6). Waiting ${drain_sleep}s for remote socket to clear..." >> "${LOG_FILE}"
           sleep "${drain_sleep}"
         else
-          local conflict_msg="Port ${PORT} on ${REMOTE_HOST} is already in use by another session.
+          local conflict_msg="Port ${PORT} on ${REMOTE_CLIPBOARD_HOST} is already in use by another session.
 
 Logs: ${LOG_FILE}
 
-To fix: Close conflicting sessions on ${REMOTE_HOST} or run ~/bin/clear-clipboard-port, then:
+To fix: Close conflicting sessions on ${REMOTE_CLIPBOARD_HOST} or run ~/bin/clear-clipboard-port, then:
 systemctl --user restart clipboard-daemon@${PORT}"
-          echo "[$(get_timestamp)] [Tunnel] Persistent port ${PORT} conflict on ${REMOTE_HOST} after 6 retries." >> "${LOG_FILE}"
+          echo "[$(get_timestamp)] [Tunnel] Persistent port ${PORT} conflict on ${REMOTE_CLIPBOARD_HOST} after 6 retries." >> "${LOG_FILE}"
           echo "[$(get_timestamp)] [Tunnel] Sending desktop notification with log instructions." >> "${LOG_FILE}"
           send_desktop_notification "Clipboard Tunnel: Port ${PORT} Conflict" "${conflict_msg}"
           echo "[$(get_timestamp)] [Tunnel] Pausing tunnel creation for 10 minutes before re-checking..." >> "${LOG_FILE}"
@@ -315,8 +329,8 @@ systemctl --user restart clipboard-daemon@${PORT}"
 # Start the reverse SSH tunnel
 start_ssh_tunnel
 
-echo "[$(get_timestamp)] Started clipboard-daemon on ${HOST}:${PORT} (Tunnel to ${REMOTE_HOST}:${PORT})" >> "${LOG_FILE}"
-echo "Started clipboard-daemon on ${HOST}:${PORT} (Tunnel to ${REMOTE_HOST}:${PORT})"
+echo "[$(get_timestamp)] Started clipboard-daemon on ${HOST}:${PORT} (Tunnel to ${REMOTE_CLIPBOARD_HOST}:${PORT})" >> "${LOG_FILE}"
+echo "Started clipboard-daemon on ${HOST}:${PORT} (Tunnel to ${REMOTE_CLIPBOARD_HOST}:${PORT})"
 
 while true; do
   displays=$(ls /tmp/.X11-unix/ 2>/dev/null | sed 's/X//g')
