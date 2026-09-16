@@ -228,6 +228,10 @@ if [ -d "${HOME}/.local/bin" ]; then
   export PATH="${PATH}:${HOME}/.local/bin"
 fi
 
+if [ -d "${HOME}/.cargo/bin" ]; then
+  export PATH="${PATH}:${HOME}/.cargo/bin"
+fi
+
 export PAGER="less -R"
 export MANPAGER="sh -c 'col -bx | batcat -l man -p'"
 
@@ -365,6 +369,7 @@ if [[ ${BLE_FIRST_LOAD:-} ]]; then
   [ -s "${HOME}/.fzf.bash" ] && . "${HOME}/.fzf.bash"
   log_debug "END: Load fzf keybindings and completions."
 fi
+
 
 #+begin_src sh [ -n "$EAT_SHELL_INTEGRATION_DIR" ] && \ source "$EAT_SHELL_INTEGRATION_DIR/bash"
 #+end_src sh
