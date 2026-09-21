@@ -1,0 +1,23 @@
+[Unit]
+Description=Knock Notification Desktop Daemon
+Documentation=file://%h/.googlerc.d/lib/knock_notify_daemon.sh
+After=graphical-session.target
+StartLimitIntervalSec=0
+
+[Service]
+Type=simple
+Environment=HOME=%h
+Environment=LOG_TO_STDERR=1
+Environment=PATH=%h/.googlerc.d/bin:%h/.local/bin:%h/bin:/usr/local/bin:/usr/bin:/bin
+PassEnvironment=DISPLAY WAYLAND_DISPLAY DBUS_SESSION_BUS_ADDRESS XAUTHORITY SSH_AUTH_SOCK USER
+ExecStart=%h/.googlerc.d/lib/knock_notify_daemon.sh --foreground
+Restart=on-failure
+RestartSec=15s
+SuccessExitStatus=0 143
+TimeoutStopSec=15s
+KillMode=mixed
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=default.target

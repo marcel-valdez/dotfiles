@@ -86,6 +86,7 @@ bin/verify-packages
 !.config/systemd/
 !.config/systemd/user/
 !.config/systemd/user/clipboard-daemon*.service
+!.config/systemd/user/knock-daemon*.service
 
 # Common backup/generated files
 .*~
