@@ -87,6 +87,7 @@ bin/verify-packages
 !.config/systemd/user/
 !.config/systemd/user/clipboard-daemon*.service
 !.config/systemd/user/knock-daemon*.service
+!.config/systemd/user/jetski-gchat-bridge*.service
 
 # Common backup/generated files
 .*~

@@ -1,0 +1,22 @@
+[Unit]
+Description=Jetski Google Chat Multi-Session Bridge Daemon
+After=network.target
+StartLimitIntervalSec=0
+
+[Service]
+Type=simple
+WorkingDirectory=/usr/local/google/home/marcelvaldez
+Environment=HOME=/usr/local/google/home/marcelvaldez
+Environment=ANTIGRAVITY_PROJECT_ID=default-cli-project
+Environment=PATH=/usr/local/google/home/marcelvaldez/.gemini/jetski/bin:/usr/local/google/home/marcelvaldez/.googlerc.d/bin:/usr/local/google/home/marcelvaldez/.local/bin:/google/bin/releases/gemini-agents-gchat:/google/bin/releases/arca9-local-blaze-cli:/usr/local/bin:/usr/bin:/bin
+ExecStart=/usr/bin/python3 %h/.googlerc.d/scripts/jetski_gchat_bridge.py
+Restart=on-failure
+RestartSec=15s
+SuccessExitStatus=0 143
+KillMode=mixed
+TimeoutStopSec=15s
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=default.target
