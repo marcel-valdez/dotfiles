@@ -256,6 +256,99 @@ echo "--- Test 6: Non-Google Pass-Through (no gcertstatus in PATH) ---"
     "grep -q 'GMOSH_INVOKED' '${TEST_MOCK_LOG}'"
 }
 
+echo "--- Test 7: MOSH_SERVER_NETWORK_TMOUT Passed via --server Flag ---"
+{
+  assert_true "gmosh receives MOSH_SERVER_NETWORK_TMOUT=86400 in --server flag" \
+    "grep -q 'MOSH_SERVER_NETWORK_TMOUT=86400' '${TEST_MOCK_LOG}'"
+}
+
+echo "--- Test 8: Timeline Logging & Auto-Reconnect on HTTP 502 (Expired gmosh-server) ---"
+{
+  cat << 'EOF' > "${MOCK_BIN}/gcertstatus"
+#!/usr/bin/env bash
+exit 0
+EOF
+  chmod +x "${MOCK_BIN}/gcertstatus"
+
+  MOCK_LOG_DIR="${TEST_TMP}/gmosh_logs"
+  mkdir -p "${MOCK_LOG_DIR}"
+  CALL_COUNT_FILE="${TEST_TMP}/test8_calls"
+  echo "0" > "${CALL_COUNT_FILE}"
+
+  cat << EOF > "${MOCK_BIN}/gmosh"
+#!/usr/bin/env bash
+count=\$(cat "${CALL_COUNT_FILE}")
+count=\$((count + 1))
+echo "\${count}" > "${CALL_COUNT_FILE}"
+if [[ "\${count}" -eq 1 ]]; then
+  echo "Selected candidate pair changed: local<->remote" > "${MOCK_LOG_DIR}/gmosh-client.log.INFO.1"
+  echo "ICE connection disconnected" > "${MOCK_LOG_DIR}/gmosh-client.log.WARNING.1"
+  echo "SSO credentials insufficient" >> "${MOCK_LOG_DIR}/gmosh-client.log.WARNING.1"
+  echo "gorilla-RPC failed with code 502" >> "${MOCK_LOG_DIR}/gmosh-client.log.WARNING.1"
+  # Simulate gmosh-client hanging on dead port until monitor kills it
+  sleep 10
+  exit 143
+fi
+rm -f "${MOCK_LOG_DIR}"/*
+exit 0
+EOF
+  chmod +x "${MOCK_BIN}/gmosh"
+
+  output=$(HOME="${TEST_TMP}" PATH="${MOCK_BIN}:${PATH}" \
+    GMOSH_TEST_LOG_DIR="${MOCK_LOG_DIR}" GMOSH_WATCH_INTERVAL=0.1 \
+    timeout 5s bash "${TARGET_SCRIPT}" --gmosh gcloud "tmux attach -t default" 2>&1 || true)
+
+  final_calls="$(cat "${CALL_COUNT_FILE}")"
+  assert_eq "gmosh was automatically re-invoked after HTTP 502 kill" "2" "${final_calls}"
+  assert_true "Timeline logged ICE connected event" \
+    "echo '${output}' | grep -q 'Connected: ICE transport connected'"
+  assert_true "Timeline logged ICE disconnected event" \
+    "echo '${output}' | grep -q 'Disconnected: ICE connection lost'"
+  assert_true "Timeline logged SSO expired event" \
+    "echo '${output}' | grep -q 'Auth Expired: SSO/gcert credentials expired'"
+  assert_true "Timeline logged Server Expired HTTP 502 event" \
+    "echo '${output}' | grep -q 'Server Expired: Remote gmosh-server exited'"
+  assert_true "Logged automatic re-establishment notice" \
+    "echo '${output}' | grep -q 'Re-establishing new gmosh session'"
+}
+
+echo "--- Test 9: Auto-Reconnect When Session Detached While Credentials Expired ---"
+{
+  STATE_FILE="${TEST_TMP}/test9_gcert_valid"
+  touch "${STATE_FILE}"
+  CALL_COUNT_FILE="${TEST_TMP}/test9_calls"
+  echo "0" > "${CALL_COUNT_FILE}"
+
+  cat << EOF > "${MOCK_BIN}/gcertstatus"
+#!/usr/bin/env bash
+[[ -f "${STATE_FILE}" ]]
+EOF
+  chmod +x "${MOCK_BIN}/gcertstatus"
+
+  cat << EOF > "${MOCK_BIN}/gmosh"
+#!/usr/bin/env bash
+count=\$(cat "${CALL_COUNT_FILE}")
+count=\$((count + 1))
+echo "\${count}" > "${CALL_COUNT_FILE}"
+if [[ "\${count}" -eq 1 ]]; then
+  # Simulate credentials expiring while session is open, then server detaches (exit 0)
+  rm -f "${STATE_FILE}"
+  ( sleep 0.3; touch "${STATE_FILE}" ) &
+  exit 0
+fi
+exit 0
+EOF
+  chmod +x "${MOCK_BIN}/gmosh"
+
+  output=$(HOME="${TEST_TMP}" PATH="${MOCK_BIN}:${PATH}" GCERT_POLL_INTERVAL=0.1 \
+    timeout 5s bash "${TARGET_SCRIPT}" --gmosh gcloud "tmux attach -t default" </dev/null 2>&1 || true)
+
+  final_calls="$(cat "${CALL_COUNT_FILE}")"
+  assert_eq "gmosh reconnected after exit 0 during expired credentials" "2" "${final_calls}"
+  assert_true "Logged detach during expired credentials notice" \
+    "echo '${output}' | grep -q 'Session detached or timed out while credentials were expired'"
+}
+
 echo "=============================================================================="
 echo "TEST SUMMARY: ${PASS_COUNT} Passed, ${FAIL_COUNT} Failed"
 echo "=============================================================================="
@@ -264,3 +357,4 @@ if [[ ${FAIL_COUNT} -gt 0 ]]; then
   exit 1
 fi
 exit 0
+

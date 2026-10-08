@@ -141,6 +141,7 @@ echo $$ > "${PIDFILE}"
 # 5. Status Polling Loop
 # ------------------------------------------------------------------------------
 CONSECUTIVE_FAILURES=0
+server_alias="$("${TMUX_CMD[@]}" show-option -gqv @server_alias 2>/dev/null || true)"
 
 while true; do
   # 1. Start the interval timer in the background instantly
@@ -167,8 +168,10 @@ while true; do
     time_val="$(date "+%H:%M:%S")"
   fi
 
-  # 5. Fetch the @server_alias directly from tmux memory
-  server_alias="$("${TMUX_CMD[@]}" show-option -gqv @server_alias 2>/dev/null || true)"
+  # 5. Populate @server_alias only if not yet cached
+  if [[ -z "${server_alias}" ]]; then
+    server_alias="$("${TMUX_CMD[@]}" show-option -gqv @server_alias 2>/dev/null || true)"
+  fi
 
   # 6. PUSH the constructed string directly into tmux status
   NEW_STATUS="#[reverse]📡 ${ping_val} ms#[default]${mem_cpu}#[default]#[reverse,bold] ${server_alias} #[default,bold] ${pac_date} #[reverse,bold] ${time_val}"
