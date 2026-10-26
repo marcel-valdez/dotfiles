@@ -8,13 +8,13 @@
   <string>/Users/marcelvaldez/projects/whatsapp-notification/bin</string>
   <key>ProgramArguments</key>
   <array>
-    <string>/opt/homebrew/bin/bash</string>
+    <string>/bin/bash</string>
     <string>/Users/marcelvaldez/scripts/whatsapp-notification.sh</string>
   </array>
   <key>EnvironmentVariables</key>
   <dict>
     <key>PATH</key>
-    <string>/opt/homebrew/bin:/opt/homebrew/sbin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:/Users/marcelvaldez/bin</string>
+    <string>/usr/local/bin:/usr/local/go/bin:/usr/bin:/bin:/usr/sbin:/sbin:/Users/marcelvaldez/bin:/Users/marcelvaldez/.local/bin:/opt/homebrew/bin:/opt/homebrew/sbin</string>
     <key>HOME</key>
     <string>/Users/marcelvaldez</string>
     <key>USER</key>

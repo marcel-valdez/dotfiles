@@ -433,13 +433,21 @@ echo "[Test 11] ~/scripts/setup_work_environment.sh Darwin port 3335 & sed gcert
 }
 
 # ------------------------------------------------------------------------------
-# Test 12: bootstrap_macos.sh --dry-run, launchd .plist XMLs, and JSON configs
+# Test 12: bootstrap_macos.sh --dry-run (Mule-first), launchd .plist XMLs, and JSON configs
 # ------------------------------------------------------------------------------
-echo "[Test 12] bootstrap_macos.sh --dry-run, launchd plists, and JSON configs"
+echo "[Test 12] bootstrap_macos.sh --dry-run (Mule-first), launchd plists, and JSON configs"
 {
   dry_out="$(bash "${HOME}/.googlerc.d/scripts/bootstrap_macos.sh" --dry-run)"
   assert_contains "bootstrap_macos.sh --dry-run completes cleanly" \
     "Bootstrap complete!" "${dry_out}"
+  assert_contains "bootstrap_macos.sh --dry-run uses /usr/local/bin/mule update" \
+    "sudo /usr/local/bin/mule update" "${dry_out}"
+  assert_contains "bootstrap_macos.sh --dry-run installs kitty via mule" \
+    "sudo /usr/local/bin/mule install -noprompt kitty" "${dry_out}"
+  assert_contains "bootstrap_macos.sh --dry-run symlinks Kitty.app binary into ~/bin/kitty" \
+    "ln -sfn /Applications/kitty.app/Contents/MacOS/kitty ${HOME}/bin/kitty" "${dry_out}"
+  assert_true "~/scripts/bootstrap_macos.sh and ~/.googlerc.d/scripts/bootstrap_macos.sh are identical" \
+    cmp -s "${HOME}/scripts/bootstrap_macos.sh" "${HOME}/.googlerc.d/scripts/bootstrap_macos.sh"
 
   validate_py="${TEST_TMP}/validate_configs.py"
   cat << 'EOF' > "${validate_py}"
@@ -460,6 +468,7 @@ for p in plists:
     assert "Label" in data and "ProgramArguments" in data, f"Missing keys in {p}"
     for arg in data["ProgramArguments"]:
         assert "__HOME__" not in arg, f"Unexpanded __HOME__ in {p}"
+        assert "/opt/homebrew/bin/bash" not in arg, f"Hardcoded Homebrew bash in {p}"
 
 jsons = [
     home / ".config/karabiner/karabiner.json",
@@ -472,7 +481,7 @@ for j in jsons:
 print("VALID")
 EOF
   val_res="$(python3 "${validate_py}")"
-  assert_eq "All 4 launchd plists and 3 macOS JSON configs validate cleanly" "VALID" "${val_res}"
+  assert_eq "All 4 launchd plists (no Homebrew bash dep) and 3 macOS JSON configs validate cleanly" "VALID" "${val_res}"
 }
 
 # ------------------------------------------------------------------------------

@@ -1,10 +1,11 @@
 #!/usr/bin/env bash
 # ==============================================================================
-# bootstrap_macos.sh: Idempotent macOS M5 Pro Bootstrap & Verification Script
+# bootstrap_macos.sh: Idempotent gMac M5 Pro Bootstrap & Verification Script
 # ==============================================================================
-# Sets up a new Apple Silicon MacBook Pro (Darwin arm64) with Marcel's complete
-# Linux power-user environment, Homebrew packages, fonts, FUSE-T user-space
-# sshfs, compiled C++/Go helper binaries, macOS defaults, and LaunchAgents.
+# Sets up a new Google corporate Apple Silicon MacBook Pro (gMac Darwin arm64)
+# using Google's internal `mule` package manager (/usr/local/bin/mule),
+# user-space CLI binaries in ~/bin, compiled Go/C++ helpers, macOS system
+# defaults, and LaunchAgents (without requiring Homebrew).
 #
 # Usage:
 #   ~/scripts/bootstrap_macos.sh [--dry-run] [--help|-h]
@@ -13,9 +14,14 @@
 
 set -euo pipefail
 
-if [[ -d "/opt/homebrew/bin" && ":${PATH}:" != *":/opt/homebrew/bin:"* ]]; then
-  export PATH="/opt/homebrew/bin:/opt/homebrew/sbin:${PATH}"
-fi
+# Ensure gMac Mule paths (/usr/local/bin, /usr/local/go/bin, ~/bin) and optional
+# Homebrew paths are in PATH before checking tool availability.
+for _dir in "${HOME}/bin" "${HOME}/.local/bin" "/usr/local/go/bin" "/usr/local/bin" "/opt/homebrew/bin" "/opt/homebrew/sbin"; do
+  if [[ -d "${_dir}" && ":${PATH}:" != *":${_dir}:"* ]]; then
+    export PATH="${_dir}:${PATH}"
+  fi
+done
+unset _dir
 
 DRY_RUN=0
 
@@ -57,8 +63,67 @@ run_cmd() {
   fi
 }
 
+install_github_tarball_bin() {
+  local bin_name="$1"
+  local repo="$2"
+  local asset_Substring="$3"
+
+  if command -v "${bin_name}" >/dev/null 2>&1 && (( DRY_RUN == 0 )); then
+    echo "[INFO] ${bin_name} already installed at $(command -v "${bin_name}")"
+    return 0
+  fi
+
+  if (( DRY_RUN == 1 )); then
+    printf '[DRY-RUN] install_github_tarball_bin %s (%s -> ~/bin/%s)\n' "${bin_name}" "${repo}" "${bin_name}"
+    return 0
+  fi
+
+  echo "[INFO] Installing ${bin_name} from GitHub release (${repo}) into ${HOME}/bin/${bin_name}..."
+  local tmp_dir
+  tmp_dir="$(mktemp -d)"
+  local download_url
+  download_url="$(python3 - "${repo}" "${asset_Substring}" << 'PY' || true
+import json, sys, urllib.request
+repo, substr = sys.argv[1], sys.argv[2]
+req = urllib.request.Request(
+    f"https://api.github.com/repos/{repo}/releases/latest",
+    headers={"User-Agent": "bootstrap_macos.sh"}
+)
+with urllib.request.urlopen(req, timeout=15) as resp:
+    data = json.load(resp)
+for asset in data.get("assets", []):
+    name = asset.get("name", "")
+    if substr in name and (name.endswith(".tar.gz") or not "." in name):
+        print(asset.get("browser_download_url", ""))
+        break
+PY
+)"
+  if [[ -z "${download_url}" ]]; then
+    echo "[WARN] Could not resolve GitHub release URL for ${bin_name} (${repo}); skipping."
+    rm -rf "${tmp_dir}"
+    return 0
+  fi
+
+  if [[ "${download_url}" == *.tar.gz ]]; then
+    if curl -fsSL "${download_url}" -o "${tmp_dir}/pkg.tar.gz"; then
+      tar -xzf "${tmp_dir}/pkg.tar.gz" -C "${tmp_dir}"
+      local found_bin
+      found_bin="$(find "${tmp_dir}" -type f -name "${bin_name}" | head -n 1)"
+      if [[ -n "${found_bin}" ]]; then
+        cp "${found_bin}" "${HOME}/bin/${bin_name}"
+        chmod +x "${HOME}/bin/${bin_name}"
+      fi
+    fi
+  else
+    if curl -fsSL "${download_url}" -o "${HOME}/bin/${bin_name}"; then
+      chmod +x "${HOME}/bin/${bin_name}"
+    fi
+  fi
+  rm -rf "${tmp_dir}"
+}
+
 echo "=============================================================================="
-echo "macOS M5 Pro Dual-OS Dotfiles & Daemon Bootstrap (DRY_RUN=${DRY_RUN})"
+echo "gMac M5 Pro Dual-OS Dotfiles & Daemon Bootstrap (DRY_RUN=${DRY_RUN})"
 echo "=============================================================================="
 
 if [[ "$(uname -s)" != "Darwin" ]] && (( DRY_RUN == 0 )); then
@@ -66,57 +131,97 @@ if [[ "$(uname -s)" != "Darwin" ]] && (( DRY_RUN == 0 )); then
   exit 1
 fi
 
+run_cmd mkdir -p "${HOME}/bin" "${HOME}/.local/bin" "${HOME}/modules" "${HOME}/.cache" "${HOME}/tmp"
+
 # ------------------------------------------------------------------------------
-# Stage 1: Homebrew Packages, Casks, Fonts, & FUSE-T User-Space SSHFS
+# Stage 1: Google Internal `mule` Package Manager (/usr/local/bin/mule)
 # ------------------------------------------------------------------------------
 echo ""
-echo "--- Stage 1: Homebrew CLI Tools, GUI Casks, Fonts, & FUSE-T ---"
-BREW_FORMULAE=(
-  bash
-  coreutils
-  findutils
-  gnu-sed
-  grep
-  gawk
-  flock
-  cmake
-  fzf
-  ripgrep
-  fd
-  bat
-  jq
+echo "--- Stage 1: Google Internal Mule Packages (/usr/local/bin/mule) ---"
+MULE_BIN="/usr/local/bin/mule"
+if [[ ! -x "${MULE_BIN}" && -x "/Library/GoogleCorpSupport/bin/mule" ]]; then
+  MULE_BIN="/Library/GoogleCorpSupport/bin/mule"
+fi
+
+# Packages verified in Google's corp-mule repository for gMac:
+# - CLI & Toolchain: tmux, emacs, go, gmosh, mosh, git, gh, jj, gosso, bash-preexec
+# - Desktop & Input: kitty, karabiner-elements, maccy, scroll-reverser, betterdisplay, rectangle
+# - Fonts: roboto-font, google-sans
+MULE_PACKAGES=(
   tmux
-  neovim
   emacs
-  terminal-notifier
-  displayplacer
-  sox
-)
-
-BREW_CASKS=(
   kitty
-  hammerspoon
   karabiner-elements
-  linearmouse
-  swiftbar
-  autoraise
   maccy
-  font-azeret-mono
-  font-jetbrains-mono
-  font-inter
+  scroll-reverser
+  betterdisplay
+  rectangle
+  go
+  gmosh
+  mosh
+  git
+  gh
+  jj
+  gosso
+  bash-preexec
+  roboto-font
+  google-sans
 )
 
-run_cmd brew tap macos-fuse-t/homebrew-cask
-run_cmd brew install "${BREW_FORMULAE[@]}"
-run_cmd brew install --cask "${BREW_CASKS[@]}"
-run_cmd brew install --cask macos-fuse-t/homebrew-cask/fuse-t macos-fuse-t/homebrew-cask/fuse-t-sshfs
+if [[ -x "${MULE_BIN}" ]] || (( DRY_RUN == 1 )); then
+  run_cmd sudo "${MULE_BIN}" update || echo "[WARN] 'sudo mule update' returned non-zero; continuing with existing /etc/mule/mule.db."
+  for pkg in "${MULE_PACKAGES[@]}"; do
+    run_cmd sudo "${MULE_BIN}" install -noprompt "${pkg}" || \
+      echo "[WARN] Mule package '${pkg}' could not be installed (may already be managed or unavailable on this track)."
+  done
+else
+  echo "[WARN] ${MULE_BIN} not found on this machine; skipping Stage 1 Mule installation."
+fi
+
+# NOTE: Never chown /usr/local on gMac (breaks mrmagoo CheckExecutableSafety).
+# Symlink Kitty CLI binaries from /Applications/kitty.app into ~/bin instead.
+if [[ -d "/Applications/kitty.app/Contents/MacOS" ]] || (( DRY_RUN == 1 )); then
+  run_cmd ln -sfn "/Applications/kitty.app/Contents/MacOS/kitty" "${HOME}/bin/kitty"
+  run_cmd ln -sfn "/Applications/kitty.app/Contents/MacOS/kitten" "${HOME}/bin/kitten"
+fi
 
 # ------------------------------------------------------------------------------
-# Stage 2: External Git Modules (~/modules/pomodoro, ~/.googlerc.d) & Helpers
+# Stage 2: User-Space CLI Tools (~/bin) & Optional Homebrew Fallback
 # ------------------------------------------------------------------------------
 echo ""
-echo "--- Stage 2: External Modules & Native C++ Helper Compilation ---"
-run_cmd mkdir -p "${HOME}/modules" "${HOME}/.cache" "${HOME}/tmp"
+echo "--- Stage 2: User-Space CLI Binaries (fzf, rg, fd, bat, jq) & Optional Brew ---"
+if [[ ! -d "${HOME}/.fzf" ]]; then
+  run_cmd git clone --depth 1 https://github.com/junegunn/fzf.git "${HOME}/.fzf" || true
+fi
+if [[ -x "${HOME}/.fzf/install" ]] || (( DRY_RUN == 1 )); then
+  run_cmd "${HOME}/.fzf/install" --bin --key-bindings --completion --no-update-rc || true
+  run_cmd ln -sfn "${HOME}/.fzf/bin/fzf" "${HOME}/bin/fzf"
+  run_cmd ln -sfn "${HOME}/.fzf/bin/fzf-tmux" "${HOME}/bin/fzf-tmux"
+fi
+
+install_github_tarball_bin "rg" "BurntSushi/ripgrep" "aarch64-apple-darwin.tar.gz"
+install_github_tarball_bin "fd" "sharkdp/fd" "aarch64-apple-darwin.tar.gz"
+install_github_tarball_bin "bat" "sharkdp/bat" "aarch64-apple-darwin.tar.gz"
+install_github_tarball_bin "jq" "jqlang/jq" "jq-macos-arm64"
+
+if command -v brew >/dev/null 2>&1; then
+  echo "[INFO] Optional Homebrew detected; installing supplementary packages not in Mule..."
+  run_cmd brew install flock cmake fzf ripgrep fd bat jq terminal-notifier displayplacer sox || true
+  run_cmd brew install --cask hammerspoon linearmouse swiftbar autoraise font-azeret-mono font-jetbrains-mono font-inter || true
+else
+  cat << 'EOF'
+[INFO] Homebrew is not installed (standard on gMac).
+       All core packages were installed via Google's internal `mule` tool and
+       user-space `~/bin` binaries, and `~/lib/os_compat.sh` uses native macOS
+       fallbacks (`osascript` notifications, `afplay` audio, `pbcopy`/`pbpaste`).
+EOF
+fi
+
+# ------------------------------------------------------------------------------
+# Stage 3: External Git Modules (~/modules/pomodoro, ~/.googlerc.d) & Helpers
+# ------------------------------------------------------------------------------
+echo ""
+echo "--- Stage 3: External Modules & Native C++ Helper Compilation ---"
 if [[ ! -d "${HOME}/modules/pomodoro" ]]; then
   run_cmd git clone https://github.com/parantapa/pomodoro.git "${HOME}/modules/pomodoro"
 fi
@@ -132,24 +237,36 @@ fi
 
 TMUX_MEM_CPU_DIR="${HOME}/.tmux/plugins/tmux-mem-cpu-load"
 if [[ -d "${TMUX_MEM_CPU_DIR}" ]] || (( DRY_RUN == 1 )); then
-  run_cmd bash -c "cd '${TMUX_MEM_CPU_DIR}' && cmake . && make -j4"
+  if command -v cmake >/dev/null 2>&1 || (( DRY_RUN == 1 )); then
+    run_cmd bash -c "cd '${TMUX_MEM_CPU_DIR}' && cmake . && make -j4"
+  else
+    echo "[INFO] cmake not installed; skipping optional tmux-mem-cpu-load compilation."
+  fi
 fi
 
 # ------------------------------------------------------------------------------
-# Stage 3: Go Daemons (whatsapp-notification & airgradient-monitor) + Santa Hint
+# Stage 4: Go Daemons (whatsapp-notification & airgradient-monitor) + Santa Hint
 # ------------------------------------------------------------------------------
 echo ""
-echo "--- Stage 3: Go Daemon Compilation (darwin/arm64) & Santa Binary Authorization ---"
-if [[ -d "${HOME}/projects/whatsapp-notification" ]] || (( DRY_RUN == 1 )); then
-  # whatsapp-notification uses github.com/mattn/go-sqlite3 (cgo) and requires CGO_ENABLED=1 + Xcode CLT
-  run_cmd bash -c "cd '${HOME}/projects/whatsapp-notification' && CGO_ENABLED=1 GOOS=darwin GOARCH=arm64 go build -o bin/whatsapp-notification ."
+echo "--- Stage 4: Go Daemon Compilation (darwin/arm64) & Santa Binary Authorization ---"
+if [[ -d "/usr/local/go/bin" && ":${PATH}:" != *":/usr/local/go/bin:"* ]]; then
+  export PATH="/usr/local/go/bin:${PATH}"
 fi
-if [[ -d "${HOME}/projects/air_gradient_alarm_daemon" ]] || (( DRY_RUN == 1 )); then
-  run_cmd bash -c "cd '${HOME}/projects/air_gradient_alarm_daemon' && CGO_ENABLED=0 GOOS=darwin GOARCH=arm64 go build -o airgradient-monitor ."
-  run_cmd mkdir -p "${HOME}/.config/airgradient-monitor"
-  if [[ -f "${HOME}/.config/airgradient-monitor/config.macos.json" && ! -f "${HOME}/.config/airgradient-monitor/config.json" ]]; then
-    run_cmd cp "${HOME}/.config/airgradient-monitor/config.macos.json" "${HOME}/.config/airgradient-monitor/config.json"
+
+if command -v go >/dev/null 2>&1 || (( DRY_RUN == 1 )); then
+  if [[ -d "${HOME}/projects/whatsapp-notification" ]] || (( DRY_RUN == 1 )); then
+    # whatsapp-notification uses github.com/mattn/go-sqlite3 (cgo) and requires CGO_ENABLED=1 + Xcode CLT
+    run_cmd bash -c "cd '${HOME}/projects/whatsapp-notification' && CGO_ENABLED=1 GOOS=darwin GOARCH=arm64 go build -o bin/whatsapp-notification ."
   fi
+  if [[ -d "${HOME}/projects/air_gradient_alarm_daemon" ]] || (( DRY_RUN == 1 )); then
+    run_cmd bash -c "cd '${HOME}/projects/air_gradient_alarm_daemon' && CGO_ENABLED=0 GOOS=darwin GOARCH=arm64 go build -o airgradient-monitor ."
+    run_cmd mkdir -p "${HOME}/.config/airgradient-monitor"
+    if [[ -f "${HOME}/.config/airgradient-monitor/config.macos.json" && ! -f "${HOME}/.config/airgradient-monitor/config.json" ]]; then
+      run_cmd cp "${HOME}/.config/airgradient-monitor/config.macos.json" "${HOME}/.config/airgradient-monitor/config.json"
+    fi
+  fi
+else
+  echo "[WARN] 'go' binary not found in PATH (/usr/local/go/bin/go); skipping Go daemon builds."
 fi
 
 cat << 'EOF'
@@ -160,10 +277,10 @@ cat << 'EOF'
 EOF
 
 # ------------------------------------------------------------------------------
-# Stage 4: macOS System Defaults for Linux Power Users
+# Stage 5: macOS System Defaults for Linux Power Users
 # ------------------------------------------------------------------------------
 echo ""
-echo "--- Stage 4: macOS System Defaults (Key Repeat, Spaces, Window Drag, Maccy) ---"
+echo "--- Stage 5: macOS System Defaults (Key Repeat, Spaces, Window Drag, Maccy) ---"
 # Ultra-fast key repeat and disable press-and-hold accent menu for Emacs/Vim
 run_cmd defaults write NSGlobalDomain KeyRepeat -int 1
 run_cmd defaults write NSGlobalDomain InitialKeyRepeat -int 10
@@ -185,10 +302,10 @@ run_cmd defaults write com.ameba.SwiftBar PluginDirectory -string "${HOME}/.conf
 run_cmd killall Dock || true
 
 # ------------------------------------------------------------------------------
-# Stage 5: Symlink & Load LaunchAgents (knock, clipboard, whatsapp, airgradient)
+# Stage 6: Symlink & Load LaunchAgents (knock, clipboard, whatsapp, airgradient)
 # ------------------------------------------------------------------------------
 echo ""
-echo "--- Stage 5: LaunchAgent Registration (~/Library/LaunchAgents) ---"
+echo "--- Stage 6: LaunchAgent Registration (~/Library/LaunchAgents) ---"
 run_cmd mkdir -p "${HOME}/Library/LaunchAgents"
 
 PLISTS=(
@@ -211,7 +328,7 @@ for plist_src in "${PLISTS[@]}"; do
 done
 
 # ------------------------------------------------------------------------------
-# Stage 6: MacBook Pro 14" (M5 Pro) + ThinkPad TB4 Dock (40B0) Cabling Checklist
+# Stage 7: MacBook Pro 14" (M5 Pro) + ThinkPad TB4 Dock (40B0) Cabling Checklist
 # ------------------------------------------------------------------------------
 echo ""
 cat << 'EOF'

@@ -312,9 +312,7 @@ function __process-ps-lines() {
   lines="$(cat)"
   byte_limit="$(numfmt --to=none --from=si $1 2>/dev/null)"
   __debug "__process-ps-lines: byte_limit=${byte_limit}"
-  readarray -t lines_array <<<"${lines}"
-  for line in "${lines_array[@]}"
-  do
+  while IFS= read -r line; do
     elements=(${line//:/ })
     kb_size="${elements[0]}"
     if [[ "${kb_size}" == "SIZE"  ]]; then
@@ -327,7 +325,7 @@ function __process-ps-lines() {
         echo "${human_size} ${elements[@]}"
       fi
     fi
-  done
+  done <<<"${lines}"
 }
 
 function ps-show-memory-hogs() {

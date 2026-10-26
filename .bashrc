@@ -5,10 +5,13 @@
 [[ -z "${DEBUG_BASHRC:-}" ]] && export DEBUG_BASHRC=
 [[ -z "${DEBUG:-}" ]] && export DEBUG=
 [[ -z "${EMACS_TTY_SERVER:-}" ]] && export EMACS_TTY_SERVER="tty-server"
-# Ensure Apple Silicon Homebrew binaries take precedence on macOS
-if [[ -d /opt/homebrew/bin && ":${PATH}:" != *":/opt/homebrew/bin:"* ]]; then
-  export PATH="/opt/homebrew/bin:/opt/homebrew/sbin:${PATH}"
-fi
+# Ensure gMac Mule (/usr/local/bin, /usr/local/go/bin, Kitty.app) and optional Homebrew binaries are on PATH
+for _macos_dir in /opt/homebrew/bin /opt/homebrew/sbin /usr/local/go/bin /Applications/kitty.app/Contents/MacOS "${HOME}/.fzf/bin"; do
+  if [[ -d "${_macos_dir}" && ":${PATH}:" != *":${_macos_dir}:"* ]]; then
+    export PATH="${_macos_dir}:${PATH}"
+  fi
+done
+unset _macos_dir
 [[ -f "${HOME}/lib/os_compat.sh" ]] && source "${HOME}/lib/os_compat.sh"
 # enable 24-bit colors
 export COLORTERM=truecolor

@@ -13,8 +13,13 @@ fi
 [[ -f "${HOME}/lib/log_lib.sh" ]] &&  source "${HOME}/lib/log_lib.sh"
 
 GCLOUD_FOLDERS=("notes" "gtd" "tmp")
-declare -A LOCAL_MOUNT_FOLDER_NAMES
-LOCAL_MOUNT_FOLDER_NAMES["tmp"]="gcloud_tmp"
+
+function get_local_mount_folder_name {
+  case "$1" in
+    tmp) echo "gcloud_tmp" ;;
+    *)   echo "$1" ;;
+  esac
+}
 
 
 GCLOUD_HOST="${USER}.c.googlers.com"
@@ -79,10 +84,8 @@ function is_folder_mounted {
 function mount_remote_gcloud_folders {
   log::info "Re-mounting (if necessary) folders from host ${USER}.c.googlers.com"
   for folder in "${GCLOUD_FOLDERS[@]}"; do
-    local local_folder_name="${LOCAL_MOUNT_FOLDER_NAMES[${folder}]}"
-    if [[ -z "${local_folder_name}" ]]; then
-      local_folder_name="${folder}"
-    fi
+    local local_folder_name
+    local_folder_name="$(get_local_mount_folder_name "${folder}")"
     if ! is_folder_mounted "${local_folder_name}"; then
       if ! [[ -e "${HOME}/${local_folder_name}" ]]; then
         mkdir "${HOME}/${local_folder_name}"
