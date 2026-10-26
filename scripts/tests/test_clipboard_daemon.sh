@@ -162,7 +162,7 @@ test_process_discovery_positive_and_order() {
         fi
       fi
     done
-    echo "${matching_pids[*]}"
+    echo "${matching_pids[*]:-}"
   }
 
   local found_pids
@@ -214,7 +214,7 @@ test_process_discovery_negative_specs() {
         fi
       fi
     done
-    echo "${matching_pids[*]}"
+    echo "${matching_pids[*]:-}"
   }
 
   local found_pids
@@ -720,7 +720,7 @@ EOF
   chmod +x "${bin_dir}/systemctl"
 
   local exit_code=0
-  CLIPBOARD_PORT=3334 PATH="${bin_dir}:${PATH}" PS1_HOST="laptop" \
+  OS_COMPAT_UNAME_S="Linux" CLIPBOARD_PORT=3334 PATH="${bin_dir}:${PATH}" PS1_HOST="laptop" \
     XDG_RUNTIME_DIR="${run_dir}" bash ~/bin/clipboard-daemon.sh -r 3334 \
     >/dev/null 2>&1 || exit_code=$?
 
