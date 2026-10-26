@@ -254,10 +254,54 @@ if [[ ! -d "${HOME}/.googlerc.d/.git" ]]; then
   fi
 fi
 
-if [[ -f "${HOME}/.googlerc.d/versioned.ssh_config" && ! -f "${HOME}/.ssh/config" ]]; then
+# Ensure ~/.ssh/config contains the Cloudtop (gcloud) and office host aliases
+if ! grep -q "^Host gcloud$" "${HOME}/.ssh/config" 2>/dev/null || (( DRY_RUN == 1 )); then
   run_cmd mkdir -p -m 700 "${HOME}/.ssh"
-  run_cmd cp "${HOME}/.googlerc.d/versioned.ssh_config" "${HOME}/.ssh/config"
-  run_cmd chmod 600 "${HOME}/.ssh/config"
+  if (( DRY_RUN == 1 )); then
+    printf '[DRY-RUN] Ensure ~/.ssh/config contains Host gcloud, gcloud_clipboard_tunnel, gcloud_aw_tunnel, and office (mode 0600)\n'
+  elif [[ -f "${HOME}/.googlerc.d/versioned.ssh_config" ]]; then
+    cat "${HOME}/.googlerc.d/versioned.ssh_config" >> "${HOME}/.ssh/config"
+    chmod 600 "${HOME}/.ssh/config"
+  else
+    cat << 'EOF' >> "${HOME}/.ssh/config"
+Match host "*.c.googlers.com,*.corp.google.com"
+  ControlMaster auto
+  ControlPath ~/.ssh/%r@%h:%p
+  ControlPersist 19h
+  ForwardAgent yes
+  # Check connection every 15 seconds.
+  ServerAliveInterval 15
+  # Four failed retries before declaring disconnection.
+  ServerAliveCountMax 4
+
+
+Host gcloud_clipboard_tunnel
+  HostName marcelvaldez.c.googlers.com
+  Port 22
+  User marcelvaldez
+
+Host gcloud_aw_tunnel
+  HostName marcelvaldez.c.googlers.com
+  Port 22
+  User marcelvaldez
+  RemoteForward 5601 localhost:5600
+
+Host gcloud
+  HostName marcelvaldez.c.googlers.com
+  Port 22
+  User marcelvaldez
+  ForwardX11 yes
+  # RemoteForward 3333 localhost:3333
+  # RemoteForward 5601 localhost:5600
+
+Host office
+  HostName marcelvaldez.mtv.corp.google.com
+  Port 22
+  User marcelvaldez
+  ForwardX11 yes
+EOF
+    chmod 600 "${HOME}/.ssh/config"
+  fi
 fi
 
 TMUX_MEM_CPU_DIR="${HOME}/.tmux/plugins/tmux-mem-cpu-load"

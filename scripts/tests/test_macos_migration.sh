@@ -459,6 +459,8 @@ echo "[Test 12] bootstrap_macos.sh --dry-run (Mule-first), launchd plists, and J
     "sudo /usr/local/bin/mule install -noprompt kitty" "${dry_out}"
   assert_contains "bootstrap_macos.sh --dry-run symlinks Kitty.app binary into ~/bin/kitty" \
     "ln -sfn /Applications/kitty.app/Contents/MacOS/kitty ${HOME}/bin/kitty" "${dry_out}"
+  assert_contains "bootstrap_macos.sh --dry-run ensures ~/.ssh/config contains Host gcloud" \
+    "Ensure ~/.ssh/config contains Host gcloud" "${dry_out}"
   assert_true "~/scripts/bootstrap_macos.sh and ~/.googlerc.d/scripts/bootstrap_macos.sh are identical" \
     cmp -s "${HOME}/scripts/bootstrap_macos.sh" "${HOME}/.googlerc.d/scripts/bootstrap_macos.sh"
 
