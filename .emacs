@@ -103,9 +103,9 @@
        ((t
          (:inherit mode-line-inactive :background "#1c1c1c" :foreground "#1c1c1c")))))))
 
-;; If we are in TMUX within an X environment
-(if (and (getenv "TMUX") (getenv "DISPLAY"))
-    ;; use xclip for copy-pasting
+;; If we are in TMUX within an X11 or macOS environment
+(if (and (getenv "TMUX") (or (getenv "DISPLAY") (eq system-type 'darwin)))
+    ;; use xclip (supports xclip on X11 and pbcopy/pbpaste on macOS) for copy-pasting
     (use-package xclip
       :ensure t
       :config
@@ -190,7 +190,7 @@
         ;; start multi-term custom configurations
         (global-unset-key (kbd "C-t"))
         (add-to-list 'term-unbind-key-list "C-t")
-        (setq multi-term-program "/bin/bash")
+        (setq multi-term-program (or (executable-find "bash") "/bin/bash"))
         ;; start new terminal
         (global-set-key (kbd "C-t C-n")
                         (lambda () (interactive) (multi-term)))
@@ -208,7 +208,10 @@
   (with-library in-tmux))
 
 (setq browse-url-browser-function 'browse-url-generic)
-(setq browse-url-generic-program "/usr/bin/google-chrome")
+(setq browse-url-generic-program
+      (if (eq system-type 'darwin)
+          "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
+        "/usr/bin/google-chrome"))
 
 ;; Command history configuration
 (savehist-mode 1)
@@ -348,12 +351,14 @@
   :config
   (defun marcel/shorten-file-path (file-path)
     (replace-regexp-in-string
-     (regexp-quote "/home/marcelvaldez/") "~/"
+     (regexp-quote "/Users/marcelvaldez/") "~/"
      (replace-regexp-in-string
-      (regexp-quote "/usr/local/google/home/marcelvaldez/") "~/"
+      (regexp-quote "/home/marcelvaldez/") "~/"
       (replace-regexp-in-string
-       (regexp-quote "/google/src/cloud/") "/g/s/c/"
-       (replace-regexp-in-string (regexp-quote "/google/src/cloud/marcelvaldez/") "//" file-path)))))
+       (regexp-quote "/usr/local/google/home/marcelvaldez/") "~/"
+       (replace-regexp-in-string
+        (regexp-quote "/google/src/cloud/") "/g/s/c/"
+        (replace-regexp-in-string (regexp-quote "/google/src/cloud/marcelvaldez/") "//" file-path))))))
 
   (defun marcel/helm-xref-format-candidate-path (file line summary)
     "Same as `helm-xref-format-candidate-full-path', but shorten specific file paths."
@@ -536,16 +541,18 @@
      (if buffer-file-name
          (limit-file-path-segments
           (replace-regexp-in-string
-           (regexp-quote "/home/marcelvaldez/") "~/"
+           (regexp-quote "/Users/marcelvaldez/") "~/"
            (replace-regexp-in-string
-            (regexp-quote "/usr/local/google/home/marcelvaldez/") "~/"
+            (regexp-quote "/home/marcelvaldez/") "~/"
             (replace-regexp-in-string
-             (regexp-quote "/google/src/cloud/") "/g/s/c/"
+             (regexp-quote "/usr/local/google/home/marcelvaldez/") "~/"
              (replace-regexp-in-string
-              "/google/src/cloud/marcelvaldez/\\([^/]+\\)/google3/\\(.*\\)" "//\\2"
+              (regexp-quote "/google/src/cloud/") "/g/s/c/"
               (replace-regexp-in-string
-               "/google/src/\\(head\\|[0-9]+\\)/depot/google3/\\(.*\\)" "//\\2 @\\1"
-               buffer-file-name))))))
+               "/google/src/cloud/marcelvaldez/\\([^/]+\\)/google3/\\(.*\\)" "//\\2"
+               (replace-regexp-in-string
+                "/google/src/\\(head\\|[0-9]+\\)/depot/google3/\\(.*\\)" "//\\2 @\\1"
+                buffer-file-name)))))))
      (telephone-line-buffer-name-segment)))
 
   ;; Content Order

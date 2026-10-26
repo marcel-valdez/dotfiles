@@ -235,7 +235,7 @@ echo "--- Test 6: Non-Google Pass-Through (no gcertstatus in PATH) ---"
   cp "${MOCK_BIN}/gmosh" "${NOGCERT_BIN}/gmosh"
 
   # Populate symlinks to system binaries, skipping any gcert* tools
-  for dir in /bin /usr/bin; do
+  for dir in /bin /usr/bin /opt/homebrew/bin /usr/local/bin; do
     if [[ -d "${dir}" ]]; then
       for bin_path in "${dir}"/*; do
         bin_name="$(basename "${bin_path}")"
@@ -347,6 +347,56 @@ EOF
   assert_eq "gmosh reconnected after exit 0 during expired credentials" "2" "${final_calls}"
   assert_true "Logged detach during expired credentials notice" \
     "echo '${output}' | grep -q 'Session detached or timed out while credentials were expired'"
+}
+
+echo "--- Test 10: macOS (Darwin) lsof FD Discovery & Grandchild PID Walk on HTTP 502 ---"
+{
+  # Copy ~/lib/os_compat.sh into TEST_TMP/lib so HOME=${TEST_TMP} loads it
+  cp "${HOME}/lib/os_compat.sh" "${MOCK_LIB}/os_compat.sh"
+
+  cat << 'EOF' > "${MOCK_BIN}/gcertstatus"
+#!/usr/bin/env bash
+exit 0
+EOF
+  chmod +x "${MOCK_BIN}/gcertstatus"
+
+  DARWIN_LOG_FILE="${TEST_TMP}/darwin_gmosh.log.WARNING.99"
+  CALL_COUNT_FILE="${TEST_TMP}/test10_calls"
+  echo "0" > "${CALL_COUNT_FILE}"
+
+  # Mock lsof in Darwin mode to report DARWIN_LOG_FILE open on grandchild
+  cat << EOF > "${MOCK_BIN}/lsof"
+#!/usr/bin/env bash
+if [[ "\$*" == *"-Fn"* && -f "${DARWIN_LOG_FILE}" ]]; then
+  printf "p12345\nf3\nn${DARWIN_LOG_FILE}\n"
+fi
+exit 0
+EOF
+  chmod +x "${MOCK_BIN}/lsof"
+
+  cat << EOF > "${MOCK_BIN}/gmosh"
+#!/usr/bin/env bash
+count=\$(cat "${CALL_COUNT_FILE}")
+count=\$((count + 1))
+echo "\${count}" > "${CALL_COUNT_FILE}"
+if [[ "\${count}" -eq 1 ]]; then
+  echo "gorilla-RPC failed with code 502" > "${DARWIN_LOG_FILE}"
+  sleep 10
+  exit 143
+fi
+rm -f "${DARWIN_LOG_FILE}"
+exit 0
+EOF
+  chmod +x "${MOCK_BIN}/gmosh"
+
+  output=$(OS_COMPAT_UNAME_S="Darwin" HOME="${TEST_TMP}" PATH="${MOCK_BIN}:${PATH}" \
+    GMOSH_WATCH_INTERVAL=0.1 \
+    timeout 5s bash "${TARGET_SCRIPT}" --gmosh gcloud "tmux attach -t default" 2>&1 || true)
+
+  final_calls="$(cat "${CALL_COUNT_FILE}")"
+  assert_eq "Darwin mode re-invoked gmosh after lsof HTTP 502 detection" "2" "${final_calls}"
+  assert_true "Darwin mode logged Server Expired HTTP 502 event" \
+    "echo '${output}' | grep -q 'Server Expired: Remote gmosh-server exited'"
 }
 
 echo "=============================================================================="

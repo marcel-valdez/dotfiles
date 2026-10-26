@@ -17,6 +17,10 @@ else
   function log::fatal { echo "[FATAL] $*" >&2; exit 1; }
 fi
 
+if [[ -f "${HOME}/lib/os_compat.sh" ]]; then
+  source "${HOME}/lib/os_compat.sh"
+fi
+
 # Threshold constants
 JETSKI_STOP_NOTIFY_THRESHOLD_SECS="${JETSKI_STOP_NOTIFY_THRESHOLD_SECS:-60}"
 JETSKI_APPROVAL_NOTIFY_THRESHOLD_SECS="${JETSKI_APPROVAL_NOTIFY_THRESHOLD_SECS:-0}"
@@ -241,7 +245,7 @@ function dispatch_notification {
   fi
 
   # Attempt to use knock to notify
-  if [[ -e /google/bin/releases/knock/knock.sh ]]; then
+  if [[ -x /google/bin/releases/knock/send && -r /google/bin/releases/knock/knock.sh ]]; then
     source /google/bin/releases/knock/knock.sh &>/dev/null
     dispatch knock "${msg}"
   else
@@ -250,16 +254,24 @@ function dispatch_notification {
       dispatch tmux-notify "${title}" "${msg}"
       notified=1
     fi
-    if [[ -n "${DISPLAY:-}" ]] && run type notify-send &>/dev/null; then
-      if [[ -n "${urgency}" ]]; then
-        dispatch notify-send -u "${urgency}" "${title}" "${msg}"
-      else
-        dispatch notify-send "${title}" "${msg}"
-      fi
+    if declare -F os::is_macos >/dev/null 2>&1 && os::is_macos; then
+      dispatch os::notify "${title}" "${msg}" "${urgency}"
       notified=1
+    elif [[ -n "${DISPLAY:-}" ]]; then
+      if declare -F os::notify >/dev/null 2>&1; then
+        dispatch os::notify "${title}" "${msg}" "${urgency}"
+        notified=1
+      elif run type notify-send &>/dev/null; then
+        if [[ -n "${urgency}" ]]; then
+          dispatch notify-send -u "${urgency}" "${title}" "${msg}"
+        else
+          dispatch notify-send "${title}" "${msg}"
+        fi
+        notified=1
+      fi
     fi
     if [[ -z "${notified}" ]]; then
-      log::debug "neither tmux-notify nor notify-send were available to notify the user."
+      log::debug "neither tmux-notify nor desktop notification was available to notify the user."
     fi
   fi
 
@@ -273,7 +285,11 @@ function prune_dead_sessions {
   local lock_dir="/tmp/jetski_${UID}_prune.lock"
   if ! mkdir "${lock_dir}" 2>/dev/null; then
     local lock_mtime
-    lock_mtime=$(stat -c %Y "${lock_dir}" 2>/dev/null || echo 0)
+    if declare -F os::file_mtime >/dev/null 2>&1; then
+      lock_mtime=$(os::file_mtime "${lock_dir}")
+    else
+      lock_mtime=$(stat -c %Y "${lock_dir}" 2>/dev/null || stat -f %m "${lock_dir}" 2>/dev/null || echo 0)
+    fi
     local now
     now=$(get_now_seconds)
     if (( now - lock_mtime > 3600 )); then
@@ -293,7 +309,11 @@ function prune_dead_sessions {
     if [[ "${pid}" =~ ^[0-9]+$ ]]; then
       if ! kill -0 "${pid}" 2>/dev/null; then
         local dir_mtime
-        dir_mtime=$(stat -c %Y "${session_dir}" 2>/dev/null || echo 0)
+        if declare -F os::file_mtime >/dev/null 2>&1; then
+          dir_mtime=$(os::file_mtime "${session_dir}")
+        else
+          dir_mtime=$(stat -c %Y "${session_dir}" 2>/dev/null || stat -f %m "${session_dir}" 2>/dev/null || echo 0)
+        fi
         local now
         now=$(get_now_seconds)
         if (( now - dir_mtime >= max_age_secs )); then

@@ -1,13 +1,60 @@
 #!/usr/bin/env bash
 
+if [[ -f "${HOME}/lib/os_compat.sh" ]]; then
+  source "${HOME}/lib/os_compat.sh"
+fi
+
 # File used to track whether Zen Mode is active
 if ! [[ -d "${HOME}/.cache" ]]; then
-  mkdir "${HOME}/.cache"
+  mkdir -p "${HOME}/.cache"
 fi
 
 STATE_FILE="${HOME}/.cache/zen_mode_enabled"
 MIN_LIST_FILE="${HOME}/.cache/zen_mode_minimized_wins"
 ICON_STYLE_FILE="${HOME}/.cache/zen_mode_icon_style"
+
+# macOS Zen Mode implementation (Hammerspoon + macOS Menu Bar + Do Not Disturb)
+if declare -F os::is_macos >/dev/null 2>&1 && os::is_macos; then
+  action="${1:-toggle}"
+  case "${action}" in
+    status|--status)
+      if [[ -f "${STATE_FILE}" ]]; then
+        echo "on"
+      else
+        echo "off"
+      fi
+      exit 0
+      ;;
+    enable|on)
+      want_enable=1
+      ;;
+    disable|off)
+      want_enable=0
+      ;;
+    *)
+      if [[ ! -f "${STATE_FILE}" ]]; then
+        want_enable=1
+      else
+        want_enable=0
+      fi
+      ;;
+  esac
+  if (( want_enable == 1 )); then
+    touch "${STATE_FILE}"
+    os::notify -g "zen-mode" "Zen Mode" "Zen mode is enabled" 2>/dev/null || true
+    defaults write com.apple.dock autohide -bool true 2>/dev/null || true
+    defaults write NSGlobalDomain _HIHideMenuBar -bool true 2>/dev/null || true
+    osascript -e 'tell application "System Events" to set visible of every process whose visible is true and frontmost is false to false' 2>/dev/null || true
+    "${HOME}/bin/do-not-disturb" enable 2>/dev/null || true
+  else
+    rm -f "${STATE_FILE}"
+    "${HOME}/bin/do-not-disturb" disable 2>/dev/null || true
+    defaults write com.apple.dock autohide -bool false 2>/dev/null || true
+    defaults write NSGlobalDomain _HIHideMenuBar -bool false 2>/dev/null || true
+    os::notify -g "zen-mode" "Zen Mode" "Zen mode is disabled" 2>/dev/null || true
+  fi
+  exit 0
+fi
 
 # 1. Ensure we are running XFCE
 if [ "${XDG_CURRENT_DESKTOP}" != "XFCE" ]; then

@@ -5,7 +5,8 @@
 export EMACS_TTY_SERVER
 
 declare -a editor_cmd
-editor_cmd+=(/usr/bin/emacsclient --create-frame --tty --socket-name="${EMACS_TTY_SERVER}")
+_emacsclient_bin="$(command -v emacsclient 2>/dev/null || echo /usr/bin/emacsclient)"
+editor_cmd+=("${_emacsclient_bin}" --create-frame --tty --socket-name="${EMACS_TTY_SERVER}")
 
 if ! pgrep -af '.*emacs.*'"--daemon=${EMACS_TTY_SERVER}"'.*' &>/dev/null; then
   (emacs --daemon="${EMACS_TTY_SERVER}" &> "/tmp/emacs-${EMACS_TTY_SERVER}-server.log") & disown

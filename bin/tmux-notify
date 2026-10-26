@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
 
+[[ -f "${HOME}/lib/os_compat.sh" ]] && source "${HOME}/lib/os_compat.sh"
+
 TITLE="$1"
 shift
 MESSAGE="$*"
@@ -12,9 +14,9 @@ fi
 line_count=$(echo "${MESSAGE}" | wc -l)
 line_count=$((line_count+2))
 
-b64_msg=$(printf "%s" "${MESSAGE}" | base64 -w0)
+b64_msg=$(printf "%s" "${MESSAGE}" | os::base64_nowrap)
 popup_timeout="${TMUX_NOTIFY_TIMEOUT:-7200}"
 outer_timeout=$((popup_timeout + 10))
-timeout "${outer_timeout}s" tmux display-popup -T "${TITLE}" -h "${line_count}" -E \
+os::timeout "${outer_timeout}s" tmux display-popup -T "${TITLE}" -h "${line_count}" -E \
   "tput civis; echo \"${b64_msg}\" | base64 -d; echo; read -s -n 1 -t ${popup_timeout} || true"
 

@@ -1,5 +1,9 @@
 #!/usr/bin/env bash
 
+if [[ -f "${HOME}/lib/os_compat.sh" ]]; then
+  source "${HOME}/lib/os_compat.sh"
+fi
+
 repetitions=$1
 [ -z "${repetitions}" ] && repetitions=1
 
@@ -8,8 +12,17 @@ if ! [[ "${repetitions}" =~ ^[0-9]+$ ]]; then
   exit 1
 fi
 
+sound_file="${HOME}/res/beep.mp3"
+if [[ ! -f "${sound_file}" ]] && declare -F os::is_macos >/dev/null 2>&1 && os::is_macos; then
+  sound_file="/System/Library/Sounds/Ping.aiff"
+fi
+
 for _ in $(seq "${repetitions}"); do
-  mplayer -noconsolecontrols -really-quiet ~/res/beep.mp3 &>/dev/null
+  if declare -F os::play_audio >/dev/null 2>&1; then
+    os::play_audio "${sound_file}" &>/dev/null || true
+  else
+    mplayer -noconsolecontrols -really-quiet "${sound_file}" &>/dev/null || true
+  fi
   [ "${repetitions}" -gt 1 ] && sleep 1
 done
 

@@ -1,45 +1,122 @@
 #!/usr/bin/env bash
+# ==============================================================================
+# do-not-disturb: Dual-OS Do Not Disturb Controller (XFCE4 + macOS Focus)
+# ==============================================================================
+# Manages Do Not Disturb state across Linux (xfce4-notifyd) and macOS
+# (synchronous state file ~/.cache/do_not_disturb_state + Shortcuts Focus).
+#
+# Usage:
+#   do-not-disturb [enable|disable|toggle|--toggle|status|--status|--help|-h]
+# ==============================================================================
 
-# the main command to send
-function toggle_do_not_disturb() {
-  xfconf-query -c xfce4-notifyd -p /do-not-disturb -T
+if [[ -f "${HOME}/lib/os_compat.sh" ]]; then
+  source "${HOME}/lib/os_compat.sh"
+fi
+
+DND_STATE_FILE="${DND_STATE_FILE:-${HOME}/.cache/do_not_disturb_state}"
+
+print_usage() {
+  cat << 'EOF'
+Usage: do-not-disturb [enable|disable|toggle|--status|--help]
+
+Commands:
+  enable            Enable Do Not Disturb (silence notifications)
+  disable           Disable Do Not Disturb (allow notifications)
+  toggle, --toggle  Toggle Do Not Disturb state (default when no argument is given)
+  status, --status  Print current status ("true" when enabled, "false" when disabled)
+  -h, --help        Show this help message
+EOF
+}
+
+set_macos_dnd() {
+  local target_state="$1" # "true" or "false"
+  mkdir -p "$(dirname "${DND_STATE_FILE}")"
+  if [[ "${target_state}" == "true" ]]; then
+    printf '1\n' > "${DND_STATE_FILE}"
+    if command -v shortcuts &>/dev/null; then
+      (shortcuts run "Set Do Not Disturb On" &>/dev/null || true) & disown
+    fi
+  else
+    printf '0\n' > "${DND_STATE_FILE}"
+    if command -v shortcuts &>/dev/null; then
+      (shortcuts run "Set Do Not Disturb Off" &>/dev/null || true) & disown
+    fi
+  fi
 }
 
 function is_do_not_disturb_enabled() {
-  local status=$(xfconf-query -c xfce4-notifyd -p /do-not-disturb)
+  if declare -F os::is_macos >/dev/null 2>&1 && os::is_macos; then
+    [[ -f "${DND_STATE_FILE}" && "$(head -n 1 "${DND_STATE_FILE}" 2>/dev/null | tr -d '[:space:]')" == "1" ]]
+    return $?
+  fi
+  local status
+  status=$(xfconf-query -c xfce4-notifyd -p /do-not-disturb 2>/dev/null || echo "false")
   [[ "${status}" == "true" ]]
 }
 
 function is_do_not_disturb_disabled() {
-  local status=$(xfconf-query -c xfce4-notifyd -p /do-not-disturb)
-  [[ "${status}" == "false" ]]
+  ! is_do_not_disturb_enabled
 }
 
-if [[ "$1" ]]; then
-  if [[ "$1" == "disable" ]]; then
+function toggle_do_not_disturb() {
+  if declare -F os::is_macos >/dev/null 2>&1 && os::is_macos; then
+    if is_do_not_disturb_enabled; then
+      set_macos_dnd "false"
+    else
+      set_macos_dnd "true"
+    fi
+    return 0
+  fi
+  xfconf-query -c xfce4-notifyd -p /do-not-disturb -T
+}
+
+send_dnd_notice() {
+  local msg="$1"
+  if declare -F os::notify >/dev/null 2>&1; then
+    os::notify -g "do-not-disturb" "NOTICE" "${msg}" 2>/dev/null || true
+  elif command -v notify-send &>/dev/null; then
+    notify-send 'NOTICE' "${msg}" 2>/dev/null || true
+  fi
+}
+
+cmd="${1:-toggle}"
+case "${cmd}" in
+  -h|--help)
+    print_usage
+    exit 0
+    ;;
+  status|--status)
+    if is_do_not_disturb_enabled; then
+      echo "true"
+    else
+      echo "false"
+    fi
+    exit 0
+    ;;
+  disable|--disable)
     if is_do_not_disturb_enabled; then
       toggle_do_not_disturb
-      notify-send 'NOTICE' 'Notifications have been enabled!'
+      send_dnd_notice 'Notifications have been enabled!'
     fi
-  elif [[ "$1" == "enable" ]]; then
+    ;;
+  enable|--enable)
     if is_do_not_disturb_disabled; then
-      notify-send 'NOTICE' 'Notifications have been disabled!'
+      send_dnd_notice 'Notifications have been disabled!'
       toggle_do_not_disturb
     fi
-  else
-    echo "Unknown parameter: $1" >&2
-    echo "Expecting: disable or enable." >&2
+    ;;
+  toggle|--toggle)
+    if is_do_not_disturb_disabled; then
+      send_dnd_notice 'Notifications have been disabled!'
+      toggle_do_not_disturb
+    else
+      toggle_do_not_disturb
+      send_dnd_notice 'Notifications have been enabled!'
+    fi
+    ;;
+  *)
+    echo "Unknown parameter: ${cmd}" >&2
+    echo "Expecting: disable, enable, toggle, or --status." >&2
     exit 1
-  fi
-else
-  if is_do_not_disturb_disabled; then
-    notify-send 'NOTICE' 'Notifications have been disabled!'
-    toggle_do_not_disturb
-  elif is_do_not_disturb_enabled; then
-    toggle_do_not_disturb
-    notify-send 'NOTICE' 'Notifications have been enabled!'
-  else
-    echo "Unable to parse do not disturb status: $(xfconf-query -c xfce4-notifyd -p /do-not-disturb)" >&2
-    exit 1
-  fi
-fi
+    ;;
+esac

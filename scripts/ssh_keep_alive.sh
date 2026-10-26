@@ -3,6 +3,9 @@ UNRETRIABLE_SUCCESS=129
 UNRETRIABLE_ERROR=128
 
 source "${HOME}/lib/log_lib.sh" || exit ${UNRETRIABLE_ERROR}
+if [[ -f "${HOME}/lib/os_compat.sh" ]]; then
+  source "${HOME}/lib/os_compat.sh"
+fi
 
 # Source .googlerc to inherit configurations like USE_GMOSH if not already in env
 if [[ -z "${USE_GMOSH:-}" ]]; then
@@ -145,9 +148,12 @@ monitor_gmosh_session() {
     local tree_pids=()
     if [[ -n "${gmosh_wrapper_pid}" ]]; then
       tree_pids+=("${gmosh_wrapper_pid}")
-      local child_pid
+      local child_pid grandchild_pid
       for child_pid in $(pgrep -P "${gmosh_wrapper_pid}" 2>/dev/null || true); do
         tree_pids+=("${child_pid}")
+        for grandchild_pid in $(pgrep -P "${child_pid}" 2>/dev/null || true); do
+          tree_pids+=("${grandchild_pid}")
+        done
       done
     fi
 
@@ -155,18 +161,25 @@ monitor_gmosh_session() {
       info_log="$(ls -1t "${GMOSH_TEST_LOG_DIR}"/*.log.INFO.* 2>/dev/null | head -n 1 || true)"
       warn_log="$(ls -1t "${GMOSH_TEST_LOG_DIR}"/*.log.WARNING.* 2>/dev/null | head -n 1 || true)"
     else
-      local inspect_pid fd_link target_path
+      local inspect_pid target_path
       for inspect_pid in "${tree_pids[@]}"; do
-        if [[ -d "/proc/${inspect_pid}/fd" ]]; then
-          for fd_link in "/proc/${inspect_pid}/fd"/*; do
-            target_path="$(readlink "${fd_link}" 2>/dev/null || true)"
-            if [[ "${target_path}" == *".log.INFO."* ]]; then
-              info_log="${target_path}"
-            elif [[ "${target_path}" == *".log.WARNING."* ]]; then
-              warn_log="${target_path}"
-            fi
-          done
-        fi
+        while IFS= read -r target_path; do
+          [[ -z "${target_path}" ]] && continue
+          if [[ "${target_path}" == *".log.INFO."* ]]; then
+            info_log="${target_path}"
+          elif [[ "${target_path}" == *".log.WARNING."* ]]; then
+            warn_log="${target_path}"
+          fi
+        done < <(
+          if declare -F os::pid_open_files >/dev/null 2>&1; then
+            os::pid_open_files "${inspect_pid}"
+          elif [[ -d "/proc/${inspect_pid}/fd" ]]; then
+            local fd_link
+            for fd_link in "/proc/${inspect_pid}/fd"/*; do
+              readlink "${fd_link}" 2>/dev/null || true
+            done
+          fi
+        )
       done
     fi
 

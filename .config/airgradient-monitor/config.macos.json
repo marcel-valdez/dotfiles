@@ -1,0 +1,17 @@
+{
+  "notify": {
+    "desktop": {
+      "enabled": false
+    },
+    "bell": {
+      "enabled": true,
+      "command": [
+        "afplay",
+        "/System/Library/Sounds/Sosumi.aiff"
+      ]
+    },
+    "hooks": [
+      "/Users/marcelvaldez/scripts/airgradient-notify-hook.sh"
+    ]
+  }
+}

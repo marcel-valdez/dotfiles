@@ -11,22 +11,28 @@ if [[ -z "${TITLE}" ]]; then
   exit 1
 fi
 
-# If message is provided, combine them with a newline as required by Kitty OSC 99 spec
-CONTENT="${TITLE}"
-if [[ -n "${MESSAGE}" ]]; then
-  CONTENT="${TITLE}"$'\n'"${MESSAGE}"
-fi
+# Sanitize BEL (\a) and ESC (\e) from title and message to prevent premature sequence termination
+SAFE_TITLE="${TITLE//$'\a'/ }"
+SAFE_TITLE="${SAFE_TITLE//$'\e'/ }"
+SAFE_MESSAGE="${MESSAGE//$'\a'/ }"
+SAFE_MESSAGE="${SAFE_MESSAGE//$'\e'/ }"
 
-# Sanitize BEL (\a) from content to prevent premature sequence termination
-CONTENT="${CONTENT//$'\a'/ }"
-
-# Construct the OSC 99 escape sequence: ESC ] 99 ; i=jetski ; d=0 ; CONTENT BEL
-# Inside tmux, we wrap the sequence with ESC P tmux ; and double the ESC character (\e -> \e\e)
-# Use %s instead of %b to prevent printf from interpreting backslashes in user text
-if [[ -n "${TMUX}" ]]; then
-  osc_seq=$(printf "\ePtmux;\e\e]99;i=jetski;d=0;%s\a\e\\\\" "${CONTENT}")
+# Construct the Kitty OSC 99 escape sequence using colon-separated key=value metadata:
+#   - Title chunk: ESC ] 99 ; i=jetski:d=0:p=title ; <TITLE> BEL
+#   - Body chunk:  ESC ] 99 ; i=jetski:d=1:p=body  ; <MESSAGE> BEL
+# Inside tmux, wrap with ESC P tmux ; ... ESC \ and double internal ESC characters (\e -> \e\e).
+if [[ -n "${SAFE_MESSAGE}" ]]; then
+  if [[ -n "${TMUX}" ]]; then
+    osc_seq=$(printf "\ePtmux;\e\e]99;i=jetski:d=0:p=title;%s\a\e\e]99;i=jetski:d=1:p=body;%s\a\e\\\\" "${SAFE_TITLE}" "${SAFE_MESSAGE}")
+  else
+    osc_seq=$(printf "\e]99;i=jetski:d=0:p=title;%s\a\e]99;i=jetski:d=1:p=body;%s\a" "${SAFE_TITLE}" "${SAFE_MESSAGE}")
+  fi
 else
-  osc_seq=$(printf "\e]99;i=jetski;d=0;%s\a" "${CONTENT}")
+  if [[ -n "${TMUX}" ]]; then
+    osc_seq=$(printf "\ePtmux;\e\e]99;i=jetski:d=1:p=title;%s\a\e\\\\" "${SAFE_TITLE}")
+  else
+    osc_seq=$(printf "\e]99;i=jetski:d=1:p=title;%s\a" "${SAFE_TITLE}")
+  fi
 fi
 
 # Check for explicit TARGET_TTY or discover from PPID

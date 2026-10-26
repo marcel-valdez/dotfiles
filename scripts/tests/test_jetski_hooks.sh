@@ -729,7 +729,7 @@ fi
 printf "\nTest Case 19: Dead Process Pruning\n"
 DEAD_DIR="/tmp/jetski_${UID}_999998"
 mkdir -p "${DEAD_DIR}"
-touch -d "2 days ago" "${DEAD_DIR}"
+touch -t 202001010000 "${DEAD_DIR}"
 
 ACTIVE_PID=$$
 ACTIVE_DIR="/tmp/jetski_${UID}_${ACTIVE_PID}"
@@ -738,7 +738,7 @@ mkdir -p "${ACTIVE_DIR}"
 # Create a stale lock older than 1 hour
 STALE_LOCK="/tmp/jetski_${UID}_prune.lock"
 mkdir -p "${STALE_LOCK}"
-touch -d "2 hours ago" "${STALE_LOCK}"
+touch -t 202001010000 "${STALE_LOCK}"
 
 (
   export LOG_TO_STDERR=""
@@ -750,6 +750,59 @@ assert_dir_not_exists "${DEAD_DIR}" "TC-19: Dead session directory older than 24
 assert_dir_exists "${ACTIVE_DIR}" "TC-19: Active session directory preserved"
 assert_dir_not_exists "${STALE_LOCK}" "TC-19: Stale prune lock directory recovered and cleaned up"
 rm -rf "${ACTIVE_DIR}"
+
+# ---------------------------------------------------------
+# TC-20: macOS (Darwin) OSC 99 Two-Part Sequence & os::notify Dispatch
+# ---------------------------------------------------------
+printf "\nTest Case 20: macOS (Darwin) OSC 99 Two-Part Sequence & os::notify Dispatch\n"
+OSC_CAPTURE_FILE="/tmp/jetski_test_osc99_$$.out"
+: > "${OSC_CAPTURE_FILE}"
+(
+  unset TMUX
+  TARGET_TTY="${OSC_CAPTURE_FILE}" bash "${SCRIPT_DIR}/osc99_notify.sh" "Jetski Title" "Jetski Body"
+)
+OSC_RAW="$(cat "${OSC_CAPTURE_FILE}")"
+assert_contains "i=jetski:d=0:p=title;Jetski Title" "${OSC_RAW}" \
+  "TC-20: osc99_notify.sh emits colon-separated d=0:p=title sequence"
+assert_contains "i=jetski:d=1:p=body;Jetski Body" "${OSC_RAW}" \
+  "TC-20: osc99_notify.sh emits colon-separated d=1:p=body sequence"
+
+: > "${OSC_CAPTURE_FILE}"
+(
+  export TMUX="/tmp/tmux-1000/default,123,0"
+  TARGET_TTY="${OSC_CAPTURE_FILE}" bash "${SCRIPT_DIR}/osc99_notify.sh" "Tmux Title" "Tmux Body"
+)
+OSC_TMUX_RAW="$(cat "${OSC_CAPTURE_FILE}")"
+assert_contains "Ptmux;" "${OSC_TMUX_RAW}" \
+  "TC-20: osc99_notify.sh wraps two-part sequence in DCS tmux passthrough when TMUX is set"
+assert_contains "i=jetski:d=0:p=title;Tmux Title" "${OSC_TMUX_RAW}" \
+  "TC-20: osc99_notify.sh tmux passthrough preserves d=0:p=title"
+assert_contains "i=jetski:d=1:p=body;Tmux Body" "${OSC_TMUX_RAW}" \
+  "TC-20: osc99_notify.sh tmux passthrough preserves d=1:p=body"
+rm -f "${OSC_CAPTURE_FILE}"
+
+# Verify Darwin desktop notification dispatch in agent_notify.sh when DISPLAY is unset
+DARWIN_MOCK_BIN="/tmp/jetski_test_darwin_bin_$$"
+DARWIN_NOTIFY_LOG="/tmp/jetski_test_darwin_notify_$$.log"
+mkdir -p "${DARWIN_MOCK_BIN}"
+cat << 'EOF' > "${DARWIN_MOCK_BIN}/terminal-notifier"
+#!/usr/bin/env bash
+printf '%s\n' "$*" >> "${DARWIN_NOTIFY_LOG}"
+EOF
+chmod +x "${DARWIN_MOCK_BIN}/terminal-notifier"
+(
+  unset DISPLAY
+  export OS_COMPAT_UNAME_S="Darwin"
+  export DARWIN_NOTIFY_LOG
+  export JETSKI_ENABLE_OSC99="false"
+  PATH="${DARWIN_MOCK_BIN}:${PATH}" bash "${SCRIPT_DIR}/agent_notify.sh" "Darwin Hook Title" "Darwin Hook Body"
+  sleep 0.2
+)
+assert_file_exists "${DARWIN_NOTIFY_LOG}" \
+  "TC-20: agent_notify.sh dispatches terminal-notifier on Darwin even when DISPLAY is unset"
+assert_contains "-title Darwin Hook Title" "$(cat "${DARWIN_NOTIFY_LOG}" 2>/dev/null || true)" \
+  "TC-20: Darwin terminal-notifier received expected title"
+rm -rf "${DARWIN_MOCK_BIN}" "${DARWIN_NOTIFY_LOG}"
 
 # ---------------------------------------------------------
 # Test Results Summary

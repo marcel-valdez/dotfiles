@@ -1,0 +1,14 @@
+[Unit]
+Description=WhatsApp Notification Daemon
+After=graphical-session.target network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=%h/projects/whatsapp-notification/bin
+EnvironmentFile=-%h/.config/whatsapp-notification/config.env
+ExecStart=%h/scripts/whatsapp-notification.sh
+Restart=on-failure
+RestartSec=10
+
+[Install]
+WantedBy=default.target

@@ -1,5 +1,13 @@
 #!/usr/bin/env bash
 
+if [[ -d "/opt/homebrew/bin" && ":${PATH}:" != *":/opt/homebrew/bin:"* ]]; then
+  export PATH="/opt/homebrew/bin:/opt/homebrew/sbin:${PATH}"
+fi
+if (( BASH_VERSINFO[0] < 4 )) && [[ -x "/opt/homebrew/bin/bash" ]]; then
+  exec /opt/homebrew/bin/bash "$0" "$@"
+fi
+
+[[ -f "${HOME}/lib/os_compat.sh" ]] && source "${HOME}/lib/os_compat.sh"
 [[ -f "${HOME}/.bash_functions" ]] && source "${HOME}/.bash_functions"
 [[ -f "${HOME}/.googlerc.d/.googlerc" ]] && source "${HOME}/.googlerc.d/.googlerc"
 [[ -f "${HOME}/lib/log_lib.sh" ]] &&  source "${HOME}/lib/log_lib.sh"
@@ -13,7 +21,11 @@ GCLOUD_HOST="${USER}.c.googlers.com"
 OFFICE_HOST="${USER}.mtv.corp.google.com"
 LAPTOP_HOST="${USER}-glaptop"
 CHROMEOS_HOST="${USER}28"
-REVERSE_TUNNEL_PORT=3333
+if declare -F os::is_macos >/dev/null 2>&1 && os::is_macos; then
+  REVERSE_TUNNEL_PORT="${CLIPBOARD_PORT:-3335}"
+else
+  REVERSE_TUNNEL_PORT="${CLIPBOARD_PORT:-3333}"
+fi
 CLIPBOARD_DAEMON_BIN="${HOME}/bin/clipboard-daemon.sh"
 
 function is_gcloud_host {
@@ -25,7 +37,10 @@ function is_office_host {
 }
 
 function is_laptop_host {
-  [[ "${HOSTNAME}" == "${LAPTOP_HOST}" ]] || [[ "${HOSTNAME}" == "${CHROMEOS_HOST}" ]]
+  [[ "${HOSTNAME}" =~ ^${LAPTOP_HOST} ]] || \
+    [[ "${HOSTNAME}" == "${CHROMEOS_HOST}" ]] || \
+    [[ "${HOSTNAME}" =~ macbook|darwin ]] || \
+    (declare -F os::is_macos >/dev/null 2>&1 && os::is_macos)
 }
 
 # override sshpass & get_secret for now as they are broken
@@ -54,7 +69,11 @@ function office_ssh_cmd() {
 
 function is_folder_mounted {
   local _folder="$1"
-  mountpoint -q "${HOME}/${_folder}"
+  if declare -F os::is_mounted >/dev/null 2>&1; then
+    os::is_mounted "${HOME}/${_folder}"
+  else
+    mountpoint -q "${HOME}/${_folder}"
+  fi
 }
 
 function mount_remote_gcloud_folders {
@@ -73,7 +92,11 @@ function mount_remote_gcloud_folders {
       sshpass -p "$(get_secret)" sshfs -o compression=yes -o auto_cache -o reconnect "${USER}@${GCLOUD_HOST}:${remote_folder}" "${HOME}/${local_folder_name}"
       if [[ $? -ne 0 ]]; then
         log::warn "Unable to mount folder ${HOME}/${folder}. Unmounting and remounting once."
-        umount "${HOME}/${local_folder_name}"
+        if declare -F os::unmount_lazy >/dev/null 2>&1; then
+          os::unmount_lazy "${HOME}/${local_folder_name}"
+        else
+          umount "${HOME}/${local_folder_name}"
+        fi
         sshpass -p "$(get_secret)" sshfs -o compression=yes -o auto_cache -o reconnect "${USER}@${GCLOUD_HOST}:${remote_folder}" "${HOME}/${local_folder_name}"
       fi
     fi
@@ -87,7 +110,7 @@ function check_gcert_ssh {
 }
 
 function get_gcert_ssh_hours_remaining {
-  check_gcert_ssh "$@" | grep -oP "[0-9]+(?=h\s[0-9]+m)"
+  check_gcert_ssh "$@" | sed -nE 's/.* ([0-9]+)h [0-9]+m.*/\1/p' | head -n 1
 }
 
 function check_cloud_gcert_loas {
@@ -96,7 +119,7 @@ function check_cloud_gcert_loas {
 }
 
 function get_cloud_gcert_loas_hours_remaining {
-  check_cloud_gcert_loas "$@" | grep -oP "[0-9]+(?=h\s[0-9]+m)"
+  check_cloud_gcert_loas "$@" | sed -nE 's/.* ([0-9]+)h [0-9]+m.*/\1/p' | head -n 1
 }
 
 function cloud_gcert {
@@ -240,7 +263,7 @@ function restart_master_session {
 
 function list_commands {
   grep -E '^[[:space:]]*([[:alnum:]_]+[[:space:]]*\(\)|function[[:space:]]+[[:alnum:]_]+)' "${SCRIPT}" |\
-    grep -Eo '[[:space:]][a-Z_]+' |\
+    grep -Eo '[[:space:]][[:alpha:]_][[:alnum:]_]*' |\
     grep -Ev "main|parse_args|run|usage" |\
     sort
 }
@@ -385,12 +408,12 @@ function check_gcert {
   if ! gcertstatus &>/dev/null; then
     log::info "No gcert certificate available. Running gcert."
 
-    if ! gcert; then
+    if ! type gcert &>/dev/null; then
       log::error "gcert not available, is this a corp machine?"
       return 1
     fi
 
-    /usr/bin/gcert
+    gcert
   fi
 }
 

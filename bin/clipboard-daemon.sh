@@ -8,6 +8,10 @@ HOST="127.0.0.1"
 REMOTE_CLIPBOARD_HOST="${REMOTE_CLIPBOARD_HOST:-${USER}@marcelvaldez.c.googlers.com}"
 LOG_FILE="/tmp/clipboard-daemon.log"
 
+if [[ -f "${HOME}/lib/os_compat.sh" ]]; then
+  source "${HOME}/lib/os_compat.sh"
+fi
+
 RESTART=0
 PORT=""
 
@@ -50,7 +54,9 @@ fi
 # Auto-detect default port by host type
 DEFAULT_PORT=""
 host_name="$(hostname -s 2>/dev/null || hostname)"
-if [[ "${host_name}" =~ laptop|glaptop ]]; then
+if declare -F os::is_macos >/dev/null 2>&1 && os::is_macos; then
+  DEFAULT_PORT=3335
+elif [[ "${host_name}" =~ laptop|glaptop ]]; then
   DEFAULT_PORT=3334
 elif [[ "${host_name}" =~ mtv|workstation ]]; then
   DEFAULT_PORT=3333
@@ -84,6 +90,10 @@ get_timestamp() {
 send_desktop_notification() {
   local title="$1"
   local body="$2"
+  if declare -F os::is_macos >/dev/null 2>&1 && os::is_macos; then
+    os::notify -a "Clipboard Daemon" -g "clipboard-daemon-${PORT}" -- "${title}" "${body}" 2>/dev/null || true
+    return 0
+  fi
   if command -v notify-send &>/dev/null; then
     # -u normal -t 600000 makes the notification stay on screen for exactly
     # 10 minutes (600,000 ms) before automatically disappearing
@@ -96,6 +106,26 @@ send_desktop_notification() {
         [[ -n "${d}" ]] && DISPLAY=":${d}" notify-send -u normal -t 600000 -a "Clipboard Daemon" -i dialog-warning "${title}" "${body}" 2>/dev/null || true
       done
     fi
+  fi
+}
+
+get_pid_cmdline() {
+  local pid="$1"
+  if [[ -r "/proc/${pid}/cmdline" ]]; then
+    tr '\0' ' ' < "/proc/${pid}/cmdline" 2>/dev/null || true
+  elif declare -F os::pid_cmdline >/dev/null 2>&1; then
+    os::pid_cmdline "${pid}" 2>/dev/null || true
+  else
+    ps -o command= -p "${pid}" 2>/dev/null || true
+  fi
+}
+
+get_pid_state() {
+  local pid="$1"
+  if [[ -r "/proc/${pid}/status" ]]; then
+    awk '/^State:/ {print $2}' "/proc/${pid}/status" 2>/dev/null || true
+  else
+    ps -o state= -p "${pid}" 2>/dev/null | awk '{print substr($1, 1, 1)}' || true
   fi
 }
 
@@ -118,17 +148,15 @@ find_local_tunnel_pids() {
 
   for pid in ${ssh_pids}; do
     [[ -z "${pid}" ]] && continue
-    if [[ -r "/proc/${pid}/status" ]]; then
-      local state
-      state=$(awk '/^State:/ {print $2}' "/proc/${pid}/status" 2>/dev/null || true)
-      if [[ "${state}" == "Z" || "${state}" == "T" ]]; then
-        continue
-      fi
+    local state
+    state="$(get_pid_state "${pid}")"
+    if [[ "${state}" == "Z" || "${state}" == "T" ]]; then
+      continue
     fi
 
-    if [[ -r "/proc/${pid}/cmdline" ]]; then
-      local cmdline
-      cmdline=$(tr '\0' ' ' < "/proc/${pid}/cmdline" 2>/dev/null || true)
+    local cmdline
+    cmdline="$(get_pid_cmdline "${pid}")"
+    if [[ -n "${cmdline}" ]]; then
       if [[ "${cmdline}" =~ ${regex_r} ]] || [[ "${cmdline}" =~ ${regex_rf} ]]; then
         matching_pids+=("${pid}")
       fi
@@ -160,10 +188,10 @@ kill_existing_daemon() {
   if [[ -f "${DAEMON_PID_FILE}" ]]; then
     local dpid
     dpid=$(cat "${DAEMON_PID_FILE}" 2>/dev/null || true)
-    if [[ -n "${dpid}" && -r "/proc/${dpid}/cmdline" ]]; then
+    if [[ -n "${dpid}" ]]; then
       local cmdline
-      cmdline=$(tr '\0' ' ' < "/proc/${dpid}/cmdline" 2>/dev/null || true)
-      if [[ ! "${cmdline}" =~ [[:space:]]-c[[:space:]] ]] && \
+      cmdline="$(get_pid_cmdline "${dpid}")"
+      if [[ -n "${cmdline}" ]] && [[ ! "${cmdline}" =~ [[:space:]]-c[[:space:]] ]] && \
          [[ "${cmdline}" =~ (^|[[:space:]])([^[:space:]]*/)?clipboard-daemon ]]; then
         target_pids+=("${dpid}")
       fi
@@ -173,13 +201,11 @@ kill_existing_daemon() {
   local pgrep_pids
   pgrep_pids=$(pgrep -f "clipboard-daemon.*${PORT}" 2>/dev/null | grep -v -E "^($$|${PPID})$" || true)
   for p in ${pgrep_pids}; do
-    if [[ -r "/proc/${p}/cmdline" ]]; then
-      local cmdline
-      cmdline=$(tr '\0' ' ' < "/proc/${p}/cmdline" 2>/dev/null || true)
-      if [[ ! "${cmdline}" =~ [[:space:]]-c[[:space:]] ]] && \
-         [[ "${cmdline}" =~ (^|[[:space:]])([^[:space:]]*/)?clipboard-daemon ]]; then
-        target_pids+=("${p}")
-      fi
+    local cmdline
+    cmdline="$(get_pid_cmdline "${p}")"
+    if [[ -n "${cmdline}" ]] && [[ ! "${cmdline}" =~ [[:space:]]-c[[:space:]] ]] && \
+       [[ "${cmdline}" =~ (^|[[:space:]])([^[:space:]]*/)?clipboard-daemon ]]; then
+      target_pids+=("${p}")
     fi
   done
 
@@ -197,7 +223,13 @@ kill_existing_daemon() {
 
   rm -f "${DAEMON_PID_FILE}" 2>/dev/null || true
   kill_existing_tunnel
-  fuser -k "${PORT}/tcp" 2>/dev/null || true
+  if command -v fuser &>/dev/null; then
+    fuser -k "${PORT}/tcp" 2>/dev/null || true
+  elif command -v lsof &>/dev/null; then
+    local port_pids
+    port_pids=$(lsof -ti "tcp:${PORT}" 2>/dev/null || true)
+    [[ -n "${port_pids}" ]] && kill -9 ${port_pids} 2>/dev/null || true
+  fi
 }
 
 exit_code=0
@@ -223,19 +255,34 @@ if [[ "${RESTART}" -eq 1 ]]; then
   echo "[$(get_timestamp)] Restarting clipboard daemon and tunnel on port ${PORT}..." >> "${LOG_FILE}"
   echo "Restarting clipboard daemon and tunnel on port ${PORT}..."
 
-  if systemctl --user is-active --quiet "clipboard-daemon@${PORT}.service" 2>/dev/null; then
-    systemctl --user restart "clipboard-daemon@${PORT}.service"
-    exit 0
-  elif [[ "${PORT}" == "${DEFAULT_PORT}" ]] && \
-       systemctl --user is-active --quiet "clipboard-daemon.service" 2>/dev/null; then
-    systemctl --user restart "clipboard-daemon.service"
-    exit 0
+  if declare -F os::is_macos >/dev/null 2>&1 && os::is_macos && command -v launchctl &>/dev/null; then
+    if launchctl print "gui/$(id -u)/com.marcelvaldez.clipboard-daemon" &>/dev/null; then
+      launchctl kickstart -k "gui/$(id -u)/com.marcelvaldez.clipboard-daemon"
+      exit 0
+    fi
+  elif command -v systemctl &>/dev/null; then
+    if systemctl --user is-active --quiet "clipboard-daemon@${PORT}.service" 2>/dev/null; then
+      systemctl --user restart "clipboard-daemon@${PORT}.service"
+      exit 0
+    elif [[ "${PORT}" == "${DEFAULT_PORT}" ]] && \
+         systemctl --user is-active --quiet "clipboard-daemon.service" 2>/dev/null; then
+      systemctl --user restart "clipboard-daemon.service"
+      exit 0
+    fi
   fi
 
   kill_existing_daemon
-  flock -w 5 200 || { echo "Failed to acquire lock on ${LOCK_FILE}" >&2; cleanup 1; }
+  if command -v flock &>/dev/null; then
+    flock -w 5 200 || { echo "Failed to acquire lock on ${LOCK_FILE}" >&2; cleanup 1; }
+  elif declare -F os::flock_wait >/dev/null 2>&1; then
+    os::flock_wait 200 5 "${LOCK_FILE}" || { echo "Failed to acquire lock on ${LOCK_FILE}" >&2; cleanup 1; }
+  fi
 else
-  flock -n 200 || { echo "clipboard-daemon already running on port ${PORT}" >&2; exit 0; }
+  if command -v flock &>/dev/null; then
+    flock -n 200 || { echo "clipboard-daemon already running on port ${PORT}" >&2; exit 0; }
+  elif declare -F os::flock_nb >/dev/null 2>&1; then
+    os::flock_nb 200 "${LOCK_FILE}" || { echo "clipboard-daemon already running on port ${PORT}" >&2; exit 0; }
+  fi
 fi
 
 echo "$$" > "${DAEMON_PID_FILE}"
@@ -468,23 +515,31 @@ while true; do
   fi
 
   copied=0
-  for display in "${displays_array[@]}"; do
-    [[ -z "${display}" ]] && continue
-    display_num="${display/:/}"
-    display_num="${display_num/.0/}"
-    if [[ "${display_num}" =~ ^[0-9]+$ ]] && [[ "${display_num}" -le 100 ]]; then
-      printf '%s' "${paste_buffer}" | xclip -selection clipboard -display ":${display}" 200>&- 2>/dev/null
-      if [[ $? -eq 0 ]]; then
-        copied=1
-      else
-        echo "[$(get_timestamp)] Failed to copy contents to display :${display}" >> "${LOG_FILE}"
-      fi
+  if declare -F os::is_macos >/dev/null 2>&1 && os::is_macos; then
+    if printf '%s' "${paste_buffer}" | os::clipboard_copy 200>&- 2>/dev/null; then
+      copied=1
+    else
+      echo "[$(get_timestamp)] Failed to copy contents to macOS clipboard via pbcopy" >> "${LOG_FILE}"
     fi
-  done
+  else
+    for display in "${displays_array[@]}"; do
+      [[ -z "${display}" ]] && continue
+      display_num="${display/:/}"
+      display_num="${display_num/.0/}"
+      if [[ "${display_num}" =~ ^[0-9]+$ ]] && [[ "${display_num}" -le 100 ]]; then
+        printf '%s' "${paste_buffer}" | xclip -selection clipboard -display ":${display}" 200>&- 2>/dev/null
+        if [[ $? -eq 0 ]]; then
+          copied=1
+        else
+          echo "[$(get_timestamp)] Failed to copy contents to display :${display}" >> "${LOG_FILE}"
+        fi
+      fi
+    done
 
-  # Fallback to current $DISPLAY if set and not already copied
-  if [[ -n "${DISPLAY:-}" ]] && [[ "${copied}" -eq 0 ]]; then
-    printf '%s' "${paste_buffer}" | xclip -selection clipboard 200>&- 2>/dev/null && copied=1
+    # Fallback to current $DISPLAY if set and not already copied
+    if [[ -n "${DISPLAY:-}" ]] && [[ "${copied}" -eq 0 ]]; then
+      printf '%s' "${paste_buffer}" | xclip -selection clipboard 200>&- 2>/dev/null && copied=1
+    fi
   fi
 
   if [[ "${copied}" -eq 1 ]]; then

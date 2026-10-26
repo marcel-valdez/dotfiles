@@ -5,6 +5,11 @@
 [[ -z "${DEBUG_BASHRC:-}" ]] && export DEBUG_BASHRC=
 [[ -z "${DEBUG:-}" ]] && export DEBUG=
 [[ -z "${EMACS_TTY_SERVER:-}" ]] && export EMACS_TTY_SERVER="tty-server"
+# Ensure Apple Silicon Homebrew binaries take precedence on macOS
+if [[ -d /opt/homebrew/bin && ":${PATH}:" != *":/opt/homebrew/bin:"* ]]; then
+  export PATH="/opt/homebrew/bin:/opt/homebrew/sbin:${PATH}"
+fi
+[[ -f "${HOME}/lib/os_compat.sh" ]] && source "${HOME}/lib/os_compat.sh"
 # enable 24-bit colors
 export COLORTERM=truecolor
 # If not running interactively, don't do anything
@@ -233,7 +238,11 @@ if [ -d "${HOME}/.cargo/bin" ]; then
 fi
 
 export PAGER="less -R"
-export MANPAGER="sh -c 'col -bx | batcat -l man -p'"
+if command -v batcat &>/dev/null; then
+  export MANPAGER="sh -c 'col -bx | batcat -l man -p'"
+elif command -v bat &>/dev/null; then
+  export MANPAGER="sh -c 'col -bx | bat -l man -p'"
+fi
 
 # Add RVM to PATH for scripting
 # custom environment variables
@@ -244,7 +253,7 @@ export NODE_VERSION="lts"
 export BIN_UTILS_PASS_PHRASE_FILE="${HOME}/.bin-utils-pass-phrase"
 export SUBLIME_PROJECTS_FOLDER="${HOME}/sublime_projects"
 
-if [ "$(expr substr $(uname) 1 5)" == "Linux" ]; then
+if [[ "$(uname -s)" =~ ^(Linux|Darwin)$ ]]; then
   if [[ "${TERM:-}" =~ "eterm" ]]; then
     export EDITOR="emacs-client"
     export GIT_EDITOR="${EDITOR}"
@@ -279,15 +288,11 @@ fi
 
 if ! pgrep -af '.*emacs.*'"--daemon=${EMACS_TTY_SERVER}"'.*' &>/dev/null; then
   log_debug "No emacs daemon running. Starting one."
-#  if [[ -x /usr/bin/systemd-run ]]; then
-#    log_debug "systemd-run, found. Using systemd to start an emacs daemon named ${EMACS_TTY_SERVER}"
-#    (/usr/bin/systemd-run --user /usr/bin/emacs --daemon="${EMACS_TTY_SERVER}") &
-#
-#  else
-#    log_debug "systemd-run NOT found. Starting an emacs daemon named ${EMACS_TTY_SERVER}"
-    (nohup /usr/bin/emacs --daemon="${EMACS_TTY_SERVER}" &> "/tmp/emacs-${EMACS_TTY_SERVER}-server.log") & disown
-#  fi
-
+  _emacs_bin="$(command -v emacs 2>/dev/null || echo /usr/bin/emacs)"
+  if [[ -x "${_emacs_bin}" ]]; then
+    (nohup "${_emacs_bin}" --daemon="${EMACS_TTY_SERVER}" &> "/tmp/emacs-${EMACS_TTY_SERVER}-server.log") & disown
+  fi
+  unset _emacs_bin
 else
   log_debug "Emacs daemon already running, not starting another one."
 fi

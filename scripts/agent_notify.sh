@@ -6,6 +6,9 @@ LOG_SCRIPT_NAME="$(basename "$0")"
 [[ -z "${LOG_FILE:-}" ]] && export LOG_FILE="/tmp/agent_notify.log"
 
 source "${HOME}/lib/log_lib.sh"
+if [[ -f "${HOME}/lib/os_compat.sh" ]]; then
+  source "${HOME}/lib/os_compat.sh"
+fi
 
 function dispatch {
   log::debug "dispatch $*"
@@ -49,7 +52,7 @@ EOF
         )
 
 # 1. Send push notification via Google Knock if available
-if [[ -e /google/bin/releases/knock/knock.sh ]]; then
+if [[ -x /google/bin/releases/knock/send && -r /google/bin/releases/knock/knock.sh ]]; then
   log::debug "source /google/bin/releases/knock/knock.sh"
   source /google/bin/releases/knock/knock.sh &>/dev/null
   dispatch knock "${FULL_MSG}"
@@ -60,9 +63,15 @@ if run type tmux-notify &>/dev/null; then
   dispatch tmux-notify "${TITLE}" "${BODY}"
 fi
 
-# 3. Send desktop notification via notify-send if local X11 display is available
-if [[ -n "${DISPLAY:-}" ]] && run type notify-send &>/dev/null; then
-  dispatch notify-send "${TITLE}" "${BODY}"
+# 3. Send desktop notification if on macOS or local X11 display is available
+if declare -F os::is_macos >/dev/null 2>&1 && os::is_macos; then
+  dispatch os::notify "${TITLE}" "${BODY}"
+elif [[ -n "${DISPLAY:-}" ]]; then
+  if declare -F os::notify >/dev/null 2>&1; then
+    dispatch os::notify "${TITLE}" "${BODY}"
+  elif run type notify-send &>/dev/null; then
+    dispatch notify-send "${TITLE}" "${BODY}"
+  fi
 fi
 
 # Send OSC 99 terminal notification (Kitty, etc.) if enabled

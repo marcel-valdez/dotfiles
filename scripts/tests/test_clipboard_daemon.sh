@@ -776,10 +776,62 @@ test_log_isolation_no_false_conflict() {
 }
 
 # -----------------------------------------------------------------------------
+# Item 12: macOS (Darwin) Port 3335, launchctl Delegation & ps/lsof Fallbacks
+# -----------------------------------------------------------------------------
+test_macos_darwin_port_launchctl_and_lsof_support() {
+  echo "Running test_macos_darwin_port_launchctl_and_lsof_support..."
+  local bin_dir
+  bin_dir="$(setup_mock_bin)"
+  local run_dir="${TEST_DIR}/run_darwin"
+  local fake_home="${run_dir}/home"
+  mkdir -p "${fake_home}/lib"
+  ln -sf "${HOME}/lib/os_compat.sh" "${fake_home}/lib/os_compat.sh"
+
+  cat << EOF > "${bin_dir}/launchctl"
+#!/bin/bash
+echo "\$*" >> "${run_dir}/launchctl.log"
+exit 0
+EOF
+  chmod +x "${bin_dir}/launchctl"
+
+  local exit_code=0
+  HOME="${fake_home}" OS_COMPAT_UNAME_S="Darwin" PATH="${bin_dir}:${PATH}" PS1_HOST="macbook" \
+    XDG_RUNTIME_DIR="${run_dir}" bash "${HOME}/bin/clipboard-daemon.sh" -r \
+    >/dev/null 2>&1 || exit_code=$?
+
+  assert_equals "0" "${exit_code}" \
+    "Darwin -r restart delegates cleanly to launchctl kickstart -k with exit 0"
+  assert_string_contains "$(cat "${run_dir}/launchctl.log" 2>/dev/null || true)" \
+    "kickstart -k gui/$(id -u)/com.marcelvaldez.clipboard-daemon" \
+    "Darwin restart invokes launchctl kickstart -k gui/<uid>/com.marcelvaldez.clipboard-daemon"
+
+  # Verify Darwin default port is 3335 when holding lock on 3335
+  local lock_3335="${run_dir}/clipboard-daemon-3335.lock"
+  touch "${lock_3335}"
+  (
+    exec 200>"${lock_3335}"
+    flock -n 200
+    sleep 5
+  ) &
+  local holder_pid=$!
+  sleep 0.1
+
+  local darwin_out=""
+  darwin_out=$(HOME="${fake_home}" OS_COMPAT_UNAME_S="Darwin" PATH="${bin_dir}:${PATH}" PS1_HOST="macbook" \
+    XDG_RUNTIME_DIR="${run_dir}" bash "${HOME}/bin/clipboard-daemon.sh" 2>&1) || true
+
+  kill -9 "${holder_pid}" 2>/dev/null || true
+  wait "${holder_pid}" 2>/dev/null || true
+
+  assert_string_contains "${darwin_out}" "already running on port 3335" \
+    "Darwin mode defaults to port 3335 when no port argument is passed"
+}
+
+# -----------------------------------------------------------------------------
 # Test Runner
 # -----------------------------------------------------------------------------
 echo "================================================================="
-echo "Running Clipboard Daemon Unit Tests (11 Test Plan Items)"
+echo "Running Clipboard Daemon Unit Tests (12 Test Plan Items)"
 echo "================================================================="
 test_flock_singleton_mutual_exclusion
 test_restart_bounded_pid_polling_and_kill_escalation
@@ -799,6 +851,7 @@ test_active_tunnel_poll_no_recreate
 test_gcert_missing_blocks_recreate
 test_network_drop_progressive_backoff
 test_log_isolation_no_false_conflict
+test_macos_darwin_port_launchctl_and_lsof_support
 
 echo "================================================================="
 echo "Test Results: ${PASSED_TESTS} passed, ${FAILED_TESTS} failed."

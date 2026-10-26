@@ -3,6 +3,8 @@
 # jetski-notify: Displays a tmux popup notification and focuses the target pane upon dismissal.
 # Usage: jetski-notify [title] message
 
+[[ -f "${HOME}/lib/os_compat.sh" ]] && source "${HOME}/lib/os_compat.sh"
+
 TARGET_PANE="${TARGET_PANE:-${TMUX_PANE}}"
 TITLE="$1"
 shift
@@ -16,8 +18,8 @@ fi
 line_count=$(printf "%s\n" "${MESSAGE}" | wc -l)
 line_count=$((line_count+5))
 
-b64_msg=$(printf "%s" "${MESSAGE}" | base64 -w0)
-b64_pane=$(printf "%s" "${TARGET_PANE}" | base64 -w0)
+b64_msg=$(printf "%s" "${MESSAGE}" | os::base64_nowrap)
+b64_pane=$(printf "%s" "${TARGET_PANE}" | os::base64_nowrap)
 
 SCRIPT="tput civis; echo \"${b64_msg}\" | base64 -d; echo; echo '--------------------------------------------------'; echo 'Press any key to dismiss and jump to Jetski pane...'; read -n 1 -s; target=\$(echo \"${b64_pane}\" | base64 -d); if [[ -n \"\${target}\" ]]; then tmux select-pane -t \"\${target}\" 2>/dev/null || true; fi"
 

@@ -12,14 +12,21 @@ REFRESH_TIME = 2.0
 timer_id = None
 
 def get_cpu_temp():
+    """Returns CPU temperature in Celsius on Linux, or None when unavailable (e.g. macOS)."""
+    if not os.path.isdir("/sys/class/thermal"):
+        return None
     for i in range(5):
         path = f"/sys/class/thermal/thermal_zone{i}/temp"
         if os.path.exists(path):
             try:
                 with open(path, "r") as f:
                     t = int(f.read().strip()) / 1000
-                    if 30 < t < 105: return t
-            except: continue
+                    if 30 < t < 105:
+                        return t
+            except OSError:
+                continue
+            except ValueError:
+                continue
     return None
 
 def get_temp_color(temp):

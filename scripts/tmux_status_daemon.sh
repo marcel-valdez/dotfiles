@@ -14,6 +14,8 @@
 
 set -uo pipefail
 
+[[ -f "${HOME}/lib/os_compat.sh" ]] && source "${HOME}/lib/os_compat.sh"
+
 INTERVAL_SECS=1
 TPM_PATH="${TMUX_PLUGIN_MANAGER_PATH:-${HOME}/.tmux/plugins}"
 USER_ID="${UID:-$(id -u)}"
@@ -51,7 +53,11 @@ is_status_daemon_process() {
   local target_pid="$1"
   [[ -n "${target_pid}" && "${target_pid}" =~ ^[0-9]+$ ]] || return 1
   kill -0 "${target_pid}" 2>/dev/null || return 1
-  if [[ -r "/proc/${target_pid}/cmdline" ]]; then
+  if declare -F os::pid_cmdline &>/dev/null; then
+    if os::pid_cmdline "${target_pid}" 2>/dev/null | grep -Fq "tmux_status_daemon.sh"; then
+      return 0
+    fi
+  elif [[ -r "/proc/${target_pid}/cmdline" ]]; then
     if { tr '\0' ' ' < "/proc/${target_pid}/cmdline"; } 2>/dev/null | grep -Fq "tmux_status_daemon.sh"; then
       return 0
     fi
@@ -149,7 +155,11 @@ while true; do
   TIMER_PID="$!"
 
   # 2. Fetch Ping
-  ping_val="$(ping -c 1 -W 1 8.8.8.8 2>/dev/null | sed -n "s/.*time=\([^ ]*\).*/\1/p")"
+  if declare -F os::ping_once_ms &>/dev/null; then
+    ping_val="$(os::ping_once_ms 8.8.8.8 || true)"
+  else
+    ping_val="$(ping -c 1 -W 1 8.8.8.8 2>/dev/null | sed -n "s/.*time=\([^ ]*\).*/\1/p")"
+  fi
   ping_val="${ping_val:-ERR}"
 
   # 3. Fetch CPU/Mem

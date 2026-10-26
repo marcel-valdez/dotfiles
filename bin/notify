@@ -19,7 +19,13 @@ File.open(File.join(log_dir, 'notify.log'), 'a') do |f|
   f.puts("#{title} #{message}")
 end
 
-if File.exist?('/usr/bin/gntp-send')
+if RUBY_PLATFORM.include?('darwin')
+  if system('which terminal-notifier >/dev/null 2>&1')
+    system('terminal-notifier', '-title', title, '-message', message)
+  else
+    system('osascript', '-e', 'on run argv', '-e', 'display notification (item 2 of argv) with title (item 1 of argv)', '-e', 'end run', '--', title, message)
+  end
+elsif File.exist?('/usr/bin/gntp-send')
   system('gntp-send', '-s', 'localhost', title, message)
 else
   system('notify-send', title, message)

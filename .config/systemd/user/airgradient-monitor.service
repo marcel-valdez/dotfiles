@@ -1,0 +1,13 @@
+[Unit]
+Description=AirGradient Air Quality Alarm Daemon
+After=graphical-session.target network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=%h/projects/air_gradient_alarm_daemon
+ExecStart=%h/projects/air_gradient_alarm_daemon/airgradient-monitor -config %h/.config/airgradient-monitor/config.json
+Restart=on-failure
+RestartSec=10
+
+[Install]
+WantedBy=default.target

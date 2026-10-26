@@ -88,6 +88,24 @@ bin/verify-packages
 !.config/systemd/user/clipboard-daemon*.service
 !.config/systemd/user/knock-daemon*.service
 !.config/systemd/user/jetski-gchat-bridge*.service
+!.config/systemd/user/whatsapp-notification.service
+!.config/systemd/user/airgradient-monitor.service
+!.config/kitty/
+!.config/kitty/kitty.conf
+!.config/kitty/tab_bar.py
+!.config/kitty/macos_session.conf
+!.config/karabiner/
+!.config/karabiner/karabiner.json
+!.config/linearmouse/
+!.config/linearmouse/linearmouse.json
+!.config/swiftbar/
+!.config/swiftbar/*.sh
+!.config/launchd/
+!.config/launchd/*.plist
+!.config/airgradient-monitor/
+!.config/airgradient-monitor/config.macos.json
+!.hammerspoon/
+!.hammerspoon/init.lua
 
 # Common backup/generated files
 .*~

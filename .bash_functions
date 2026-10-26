@@ -1,5 +1,15 @@
 #!/usr/bin/env bash
 
+[[ -f "${HOME}/lib/os_compat.sh" ]] && source "${HOME}/lib/os_compat.sh"
+
+# Provide batcat shim on systems (like macOS Homebrew) where bat is installed as `bat`
+if ! command -v batcat &>/dev/null && command -v bat &>/dev/null; then
+  function batcat() {
+    bat "$@"
+  }
+  export -f batcat 2>/dev/null || true
+fi
+
 function __debug() {
   if [[ ! -z ${DEBUG} ]]; then
     echo "$@"
@@ -227,11 +237,11 @@ function java-package-to-path() {
 }
 
 function copy-to-clip() {
-  get-arg-or-stdin "$@" | perl -pe 'chomp if eof' | xclip -sel clip
+  get-arg-or-stdin "$@" | perl -pe 'chomp if eof' | os::clipboard_copy
 }
 
 function paste-clip() {
-  xclip -o
+  os::clipboard_paste
 }
 
 function get-arg-or-stdin() {
@@ -404,20 +414,25 @@ function ps-nice() {
 }
 
 function emacs() {
+  local emacs_bin
+  emacs_bin="$(command -v -p emacs 2>/dev/null || echo /usr/bin/emacs)"
   if [[ "${TERM}" =~ "eterm" ]]; then
     emacs-client "$@"
   else
-    /usr/bin/emacs --no-window-system "$@" &>"/tmp/emacs-${USER}-${RANDOM}.log"
+    "${emacs_bin}" --no-window-system "$@" &>"/tmp/emacs-${USER}-${RANDOM}.log"
   fi
 }
 
 function emacs-client() {
-  local editor_cmd=(/usr/bin/emacsclient --create-frame --tty --socket-name="${EMACS_TTY_SERVER}")
+  local emacsclient_bin emacs_bin
+  emacsclient_bin="$(command -v emacsclient 2>/dev/null || echo /usr/bin/emacsclient)"
+  emacs_bin="$(command -v -p emacs 2>/dev/null || echo /usr/bin/emacs)"
+  local editor_cmd=("${emacsclient_bin}" --create-frame --tty --socket-name="${EMACS_TTY_SERVER}")
   if ! EDITOR="'""${editor_cmd[@]}""'" "${editor_cmd[@]}" "$@"; then
     if [[ -x /usr/bin/systemd-run ]]; then
-      (nohup /usr/bin/systemd-run --user /usr/bin/emacs --daemon="${EMACS_TTY_SERVER}") & disown
+      (nohup /usr/bin/systemd-run --user "${emacs_bin}" --daemon="${EMACS_TTY_SERVER}") & disown
     else
-      (nohup /usr/bin/emacs --bg-daemon="${EMACS_TTY_SERVER}") & disown
+      (nohup "${emacs_bin}" --bg-daemon="${EMACS_TTY_SERVER}") & disown
     fi
     # Give the server 250ms to start listening for connections.
     sleep 0.250
@@ -638,7 +653,7 @@ function fzf-edit-deep {
     --delimiter : \
     --preview 'batcat --color=always {1} --highlight-line {2}' \
     --preview-window 'up,60%,border-bottom,+{2}+3/3,~3' \
-    --bind 'enter:become(/usr/bin/emacsclient --socket-name='"${EMACS_TTY_SERVER}"' --create-frame --tty {1} +{2})'
+    --bind 'enter:become(emacsclient --socket-name='"${EMACS_TTY_SERVER}"' --create-frame --tty {1} +{2})'
 }
 
 function fzf-preview {

@@ -8,6 +8,10 @@ SHORT_BREAK_TIME=10
 LONG_BREAK_TIME=55
 CYCLES_BETWEEN_LONG_BREAKS=3
 
+if [[ -f "${HOME}/lib/os_compat.sh" ]]; then
+  source "${HOME}/lib/os_compat.sh"
+fi
+
 
 function now() {
     date "+%H:%M:%S"
@@ -72,7 +76,11 @@ function run_command() {
   fi
 
  if [[ "${NOTIFICATION_SOUND}" ]]; then
-    systemd-run --user ffplay -nodisp -autoexit "${NOTIFICATION_SOUND}"
+    if declare -F os::play_audio >/dev/null 2>&1; then
+      (os::play_audio "${NOTIFICATION_SOUND}" &>/dev/null) & disown
+    elif command -v systemd-run &>/dev/null; then
+      systemd-run --user ffplay -nodisp -autoexit "${NOTIFICATION_SOUND}"
+    fi
  fi
 }
 

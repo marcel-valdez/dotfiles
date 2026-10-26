@@ -16,7 +16,7 @@ function curl::post_json() {
 
 
   curl -s -H "Content-Type: application/json"\
-    -H "Authorization: Bearer cki1m3mi33jbs6ocd9j4yfecv8al5ssq"\
+    -H "Authorization: Bearer ${CURL_HELPER_BEARER_TOKEN:-}"\
     -X POST "$1"\
     --data "$2"
 }

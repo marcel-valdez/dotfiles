@@ -1,0 +1,96 @@
+{
+  "$schema": "https://schema.linearmouse.app/0.10.0",
+  "schemes": [
+    {
+      "if": {
+        "device": {
+          "category": "mouse"
+        }
+      },
+      "pointer": {
+        "disableAcceleration": true
+      },
+      "scrolling": {
+        "reverse": {
+          "vertical": true,
+          "horizontal": false
+        }
+      }
+    },
+    {
+      "if": {
+        "device": {
+          "vendorID": "0x046d",
+          "productID": "0xc408",
+          "productName": "Logitech USB Trackball"
+        }
+      },
+      "pointer": {
+        "disableAcceleration": true,
+        "speed": 0.25
+      },
+      "scrolling": {
+        "reverse": {
+          "vertical": true
+        }
+      },
+      "buttons": {
+        "mappings": [
+          {
+            "button": 0,
+            "action": {
+              "mouseButton": "right"
+            }
+          },
+          {
+            "button": 1,
+            "action": {
+              "mouseButton": "left"
+            }
+          }
+        ],
+        "universalBackForward": false
+      }
+    },
+    {
+      "if": {
+        "device": {
+          "vendorID": "0x046d",
+          "productName": "MX Ergo S"
+        }
+      },
+      "pointer": {
+        "acceleration": 0,
+        "disableAcceleration": true,
+        "speed": 0.25
+      },
+      "scrolling": {
+        "reverse": {
+          "vertical": true,
+          "horizontal": false
+        },
+        "distance": {
+          "vertical": "auto"
+        }
+      }
+    },
+    {
+      "if": {
+        "device": {
+          "vendorID": "0x5043"
+        }
+      },
+      "pointer": {
+        "acceleration": 0,
+        "disableAcceleration": true,
+        "speed": 0.25
+      },
+      "scrolling": {
+        "reverse": {
+          "vertical": true,
+          "horizontal": false
+        }
+      }
+    }
+  ]
+}
