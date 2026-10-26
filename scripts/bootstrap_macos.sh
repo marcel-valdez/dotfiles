@@ -188,13 +188,32 @@ fi
 # ------------------------------------------------------------------------------
 # Stage 2: User-Space CLI Tools (~/bin) & Optional Homebrew Fallback
 # ------------------------------------------------------------------------------
+# Note: fzf, rg, fd, bat, and jq are NOT available in Google's corp-mule catalog;
+# they are installed directly from upstream GitHub darwin_arm64 releases into
+# ~/.fzf/bin and ~/bin.
 echo ""
 echo "--- Stage 2: User-Space CLI Binaries (fzf, rg, fd, bat, jq) & Optional Brew ---"
 if [[ ! -d "${HOME}/.fzf" ]]; then
   run_cmd git clone --depth 1 https://github.com/junegunn/fzf.git "${HOME}/.fzf" || true
 fi
+# Remove any dangling ~/bin/fzf symlink before running ~/.fzf/install so
+# link_fzf_in_path() does not short-circuit on a broken symlink in PATH.
+if [[ -L "${HOME}/bin/fzf" && ! -e "${HOME}/bin/fzf" ]]; then
+  rm -f "${HOME}/bin/fzf"
+fi
 if [[ -x "${HOME}/.fzf/install" ]] || (( DRY_RUN == 1 )); then
   run_cmd "${HOME}/.fzf/install" --bin --key-bindings --completion --no-update-rc || true
+fi
+# Fallback: if ~/.fzf/install could not download ~/.fzf/bin/fzf, fetch the
+# prebuilt darwin_arm64 release binary directly from GitHub releases.
+if [[ ! -x "${HOME}/.fzf/bin/fzf" ]] && (( DRY_RUN == 0 )); then
+  install_github_tarball_bin "fzf" "junegunn/fzf" "darwin_arm64.tar.gz"
+  if [[ -x "${HOME}/bin/fzf" && ! -L "${HOME}/bin/fzf" ]]; then
+    mkdir -p "${HOME}/.fzf/bin"
+    mv "${HOME}/bin/fzf" "${HOME}/.fzf/bin/fzf"
+  fi
+fi
+if [[ -d "${HOME}/.fzf/bin" ]] || (( DRY_RUN == 1 )); then
   run_cmd ln -sfn "${HOME}/.fzf/bin/fzf" "${HOME}/bin/fzf"
   run_cmd ln -sfn "${HOME}/.fzf/bin/fzf-tmux" "${HOME}/bin/fzf-tmux"
 fi

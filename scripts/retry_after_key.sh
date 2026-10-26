@@ -2,6 +2,13 @@
 UNRETRIABLE_ERROR=128
 UNRETRIABLE_SUCCESS=129
 
+for _dir in "${HOME}/bin" "${HOME}/.local/bin" "${HOME}/.fzf/bin" "/usr/local/bin" "/usr/local/go/bin" "/opt/homebrew/bin" "/Applications/kitty.app/Contents/MacOS"; do
+  if [[ -d "${_dir}" && ":${PATH}:" != *":${_dir}:"* ]]; then
+    export PATH="${_dir}:${PATH}"
+  fi
+done
+unset _dir
+
 source "${HOME}/lib/log_lib.sh" || exit ${UNRETRIABLE_ERROR}
 
 command="$@"
@@ -32,8 +39,14 @@ while true; do
   echo "Press ctrl+c to exit, any other key to retry: '$*'" >&2
   read -n 1 -s -r >&2
 
-  # 2. Flush any remaining characters (like [I) in the buffer
-  # -t 0.05 waits 50ms for extra chars
-  # -k is not standard, so we use a read loop
-  while read -r -t 0.05; do :; done
+  # 2. Flush any remaining characters (like [I) in the buffer.
+  # macOS /bin/bash 3.2 only accepts integer -t timeouts, so use perl IO::Select
+  # on Bash < 4 for a 50ms drain window.
+  if (( BASH_VERSINFO[0] >= 4 )); then
+    while read -r -t 0.05; do :; done
+  elif command -v perl >/dev/null 2>&1; then
+    while perl -MIO::Select -e 'exit(IO::Select->new(\*STDIN)->can_read(0.05) ? 0 : 1)' 2>/dev/null; do
+      IFS= read -r -n 1 _ || break
+    done
+  fi
 done

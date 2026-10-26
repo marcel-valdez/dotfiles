@@ -184,6 +184,12 @@ echo "[Test 4] kitten-cmd live-PID socket selection and stale socket cleanup"
   rm -f "${dead_sock}" "${live_sock}"
   assert_eq "Live PID socket selected over dead PID socket" "${live_sock}" "${selected}"
   assert_true "Dead PID socket was cleaned up" test ! -e "${dead_sock}"
+  assert_true "kitty-ssh-launch uses Bash 3.2-compatible read -n 1 (not read -N 1)" \
+    grep -q "read -n 1" "${HOME}/.googlerc.d/bin/kitty-ssh-launch"
+  assert_true "retry_after_key.sh guards fractional read -t 0.05 on BASH_VERSINFO[0] >= 4" \
+    grep -q "BASH_VERSINFO\[0\] >= 4" "${HOME}/scripts/retry_after_key.sh"
+  fzf_stripped="$(perl -pe 's/^[^\t]*\t//gm' <<< $'-42\twhich emacs')"
+  assert_eq "__fzf_history__ strips negative history index prefix (-42\\t)" "which emacs" "${fzf_stripped}"
 }
 
 # ------------------------------------------------------------------------------
