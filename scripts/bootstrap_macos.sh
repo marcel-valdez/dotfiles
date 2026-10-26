@@ -122,6 +122,83 @@ PY
   rm -rf "${tmp_dir}"
 }
 
+install_github_macos_app() {
+  local app_bundle="$1"
+  local repo="$2"
+  local asset_substr="$3"
+
+  local target_dir="/Applications"
+  if [[ ! -w "/Applications" ]]; then
+    target_dir="${HOME}/Applications"
+    mkdir -p "${target_dir}"
+  fi
+
+  if [[ -d "/Applications/${app_bundle}" || -d "${HOME}/Applications/${app_bundle}" ]] && (( DRY_RUN == 0 )); then
+    echo "[INFO] ${app_bundle} already installed."
+    return 0
+  fi
+
+  if (( DRY_RUN == 1 )); then
+    printf '[DRY-RUN] install_github_macos_app %s (%s -> /Applications/%s)\n' "${app_bundle}" "${repo}" "${app_bundle}"
+    return 0
+  fi
+
+  echo "[INFO] Installing ${app_bundle} from GitHub release (${repo}) into ${target_dir}/${app_bundle}..."
+  local tmp_dir
+  tmp_dir="$(mktemp -d)"
+  local download_url
+  download_url="$(python3 - "${repo}" "${asset_substr}" << 'PY' || true
+import json, sys, urllib.request
+repo, substr = sys.argv[1], sys.argv[2]
+req = urllib.request.Request(
+    f"https://api.github.com/repos/{repo}/releases/latest",
+    headers={"User-Agent": "bootstrap_macos.sh"}
+)
+with urllib.request.urlopen(req, timeout=15) as resp:
+    data = json.load(resp)
+for asset in data.get("assets", []):
+    name = asset.get("name", "")
+    if substr in name and (name.endswith(".zip") or name.endswith(".dmg")) and not name.endswith(".dSYM.zip"):
+        print(asset.get("browser_download_url", ""))
+        break
+PY
+)"
+  if [[ -z "${download_url}" ]]; then
+    echo "[WARN] Could not resolve GitHub release URL for ${app_bundle} (${repo}); skipping."
+    rm -rf "${tmp_dir}"
+    return 0
+  fi
+
+  if [[ "${download_url}" == *.zip ]]; then
+    if curl -fsSL "${download_url}" -o "${tmp_dir}/app.zip"; then
+      mkdir -p "${tmp_dir}/extracted"
+      ditto -x -k "${tmp_dir}/app.zip" "${tmp_dir}/extracted"
+      local found_app
+      found_app="$(find "${tmp_dir}/extracted" -maxdepth 2 -name "${app_bundle}" -type d | head -n 1)"
+      if [[ -n "${found_app}" ]]; then
+        rm -rf "${target_dir}/${app_bundle}"
+        cp -R "${found_app}" "${target_dir}/${app_bundle}"
+        xattr -dr com.apple.quarantine "${target_dir}/${app_bundle}" 2>/dev/null || true
+      fi
+    fi
+  elif [[ "${download_url}" == *.dmg ]]; then
+    if curl -fsSL "${download_url}" -o "${tmp_dir}/app.dmg"; then
+      mkdir -p "${tmp_dir}/mnt"
+      if hdiutil attach "${tmp_dir}/app.dmg" -nobrowse -readonly -mountpoint "${tmp_dir}/mnt" -quiet; then
+        local found_app
+        found_app="$(find "${tmp_dir}/mnt" -maxdepth 2 -name "${app_bundle}" -type d | head -n 1)"
+        if [[ -n "${found_app}" ]]; then
+          rm -rf "${target_dir}/${app_bundle}"
+          cp -R "${found_app}" "${target_dir}/${app_bundle}"
+          xattr -dr com.apple.quarantine "${target_dir}/${app_bundle}" 2>/dev/null || true
+        fi
+        hdiutil detach "${tmp_dir}/mnt" -quiet || true
+      fi
+    fi
+  fi
+  rm -rf "${tmp_dir}"
+}
+
 echo "=============================================================================="
 echo "gMac M5 Pro Dual-OS Dotfiles & Daemon Bootstrap (DRY_RUN=${DRY_RUN})"
 echo "=============================================================================="
@@ -226,6 +303,27 @@ install_github_tarball_bin "rg" "BurntSushi/ripgrep" "aarch64-apple-darwin.tar.g
 install_github_tarball_bin "fd" "sharkdp/fd" "aarch64-apple-darwin.tar.gz"
 install_github_tarball_bin "bat" "sharkdp/bat" "aarch64-apple-darwin.tar.gz"
 install_github_tarball_bin "jq" "jqlang/jq" "jq-macos-arm64"
+
+# Desktop Integration Apps not in Google's corp-mule catalog:
+# - Hammerspoon.app: loads ~/.hammerspoon/init.lua (6-tier window cycling,
+#   <Alt>Tab 10px blue border switcher, Sticky Kitty watcher, Alt+Drag move/resize,
+#   6-Space workspace navigation, and Zen Mode)
+# - SwiftBar.app: loads ~/.config/swiftbar/{pomodoro.1s.sh,airgradient.10s.sh}
+# - LinearMouse.app: loads ~/.config/linearmouse/linearmouse.json (Logitech USB
+#   Trackball left-handed 3-2-1 + button-9 scroll, MX Ergo S 400 DPI linear tracking)
+# - AutoRaise.app: focus-follows-mouse (replaces picom focus-follows-mouse)
+# - terminal-notifier.app: native Notification Center alerts with -group replacement
+install_github_macos_app "Hammerspoon.app" "Hammerspoon/hammerspoon" "Hammerspoon-"
+install_github_macos_app "SwiftBar.app" "swiftbar/SwiftBar" "SwiftBar."
+install_github_macos_app "LinearMouse.app" "linearmouse/linearmouse" "LinearMouse.dmg"
+install_github_macos_app "AutoRaise.app" "sbmpost/AutoRaise" "AutoRaise.dmg"
+install_github_macos_app "terminal-notifier.app" "julienXX/terminal-notifier" "terminal-notifier-"
+
+if [[ -x "/Applications/terminal-notifier.app/Contents/MacOS/terminal-notifier" ]] || (( DRY_RUN == 1 )); then
+  run_cmd ln -sfn "/Applications/terminal-notifier.app/Contents/MacOS/terminal-notifier" "${HOME}/bin/terminal-notifier"
+elif [[ -x "${HOME}/Applications/terminal-notifier.app/Contents/MacOS/terminal-notifier" ]]; then
+  run_cmd ln -sfn "${HOME}/Applications/terminal-notifier.app/Contents/MacOS/terminal-notifier" "${HOME}/bin/terminal-notifier"
+fi
 
 if command -v brew >/dev/null 2>&1; then
   echo "[INFO] Optional Homebrew detected; installing supplementary packages not in Mule..."
@@ -354,10 +452,15 @@ EOF
 # ------------------------------------------------------------------------------
 echo ""
 echo "--- Stage 5: macOS System Defaults (Key Repeat, Spaces, Window Drag, Maccy) ---"
-# Ultra-fast key repeat and disable press-and-hold accent menu for Emacs/Vim
-run_cmd defaults write NSGlobalDomain KeyRepeat -int 1
-run_cmd defaults write NSGlobalDomain InitialKeyRepeat -int 10
+# Fast key repeat without accidental key-bounce/tripling on Glove80 mechanical
+# switches (InitialKeyRepeat=25 -> 375ms delay before repeat; KeyRepeat=2 -> 30ms
+# repeat interval) and disable press-and-hold accent menu for Emacs/Vim:
+run_cmd defaults write NSGlobalDomain KeyRepeat -int 2
+run_cmd defaults write NSGlobalDomain InitialKeyRepeat -int 25
 run_cmd defaults write NSGlobalDomain ApplePressAndHoldEnabled -bool false
+if [[ -x "/System/Library/PrivateFrameworks/SystemAdministration.framework/Resources/activateSettings" ]] || (( DRY_RUN == 1 )); then
+  run_cmd /System/Library/PrivateFrameworks/SystemAdministration.framework/Resources/activateSettings -u || true
+fi
 
 # Ensure macOS Full Keyboard Access does not hijack Space in Kitty / Emacs.app
 run_cmd defaults write com.apple.Accessibility FullKeyboardAccessEnabled -int 0 || true
@@ -373,6 +476,14 @@ run_cmd defaults write com.apple.spaces spans-displays -bool true
 
 # Configure SwiftBar plugin directory
 run_cmd defaults write com.ameba.SwiftBar PluginDirectory -string "${HOME}/.config/swiftbar"
+
+# Launch desktop integration apps (Hammerspoon, SwiftBar, LinearMouse, Maccy, AutoRaise)
+for _app in "Hammerspoon" "SwiftBar" "LinearMouse" "Maccy" "AutoRaise"; do
+  if [[ -d "/Applications/${_app}.app" || -d "${HOME}/Applications/${_app}.app" ]] || (( DRY_RUN == 1 )); then
+    run_cmd open -g -a "${_app}" || true
+  fi
+done
+unset _app
 
 # Restart Dock/SystemUIServer to apply Space & key repeat settings
 run_cmd killall Dock || true
