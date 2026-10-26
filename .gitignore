@@ -52,6 +52,14 @@ bin/__check_version.py
 bin/__latest_version.py
 bin/check-all-versions
 bin/verify-packages
+bin/bat
+bin/fd
+bin/fzf
+bin/fzf-tmux
+bin/jq
+bin/kitten
+bin/kitty
+bin/rg
 
 !.emacs
 !.emacs.d/

@@ -222,8 +222,12 @@ EOF
     bash "${HOME}/bin/do-not-disturb" --status)"
   assert_eq "Darwin DND status after toggle is false" "false" "${s2}"
 
+  for _i in {1..20}; do
+    [[ -s "${sc_log}" ]] && break
+    sleep 0.1
+  done
   assert_contains "shortcuts run Set Do Not Disturb invoked" \
-    "run Set Do Not Disturb" "$(cat "${sc_log}")"
+    "run Set Do Not Disturb" "$(cat "${sc_log}" 2>/dev/null || true)"
 }
 
 # ------------------------------------------------------------------------------
@@ -355,8 +359,11 @@ EOF
   # 2. 2-arg notification callback mode on Darwin
   HOME="${fake_home}" PATH="${mock_bin}:${PATH}" OS_COMPAT_UNAME_S="Darwin" \
     bash "${HOME}/scripts/whatsapp-notification.sh" "Alice" "Hello from WhatsApp"
-  sleep 0.2
-  tn_logged="$(cat "${TEST_WA_TN_LOG}")"
+  for _i in {1..20}; do
+    [[ -s "${TEST_WA_TN_LOG}" ]] && break
+    sleep 0.1
+  done
+  tn_logged="$(cat "${TEST_WA_TN_LOG}" 2>/dev/null || true)"
   assert_contains "whatsapp-notification.sh 2-arg Darwin mode dispatches via terminal-notifier" \
     "-title Alice -message Hello from WhatsApp -subtitle WhatsApp -group whatsapp-notification" "${tn_logged}"
 }

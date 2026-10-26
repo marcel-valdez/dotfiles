@@ -125,7 +125,9 @@ function node-lts-version() {
 function node-check-use() {
   if ! type nvm &>/dev/null; then
     # Do not proceed if NVM is not installed
-    echo "WARNING: NVM is not installed on this machine." >&2
+    if [[ "${1:-}" != "-s" && "${1:-}" != "--silent" ]]; then
+      echo "WARNING: NVM is not installed on this machine." >&2
+    fi
     return 1
   fi
 

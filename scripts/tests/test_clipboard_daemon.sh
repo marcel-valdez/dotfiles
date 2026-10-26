@@ -2,6 +2,7 @@
 # test_clipboard_daemon.sh: Hermetic unit test suite for clipboard-daemon.sh
 set -euo pipefail
 
+export PATH="${HOME}/bin:${PATH}"
 TEST_DIR="$(mktemp -d /tmp/test_clipboard_daemon.XXXXXX)"
 cleanup_test_env() {
   rm -rf "${TEST_DIR}"

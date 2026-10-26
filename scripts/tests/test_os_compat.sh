@@ -118,7 +118,7 @@ test_pid_open_files_emits_clean_absolute_paths_linux() {
       echo "FAIL: os::pid_open_files emitted non-absolute line: ${line}" >&2
       FAIL_COUNT=$((FAIL_COUNT + 1))
     fi
-    if [[ "${line}" == "${tmp_file}" ]]; then
+    if [[ "${line}" == "${tmp_file}" || "${line}" == "/private${tmp_file}" ]]; then
       found=1
     fi
   done < <(OS_COMPAT_UNAME_S="Linux" os::pid_open_files "$$")

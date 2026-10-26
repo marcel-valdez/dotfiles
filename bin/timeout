@@ -1,0 +1,99 @@
+#!/usr/bin/env python3
+"""Cross-platform timeout(1) utility for macOS (Darwin) and Linux.
+
+Delegates to /usr/bin/timeout on Linux when present. On macOS (where GNU
+coreutils timeout is absent by default), executes the target command with a
+wall-clock timeout while preserving standard input/output/error streams,
+returning 124 on timeout expiration.
+
+Usage Examples:
+  timeout 5s ssh gcloud true
+  printf "hello" | timeout 0.5s pbcopy
+"""
+
+import os
+import signal
+import subprocess
+import sys
+
+
+def parse_duration(val: str) -> float:
+  val = val.strip()
+  if val.endswith("ms"):
+    return float(val[:-2]) / 1000.0
+  if val.endswith("s"):
+    return float(val[:-1])
+  if val.endswith("m"):
+    return float(val[:-1]) * 60.0
+  if val.endswith("h"):
+    return float(val[:-1]) * 3600.0
+  if val.endswith("d"):
+    return float(val[:-1]) * 86400.0
+  return float(val)
+
+
+def main() -> int:
+  if os.path.exists("/usr/bin/timeout") and os.path.realpath("/usr/bin/timeout") != os.path.realpath(__file__):
+    os.execv("/usr/bin/timeout", ["/usr/bin/timeout"] + sys.argv[1:])
+
+  args = sys.argv[1:]
+  preserve_status = False
+  i = 0
+  while i < len(args):
+    arg = args[i]
+    if arg in ("--preserve-status", "--foreground", "-v", "--verbose"):
+      if arg == "--preserve-status":
+        preserve_status = True
+      i += 1
+    elif arg in ("-k", "--kill-after", "-s", "--signal") and i + 1 < len(args):
+      i += 2
+    elif arg.startswith("--kill-after=") or arg.startswith("--signal="):
+      i += 1
+    elif arg == "--":
+      i += 1
+      break
+    elif arg.startswith("-"):
+      i += 1
+    else:
+      break
+
+  if i + 1 >= len(args):
+    sys.stderr.write("Usage: timeout [OPTION] DURATION COMMAND [ARG]...\n")
+    return 125
+
+  try:
+    duration = parse_duration(args[i])
+  except ValueError:
+    sys.stderr.write(f"timeout: invalid time interval '{args[i]}'\n")
+    return 125
+
+  cmd = args[i + 1 :]
+  try:
+    proc = subprocess.Popen(cmd, start_new_session=True)
+  except FileNotFoundError:
+    sys.stderr.write(f"timeout: failed to run command '{cmd[0]}': No such file or directory\n")
+    return 127
+  except PermissionError:
+    sys.stderr.write(f"timeout: failed to run command '{cmd[0]}': Permission denied\n")
+    return 126
+
+  try:
+    return proc.wait(timeout=duration)
+  except subprocess.TimeoutExpired:
+    try:
+      os.killpg(proc.pid, signal.SIGTERM)
+    except OSError:
+      proc.terminate()
+    try:
+      proc.wait(timeout=0.5)
+    except subprocess.TimeoutExpired:
+      try:
+        os.killpg(proc.pid, signal.SIGKILL)
+      except OSError:
+        proc.kill()
+      proc.wait()
+    return 143 if preserve_status else 124
+
+
+if __name__ == "__main__":
+  sys.exit(main())

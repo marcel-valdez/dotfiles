@@ -796,7 +796,10 @@ chmod +x "${DARWIN_MOCK_BIN}/terminal-notifier"
   export DARWIN_NOTIFY_LOG
   export JETSKI_ENABLE_OSC99="false"
   PATH="${DARWIN_MOCK_BIN}:${PATH}" bash "${SCRIPT_DIR}/agent_notify.sh" "Darwin Hook Title" "Darwin Hook Body"
-  sleep 0.2
+  for _i in {1..20}; do
+    [[ -s "${DARWIN_NOTIFY_LOG}" ]] && break
+    sleep 0.1
+  done
 )
 assert_file_exists "${DARWIN_NOTIFY_LOG}" \
   "TC-20: agent_notify.sh dispatches terminal-notifier on Darwin even when DISPLAY is unset"

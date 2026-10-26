@@ -1,0 +1,124 @@
+#!/usr/bin/env python3
+"""Cross-platform flock(1) utility for macOS (Darwin) and Linux.
+
+Delegates to /usr/bin/flock on Linux when present. On macOS (where util-linux
+flock is absent), implements kernel flock(2) advisory locking via Python's
+standard library `fcntl.flock` supporting both numeric file descriptors
+(e.g. `exec 200>lockfile; flock -n 200`) and file paths with commands
+(e.g. `flock -n /path/to/lock -c "cmd"` or `flock -n /path/to/lock cmd args`).
+
+Usage Examples:
+  exec 200>"/tmp/my.lock"
+  flock -n 200 || exit 1
+  flock -u 200
+  flock -n /tmp/my.lock -c "echo locked"
+"""
+
+import fcntl
+import os
+import subprocess
+import sys
+
+
+def main() -> int:
+  if os.path.exists("/usr/bin/flock") and os.path.realpath("/usr/bin/flock") != os.path.realpath(__file__):
+    os.execv("/usr/bin/flock", ["/usr/bin/flock"] + sys.argv[1:])
+
+  args = sys.argv[1:]
+  nonblock = False
+  shared = False
+  unlock = False
+  conflict_exit_code = 1
+
+  i = 0
+  while i < len(args):
+    arg = args[i]
+    if arg in ("-n", "--nonblock", "--nb"):
+      nonblock = True
+      i += 1
+    elif arg in ("-s", "--shared"):
+      shared = True
+      i += 1
+    elif arg in ("-x", "-e", "--exclusive"):
+      shared = False
+      i += 1
+    elif arg in ("-u", "--unlock"):
+      unlock = True
+      i += 1
+    elif arg in ("-E", "--conflict-exit-code") and i + 1 < len(args):
+      conflict_exit_code = int(args[i + 1])
+      i += 2
+    elif arg in ("-w", "--wait", "--timeout") and i + 1 < len(args):
+      i += 2
+    elif arg == "--":
+      i += 1
+      break
+    elif arg.startswith("-"):
+      # Handle combined short flags such as -nx or -nu
+      for ch in arg[1:]:
+        if ch == "n":
+          nonblock = True
+        elif ch == "s":
+          shared = True
+        elif ch in ("x", "e"):
+          shared = False
+        elif ch == "u":
+          unlock = True
+      i += 1
+    else:
+      break
+
+  if i >= len(args):
+    sys.stderr.write("Usage: flock [-sxun] fd|{file [-c] command...}\n")
+    return 64
+
+  target = args[i]
+  rest = args[i + 1 :]
+
+  if unlock:
+    op = fcntl.LOCK_UN
+  elif shared:
+    op = fcntl.LOCK_SH
+  else:
+    op = fcntl.LOCK_EX
+  if nonblock and not unlock:
+    op |= fcntl.LOCK_NB
+
+  # Mode 1: Numeric file descriptor opened by parent shell (e.g. flock -n 200)
+  if not rest and target.isdigit():
+    fd = int(target)
+    try:
+      fcntl.flock(fd, op)
+      return 0
+    except (BlockingIOError, PermissionError, OSError):
+      return conflict_exit_code
+
+  # Mode 2: File path with optional command
+  try:
+    f = open(target, "a+", encoding="utf-8")
+  except OSError as exc:
+    sys.stderr.write(f"flock: cannot open lock file {target}: {exc}\n")
+    return 66
+
+  try:
+    fcntl.flock(f.fileno(), op)
+  except (BlockingIOError, PermissionError, OSError):
+    f.close()
+    return conflict_exit_code
+
+  if not rest:
+    return 0
+
+  if rest[0] in ("-c", "--command") and len(rest) >= 2:
+    shell_cmd = rest[1]
+    proc = subprocess.run(["/bin/bash", "-c", shell_cmd])
+    f.close()
+    return proc.returncode
+
+  proc = subprocess.run(rest)
+  f.close()
+  return proc.returncode
+
+
+if __name__ == "__main__":
+  sys.exit(main())

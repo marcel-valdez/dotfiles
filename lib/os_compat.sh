@@ -380,7 +380,7 @@ os::timeout() {
   fi
 
   local secs="${duration%s}"
-  "$@" &
+  "$@" <&0 &
   local cmd_pid=$!
   (
     sleep "${secs}"

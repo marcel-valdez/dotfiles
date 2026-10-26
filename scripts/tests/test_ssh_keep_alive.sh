@@ -16,6 +16,7 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 TARGET_SCRIPT="${TARGET_SCRIPT:-${SCRIPT_DIR}/../ssh_keep_alive.sh}"
+export PATH="${HOME}/bin:${PATH}"
 
 PASS_COUNT=0
 FAIL_COUNT=0
@@ -234,8 +235,10 @@ echo "--- Test 6: Non-Google Pass-Through (no gcertstatus in PATH) ---"
   mkdir -p "${NOGCERT_BIN}"
   cp "${MOCK_BIN}/gmosh" "${NOGCERT_BIN}/gmosh"
 
-  # Populate symlinks to system binaries, skipping any gcert* tools
-  for dir in /bin /usr/bin /opt/homebrew/bin /usr/local/bin; do
+  # Populate symlinks to system binaries, skipping any gcert* tools.
+  # Never symlink /usr/local/bin on gMac because EndpointSecurity protects
+  # unlinking filenames matching corp agents (e.g. scalibr, fleetspeakd, puppet).
+  for dir in "${HOME}/bin" /bin /usr/bin; do
     if [[ -d "${dir}" ]]; then
       for bin_path in "${dir}"/*; do
         bin_name="$(basename "${bin_path}")"
