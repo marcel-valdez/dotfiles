@@ -276,8 +276,8 @@ test_flock_singleton_mutual_exclusion() {
   (
     exec 200>"${lock_file}"
     flock -n 200
-    sleep 5
-  ) &
+    exec sleep 5
+  ) </dev/null >/dev/null 2>&1 &
   local holder_pid=$!
   sleep 0.1
 
@@ -812,8 +812,8 @@ EOF
   (
     exec 200>"${lock_3335}"
     flock -n 200
-    sleep 5
-  ) &
+    exec sleep 5
+  ) </dev/null >/dev/null 2>&1 &
   local holder_pid=$!
   sleep 0.1
 
