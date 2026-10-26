@@ -4,6 +4,12 @@
 # see /usr/share/doc/bash/examples/startup-files for examples.
 # the files are located in the bash-doc package.
 
+# Ensure POSIX mode and Kitty's --posix / ENV injection are cleared immediately.
+unset POSIXLY_CORRECT POSIX_PEDANTIC ENV KITTY_BASH_INJECT
+if [ -n "${BASH_VERSION:-}" ]; then
+  set +o posix 2>/dev/null || true
+fi
+
 # the default umask is set in /etc/profile; for setting the umask
 # for ssh logins, install and configure the libpam-umask package.
 #umask 022

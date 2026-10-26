@@ -3,9 +3,22 @@
 # for examples
 
 # Disable POSIX mode on macOS /bin/bash (3.2) so function names with '-' or '::'
-# and process substitution '< <(...)' are always permitted.
-unset POSIXLY_CORRECT
+# and process substitution '< <(...)' are always permitted, and scrub Kitty's
+# --posix / ENV injection variables so child shells and tmux panes never inherit them.
+unset POSIXLY_CORRECT POSIX_PEDANTIC ENV KITTY_BASH_INJECT
 set +o posix 2>/dev/null || true
+if [[ -n "${TMUX:-}" ]] && command -v tmux &>/dev/null; then
+  tmux set-environment -gu POSIXLY_CORRECT 2>/dev/null || true
+  tmux set-environment -gu POSIX_PEDANTIC 2>/dev/null || true
+  tmux set-environment -gu ENV 2>/dev/null || true
+  tmux set-environment -gu KITTY_BASH_INJECT 2>/dev/null || true
+fi
+# If /etc/profile -> /etc/bashrc ran under --posix before ~/.bashrc turned off
+# POSIX mode, /etc/bash.bashrc.d/skippy.sh failed to define skippy::init; reload
+# it cleanly now that POSIX mode is disabled.
+if [[ "$-" == *i* ]] && [[ -r /etc/bash.bashrc.d/skippy.sh ]] && ! declare -F skippy::init &>/dev/null; then
+  source /etc/bash.bashrc.d/skippy.sh 2>/dev/null || true
+fi
 
 [[ -z "${DEBUG_BASHRC:-}" ]] && export DEBUG_BASHRC=
 [[ -z "${DEBUG:-}" ]] && export DEBUG=
@@ -33,6 +46,11 @@ function log_debug() {
 function tmux_attach_or_create_initial_session() {
   local _tmux=tmux
   type tmx2 &>/dev/null && _tmux=tmx2
+
+  "${_tmux}" set-environment -gu POSIXLY_CORRECT 2>/dev/null || true
+  "${_tmux}" set-environment -gu POSIX_PEDANTIC 2>/dev/null || true
+  "${_tmux}" set-environment -gu ENV 2>/dev/null || true
+  "${_tmux}" set-environment -gu KITTY_BASH_INJECT 2>/dev/null || true
 
   if [ -z "${TMUX_INIT_SESSION:-}" ]; then
     log_debug "tmux init: attaching to default session"

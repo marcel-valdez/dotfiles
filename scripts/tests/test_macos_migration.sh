@@ -529,6 +529,12 @@ EOF
     grep -q "darwin" "${HOME}/bin/notify"
   assert_true "kitty.conf enables macos_thicken_font 0.25 for 1080p external displays" \
     grep -q "^macos_thicken_font 0.25" "${HOME}/.config/kitty/kitty.conf"
+  assert_true "kitty.conf sets shell_integration no-rc to avoid --posix on macOS Bash 3.2" \
+    grep -q "^shell_integration no-rc" "${HOME}/.config/kitty/kitty.conf"
+  assert_true ".tmux.conf scrubs POSIXLY_CORRECT from global tmux environment" \
+    grep -q "^set-environment -gu POSIXLY_CORRECT" "${HOME}/.tmux.conf"
+  assert_true ".bashrc scrubs POSIXLY_CORRECT and KITTY_BASH_INJECT" \
+    grep -q "unset POSIXLY_CORRECT POSIX_PEDANTIC ENV KITTY_BASH_INJECT" "${HOME}/.bashrc"
   assert_true "bootstrap_macos.sh uses CGO_ENABLED=1 for whatsapp-notification (go-sqlite3)" \
     grep -q "CGO_ENABLED=1 GOOS=darwin GOARCH=arm64" "${HOME}/.googlerc.d/scripts/bootstrap_macos.sh"
 }
