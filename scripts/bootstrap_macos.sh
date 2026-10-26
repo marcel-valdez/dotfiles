@@ -254,6 +254,12 @@ if [[ ! -d "${HOME}/.googlerc.d/.git" ]]; then
   fi
 fi
 
+if [[ -f "${HOME}/.googlerc.d/versioned.ssh_config" && ! -f "${HOME}/.ssh/config" ]]; then
+  run_cmd mkdir -p -m 700 "${HOME}/.ssh"
+  run_cmd cp "${HOME}/.googlerc.d/versioned.ssh_config" "${HOME}/.ssh/config"
+  run_cmd chmod 600 "${HOME}/.ssh/config"
+fi
+
 TMUX_MEM_CPU_DIR="${HOME}/.tmux/plugins/tmux-mem-cpu-load"
 if [[ -d "${TMUX_MEM_CPU_DIR}" ]] || (( DRY_RUN == 1 )); then
   if command -v cmake >/dev/null 2>&1 || (( DRY_RUN == 1 )); then
