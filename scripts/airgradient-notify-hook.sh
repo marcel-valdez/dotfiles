@@ -18,14 +18,14 @@ if [[ -f "${HOME}/lib/os_compat.sh" ]]; then
 fi
 
 METRIC="${AG_METRIC:-all}"
-STATUS="${AG_STATUS:-WARNING}"
-TITLE="${AG_SUMMARY:-${1:-AirGradient Alert (${STATUS})}}"
-BODY="${AG_BODY:-${2:-Metric ${METRIC}: ${AG_VALUE:-unknown} (threshold ${AG_THRESHOLD:-unknown})}}"
+STATUS="${AG_URGENCY:-${AG_LEVEL:-${AG_STATUS:-WARNING}}}"
+TITLE="${AG_TITLE:-${AG_SUMMARY:-${1:-AirGradient Alert (${STATUS})}}}"
+BODY="${AG_BODY:-${2:-Metric ${METRIC}: ${AG_VALUE_TEXT:-${AG_VALUE:-unknown}} (threshold ${AG_THRESHOLD:-unknown})}}"
 
 URGENCY="normal"
-if [[ "${STATUS}" =~ CRITICAL|ALARM|DANGER|HIGH ]]; then
+if [[ "${STATUS}" =~ critical|CRITICAL|ALARM|DANGER|HIGH ]]; then
   URGENCY="critical"
-elif [[ "${STATUS}" =~ OK|NORMAL|RECOVERY ]]; then
+elif [[ "${STATUS}" =~ low|OK|NORMAL|RECOVERY ]] || [[ "${AG_KIND:-}" =~ resolved|improved ]]; then
   URGENCY="low"
 fi
 

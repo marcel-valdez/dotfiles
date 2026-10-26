@@ -6,13 +6,45 @@
 # <txt>/<tool> XML tags and Pango <span> markup into SwiftBar menu bar format.
 # ==============================================================================
 
-export PATH="/opt/homebrew/bin:/usr/local/bin:${HOME}/bin:${PATH}"
+export PATH="/opt/homebrew/bin:/usr/local/bin:/usr/local/go/bin:${HOME}/.local/bin:${HOME}/bin:${PATH}"
 
-AG_BIN=""
-if [[ -x "${HOME}/projects/air_gradient_alarm_daemon/airgradient-monitor" ]]; then
-  AG_BIN="${HOME}/projects/air_gradient_alarm_daemon/airgradient-monitor"
-elif command -v airgradient-monitor &>/dev/null; then
-  AG_BIN="$(command -v airgradient-monitor)"
+AG_REPO_DIR="${HOME}/projects/air_gradient_alarm_daemon"
+AG_CONFIG="${HOME}/.config/airgradient-monitor/config.json"
+
+find_ag_bin() {
+  if [[ -x "${AG_REPO_DIR}/airgradient-monitor" ]]; then
+    printf '%s\n' "${AG_REPO_DIR}/airgradient-monitor"
+  elif [[ -x "${AG_REPO_DIR}/bin/airgradient-monitor" ]]; then
+    printf '%s\n' "${AG_REPO_DIR}/bin/airgradient-monitor"
+  elif [[ -x "${HOME}/.local/bin/airgradient-monitor" ]]; then
+    printf '%s\n' "${HOME}/.local/bin/airgradient-monitor"
+  elif command -v airgradient-monitor &>/dev/null; then
+    command -v airgradient-monitor
+  fi
+}
+
+AG_BIN="$(find_ag_bin)"
+
+# Self-heal on fresh machines: if airgradient-monitor has not been built yet
+# and Go is installed, clone marcel-valdez/air_gradient_alarm_daemon and build.
+if [[ -z "${AG_BIN}" ]] && command -v go &>/dev/null; then
+  mkdir -p "${HOME}/projects" "${HOME}/.local/bin"
+  if [[ ! -d "${AG_REPO_DIR}/.git" ]] && command -v git &>/dev/null; then
+    git clone --depth 1 https://github.com/marcel-valdez/air_gradient_alarm_daemon.git "${AG_REPO_DIR}" &>/dev/null || true
+  fi
+  if [[ -d "${AG_REPO_DIR}/cmd/airgradient-monitor" ]]; then
+    (
+      cd "${AG_REPO_DIR}" && \
+      CGO_ENABLED=0 go build -trimpath -o "${AG_REPO_DIR}/airgradient-monitor" ./cmd/airgradient-monitor &>/dev/null && \
+      cp -f "${AG_REPO_DIR}/airgradient-monitor" "${HOME}/.local/bin/airgradient-monitor" &>/dev/null
+    ) || true
+  fi
+  if [[ ! -f "${AG_CONFIG}" && -f "${HOME}/.config/airgradient-monitor/config.macos.json" ]]; then
+    mkdir -p -m 700 "${HOME}/.config/airgradient-monitor"
+    cp "${HOME}/.config/airgradient-monitor/config.macos.json" "${AG_CONFIG}"
+    chmod 600 "${AG_CONFIG}"
+  fi
+  AG_BIN="$(find_ag_bin)"
 fi
 
 if [[ -z "${AG_BIN}" ]]; then
@@ -22,7 +54,12 @@ if [[ -z "${AG_BIN}" ]]; then
   exit 0
 fi
 
-RAW_OUT="$("${AG_BIN}" -genmon 2>/dev/null || true)"
+AG_ARGS=(-genmon)
+if [[ -f "${AG_CONFIG}" ]]; then
+  AG_ARGS+=(-config "${AG_CONFIG}")
+fi
+
+RAW_OUT="$("${AG_BIN}" "${AG_ARGS[@]}" 2>/dev/null || true)"
 if [[ -z "${RAW_OUT}" ]]; then
   echo "AG: offline"
   echo "---"

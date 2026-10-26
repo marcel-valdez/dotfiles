@@ -1,4 +1,6 @@
 {
+  "api_token": "YOUR_AIRGRADIENT_API_TOKEN",
+  "location_id": 210460,
   "notify": {
     "desktop": {
       "enabled": false
@@ -11,7 +13,13 @@
       ]
     },
     "hooks": [
-      "/Users/marcelvaldez/scripts/airgradient-notify-hook.sh"
+      {
+        "type": "command",
+        "name": "macos-notify",
+        "command": [
+          "/Users/marcelvaldez/scripts/airgradient-notify-hook.sh"
+        ]
+      }
     ]
   }
 }

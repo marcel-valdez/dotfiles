@@ -399,8 +399,19 @@ EOF
     "-title CO2 High -message 1250 ppm -subtitle AirGradient -group airgradient-rco2" \
     "$(cat "${TEST_AG_TN_LOG}")"
 
+  HOME="${fake_home}" PATH="${mock_bin}:${PATH}" OS_COMPAT_UNAME_S="Darwin" \
+    AG_METRIC="pm02" AG_URGENCY="critical" AG_TITLE="PM2.5 Alert" AG_VALUE_TEXT="42 ug/m3" \
+    bash "${HOME}/scripts/airgradient-notify-hook.sh"
+  assert_contains "airgradient-notify-hook.sh supports native AG_TITLE/AG_URGENCY/AG_VALUE_TEXT env vars" \
+    "-title PM2.5 Alert -message Metric pm02: 42 ug/m3 (threshold unknown) -subtitle AirGradient -group airgradient-pm02" \
+    "$(cat "${TEST_AG_TN_LOG}")"
+
+  mkdir -p "${fake_home}/.config/airgradient-monitor"
+  echo '{}' > "${fake_home}/.config/airgradient-monitor/config.json"
+
   cat << 'EOF' > "${mock_bin}/airgradient-monitor"
 #!/usr/bin/env bash
+echo "AG_ARGS:$*" > "${TEST_AG_BIN_LOG}"
 if [[ "${1:-}" == "-genmon" ]]; then
   cat << 'XML'
 <txt><span foreground='#ff5555'>CO2: 950ppm</span></txt>
@@ -412,12 +423,16 @@ fi
 exit 1
 EOF
   chmod +x "${mock_bin}/airgradient-monitor"
+  export TEST_AG_BIN_LOG="${TEST_TMP}/t9_ag_bin.log"
 
   sb_ag="$(HOME="${fake_home}" PATH="${mock_bin}:${PATH}" bash "${HOME}/.config/swiftbar/airgradient.10s.sh")"
   assert_contains "SwiftBar airgradient strips XML/Pango tags from <txt>" \
     "CO2: 950ppm" "${sb_ag}"
   assert_contains "SwiftBar airgradient includes <tool> lines in dropdown" \
     "PM2.5: 8 ug/m3" "${sb_ag}"
+  assert_contains "SwiftBar airgradient passes explicit -config path on Darwin" \
+    "-genmon -config ${fake_home}/.config/airgradient-monitor/config.json" \
+    "$(cat "${TEST_AG_BIN_LOG}")"
 }
 
 # ------------------------------------------------------------------------------
@@ -461,6 +476,10 @@ echo "[Test 12] bootstrap_macos.sh --dry-run (Mule-first), launchd plists, and J
     "ln -sfn /Applications/kitty.app/Contents/MacOS/kitty ${HOME}/bin/kitty" "${dry_out}"
   assert_contains "bootstrap_macos.sh --dry-run ensures ~/.ssh/config contains Host gcloud" \
     "Ensure ~/.ssh/config contains Host gcloud" "${dry_out}"
+  assert_contains "bootstrap_macos.sh --dry-run clones air_gradient_alarm_daemon" \
+    "git clone https://github.com/marcel-valdez/air_gradient_alarm_daemon.git" "${dry_out}"
+  assert_contains "bootstrap_macos.sh --dry-run builds ./cmd/airgradient-monitor" \
+    "./cmd/airgradient-monitor" "${dry_out}"
   assert_true "~/scripts/bootstrap_macos.sh and ~/.googlerc.d/scripts/bootstrap_macos.sh are identical" \
     cmp -s "${HOME}/scripts/bootstrap_macos.sh" "${HOME}/.googlerc.d/scripts/bootstrap_macos.sh"
 
@@ -593,6 +612,27 @@ EOF
 
   assert_true "org-mode-config.el loads cleanly when ~/notes and ~/gtd are absent on fresh laptop" \
     env HOME="${fake_home}" emacs -Q --batch -L "${HOME}/.emacs.d/lisp" -l "${HOME}/.emacs.d/lisp/org-mode-config.el"
+}
+
+# ------------------------------------------------------------------------------
+# Test 15: ~/.hammerspoon/init.lua macOS 15+ Space-Moving & Multi-Workspace Alt-Tab
+# ------------------------------------------------------------------------------
+echo "[Test 15] ~/.hammerspoon/init.lua macOS 15+ space-moving & multi-workspace Alt-Tab"
+{
+  assert_true "init.lua defines ensureUserSpacesCount for auto-creating 6 Spaces" \
+    grep -q "local function ensureUserSpacesCount" "${HOME}/.hammerspoon/init.lua"
+  assert_true "init.lua defines moveWindowViaMissionControl for borderless & direct Space jumps" \
+    grep -q "local function moveWindowViaMissionControl" "${HOME}/.hammerspoon/init.lua"
+  assert_true "init.lua clears hardware modifiers via :rawFlags(0) on synthetic mouse drag" \
+    grep -q ":rawFlags(0)" "${HOME}/.hammerspoon/init.lua"
+  assert_true "init.lua defines buildAllWorkspacesChooserChoices for cross-workspace Alt-Tab" \
+    grep -q "local function buildAllWorkspacesChooserChoices" "${HOME}/.hammerspoon/init.lua"
+  assert_true "init.lua pre-populates default workspace prefix filter ^<N> " \
+    grep -Fq 'initialChooserQuery = string.format("^%d ", currentSpaceIdx)' "${HOME}/.hammerspoon/init.lua"
+  assert_true "init.lua defines focusSelectedWindowChoice to switch workspace and raise window" \
+    grep -q "local function focusSelectedWindowChoice" "${HOME}/.hammerspoon/init.lua"
+  assert_true "init.lua has no hardcoded /opt/homebrew/bin/bash paths" \
+    bash -c "! grep -q '/opt/homebrew/bin/bash' '${HOME}/.hammerspoon/init.lua'"
 }
 
 echo "=============================================================================="

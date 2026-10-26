@@ -208,7 +208,7 @@ if [[ "$(uname -s)" != "Darwin" ]] && (( DRY_RUN == 0 )); then
   exit 1
 fi
 
-run_cmd mkdir -p "${HOME}/bin" "${HOME}/.local/bin" "${HOME}/modules" "${HOME}/.cache" "${HOME}/tmp" "${HOME}/notes" "${HOME}/gtd"
+run_cmd mkdir -p "${HOME}/bin" "${HOME}/.local/bin" "${HOME}/modules" "${HOME}/projects" "${HOME}/.cache" "${HOME}/tmp" "${HOME}/notes" "${HOME}/gtd"
 
 # ------------------------------------------------------------------------------
 # Stage 1: Google Internal `mule` Package Manager (/usr/local/bin/mule)
@@ -339,12 +339,20 @@ EOF
 fi
 
 # ------------------------------------------------------------------------------
-# Stage 3: External Git Modules (~/modules/pomodoro, ~/.googlerc.d) & Helpers
+# Stage 3: External Git Modules (~/modules/pomodoro, ~/projects/*, ~/.googlerc.d) & Helpers
 # ------------------------------------------------------------------------------
 echo ""
 echo "--- Stage 3: External Modules & Native C++ Helper Compilation ---"
 if [[ ! -d "${HOME}/modules/pomodoro" ]]; then
   run_cmd git clone https://github.com/parantapa/pomodoro.git "${HOME}/modules/pomodoro"
+fi
+if [[ ! -d "${HOME}/projects/air_gradient_alarm_daemon/.git" ]]; then
+  run_cmd git clone https://github.com/marcel-valdez/air_gradient_alarm_daemon.git "${HOME}/projects/air_gradient_alarm_daemon" || \
+    echo "[WARN] Could not clone air_gradient_alarm_daemon."
+fi
+if [[ ! -d "${HOME}/projects/whatsapp-notification/.git" ]]; then
+  run_cmd git clone https://github.com/marcel-valdez/whatsapp-notification.git "${HOME}/projects/whatsapp-notification" || \
+    echo "[WARN] Could not clone whatsapp-notification."
 fi
 
 if [[ ! -d "${HOME}/.googlerc.d/.git" ]]; then
@@ -430,10 +438,11 @@ if command -v go >/dev/null 2>&1 || (( DRY_RUN == 1 )); then
     run_cmd bash -c "cd '${HOME}/projects/whatsapp-notification' && CGO_ENABLED=1 GOOS=darwin GOARCH=arm64 go build -o bin/whatsapp-notification ."
   fi
   if [[ -d "${HOME}/projects/air_gradient_alarm_daemon" ]] || (( DRY_RUN == 1 )); then
-    run_cmd bash -c "cd '${HOME}/projects/air_gradient_alarm_daemon' && CGO_ENABLED=0 GOOS=darwin GOARCH=arm64 go build -o airgradient-monitor ."
-    run_cmd mkdir -p "${HOME}/.config/airgradient-monitor"
+    run_cmd bash -c "cd '${HOME}/projects/air_gradient_alarm_daemon' && CGO_ENABLED=0 GOOS=darwin GOARCH=arm64 go build -trimpath -o airgradient-monitor ./cmd/airgradient-monitor && cp -f airgradient-monitor '${HOME}/.local/bin/airgradient-monitor'"
+    run_cmd mkdir -p -m 700 "${HOME}/.config/airgradient-monitor"
     if [[ -f "${HOME}/.config/airgradient-monitor/config.macos.json" && ! -f "${HOME}/.config/airgradient-monitor/config.json" ]]; then
       run_cmd cp "${HOME}/.config/airgradient-monitor/config.macos.json" "${HOME}/.config/airgradient-monitor/config.json"
+      run_cmd chmod 600 "${HOME}/.config/airgradient-monitor/config.json"
     fi
   fi
 else
