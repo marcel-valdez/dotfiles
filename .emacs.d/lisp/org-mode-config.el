@@ -149,8 +149,10 @@
         '((nil :maxlevel . 3)
           (org-agenda-files :maxlevel . 3)))
   (setq org-agenda-text-search-extra-files
-        (directory-files-recursively "~/notes/" "md$"))
-  (setq org-agenda-files '("~/notes/" "~/gtd/")))
+        (when (file-directory-p "~/notes/")
+          (directory-files-recursively "~/notes/" "md$")))
+  (setq org-agenda-files
+        (seq-filter #'file-directory-p '("~/notes/" "~/gtd/"))))
 
 (provide 'org-mode-config)
 ;;; org-mode-config.el ends here

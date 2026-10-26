@@ -415,29 +415,106 @@ function ps-nice() {
 
 function emacs() {
   local emacs_bin
-  emacs_bin="$(command -v -p emacs 2>/dev/null || echo /usr/bin/emacs)"
-  if [[ "${TERM}" =~ "eterm" ]]; then
+  if declare -F os::emacs_bin &>/dev/null; then
+    emacs_bin="$(os::emacs_bin)"
+  else
+    emacs_bin="$(type -P emacs 2>/dev/null || echo /usr/local/bin/emacs)"
+    [[ ! -x "${emacs_bin}" && -x /Applications/Emacs.app/Contents/MacOS/Emacs ]] && emacs_bin="/Applications/Emacs.app/Contents/MacOS/Emacs"
+    [[ ! -x "${emacs_bin}" && -x /usr/bin/emacs ]] && emacs_bin="/usr/bin/emacs"
+  fi
+  if [[ "${TERM:-}" =~ "eterm" ]]; then
     emacs-client "$@"
   else
-    "${emacs_bin}" --no-window-system "$@" &>"/tmp/emacs-${USER}-${RANDOM}.log"
+    "${emacs_bin}" --no-window-system "$@" 2>"/tmp/emacs-${USER}-${RANDOM}.log"
   fi
 }
 
 function emacs-client() {
   local emacsclient_bin emacs_bin
-  emacsclient_bin="$(command -v emacsclient 2>/dev/null || echo /usr/bin/emacsclient)"
-  emacs_bin="$(command -v -p emacs 2>/dev/null || echo /usr/bin/emacs)"
-  local editor_cmd=("${emacsclient_bin}" --create-frame --tty --socket-name="${EMACS_TTY_SERVER}")
-  if ! EDITOR="'""${editor_cmd[@]}""'" "${editor_cmd[@]}" "$@"; then
-    if [[ -x /usr/bin/systemd-run ]]; then
-      (nohup /usr/bin/systemd-run --user "${emacs_bin}" --daemon="${EMACS_TTY_SERVER}") & disown
-    else
-      (nohup "${emacs_bin}" --bg-daemon="${EMACS_TTY_SERVER}") & disown
-    fi
-    # Give the server 250ms to start listening for connections.
-    sleep 0.250
-    EDITOR="'""${editor_cmd[@]}""'" "${editor_cmd[@]}" "$@"
+  local socket_name="${EMACS_TTY_SERVER:-tty-server}"
+  if declare -F os::emacsclient_bin &>/dev/null; then
+    emacsclient_bin="$(os::emacsclient_bin)"
+    emacs_bin="$(os::emacs_bin)"
+  else
+    emacsclient_bin="$(type -P emacsclient 2>/dev/null || echo /usr/local/bin/emacsclient)"
+    [[ ! -x "${emacsclient_bin}" && -x /Applications/Emacs.app/Contents/MacOS/bin/emacsclient ]] && emacsclient_bin="/Applications/Emacs.app/Contents/MacOS/bin/emacsclient"
+    [[ ! -x "${emacsclient_bin}" && -x /usr/bin/emacsclient ]] && emacsclient_bin="/usr/bin/emacsclient"
+    emacs_bin="$(type -P emacs 2>/dev/null || echo /usr/local/bin/emacs)"
+    [[ ! -x "${emacs_bin}" && -x /Applications/Emacs.app/Contents/MacOS/Emacs ]] && emacs_bin="/Applications/Emacs.app/Contents/MacOS/Emacs"
+    [[ ! -x "${emacs_bin}" && -x /usr/bin/emacs ]] && emacs_bin="/usr/bin/emacs"
   fi
+  local editor_cmd=("${emacsclient_bin}" --create-frame --tty --socket-name="${socket_name}")
+  if declare -F os::ensure_emacs_daemon &>/dev/null; then
+    os::ensure_emacs_daemon --wait "${socket_name}" || return 1
+    EDITOR="'""${editor_cmd[*]}""'" "${editor_cmd[@]}" "$@"
+  elif ! EDITOR="'""${editor_cmd[*]}""'" "${editor_cmd[@]}" "$@"; then
+    (nohup "${emacs_bin}" --daemon="${socket_name}" &> "/tmp/emacs-${socket_name}-server.log") & disown
+    sleep 1
+    EDITOR="'""${editor_cmd[*]}""'" "${editor_cmd[@]}" "$@"
+  fi
+}
+
+function emacsclient() {
+  local emacsclient_bin
+  if declare -F os::emacsclient_bin &>/dev/null; then
+    emacsclient_bin="$(os::emacsclient_bin)"
+  else
+    emacsclient_bin="$(type -P emacsclient 2>/dev/null || echo /usr/local/bin/emacsclient)"
+    [[ ! -x "${emacsclient_bin}" && -x /Applications/Emacs.app/Contents/MacOS/bin/emacsclient ]] && emacsclient_bin="/Applications/Emacs.app/Contents/MacOS/bin/emacsclient"
+    [[ ! -x "${emacsclient_bin}" && -x /usr/bin/emacsclient ]] && emacsclient_bin="/usr/bin/emacsclient"
+  fi
+
+  local socket_name="${EMACS_TTY_SERVER:-tty-server}"
+  local has_socket=0
+  local has_mode=0
+  local is_info_flag=0
+  local prev_was_socket=0
+  local arg
+  for arg in "$@"; do
+    if (( prev_was_socket == 1 )); then
+      socket_name="${arg}"
+      prev_was_socket=0
+      continue
+    fi
+    case "${arg}" in
+      -s|--socket-name)
+        has_socket=1
+        prev_was_socket=1
+        ;;
+      --socket-name=*)
+        has_socket=1
+        socket_name="${arg#*=}"
+        ;;
+      -s*)
+        has_socket=1
+        socket_name="${arg#-s}"
+        ;;
+      -t|--tty|-nw|--no-window-system|-c|--create-frame|-e|--eval)
+        has_mode=1
+        ;;
+      -V|--version|-H|--help)
+        is_info_flag=1
+        ;;
+    esac
+  done
+
+  if (( is_info_flag == 1 )); then
+    "${emacsclient_bin}" "$@"
+    return $?
+  fi
+
+  if declare -F os::ensure_emacs_daemon &>/dev/null; then
+    os::ensure_emacs_daemon --wait "${socket_name}" || return 1
+  fi
+
+  local extra_args=()
+  if (( has_socket == 0 )); then
+    extra_args+=(--socket-name="${socket_name}")
+  fi
+  if (( has_mode == 0 )); then
+    extra_args+=(--tty)
+  fi
+  "${emacsclient_bin}" "${extra_args[@]}" "$@"
 }
 
 # force myself to use emacs, not nano
@@ -622,7 +699,7 @@ function fzf-edit {
         --delimiter : \
         --preview 'batcat --color=always {1} --highlight-line {2} --line-range {2}:-5 --line-range {2}:+5' \
         --preview-window 'up,60%,border-bottom,+{2}+3/3,~3' \
-        --bind 'enter:become(emacsclient --socket-name='"${EMACS_TTY_SERVER}"' --tty --create-frame {1} +{2})'
+        --bind 'enter:become(emacs-client {1} +{2})'
 }
 
 function fzf-edit-deep {
@@ -653,7 +730,7 @@ function fzf-edit-deep {
     --delimiter : \
     --preview 'batcat --color=always {1} --highlight-line {2}' \
     --preview-window 'up,60%,border-bottom,+{2}+3/3,~3' \
-    --bind 'enter:become(emacsclient --socket-name='"${EMACS_TTY_SERVER}"' --create-frame --tty {1} +{2})'
+    --bind 'enter:become(emacs-client {1} +{2})'
 }
 
 function fzf-preview {

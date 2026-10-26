@@ -62,10 +62,16 @@ fi
 
 if [[ "${GOOGLE3}" -eq 1 ]] && [[ -f "${HOME}/.googlerc.d/.google_functions" ]]; then
   run source "${HOME}/.googlerc.d/.google_functions"
-  run exec emacs "${ORIGINAL_ARGS[@]}"
 elif [[ -f "${HOME}/.bash_functions" ]]; then
   run source "${HOME}/.bash_functions"
-  run exec emacs "${ORIGINAL_ARGS[@]}"
-else
-  run exec emacs "${ORIGINAL_ARGS[@]}"
 fi
+
+[[ -f "${HOME}/lib/os_compat.sh" ]] && source "${HOME}/lib/os_compat.sh"
+if declare -F os::emacs_bin &>/dev/null; then
+  EMACS_BIN="$(os::emacs_bin)"
+else
+  EMACS_BIN="$(type -P emacs 2>/dev/null || echo /usr/local/bin/emacs)"
+  [[ ! -x "${EMACS_BIN}" && -x /Applications/Emacs.app/Contents/MacOS/Emacs ]] && EMACS_BIN="/Applications/Emacs.app/Contents/MacOS/Emacs"
+  [[ ! -x "${EMACS_BIN}" && -x /usr/bin/emacs ]] && EMACS_BIN="/usr/bin/emacs"
+fi
+run exec "${EMACS_BIN}" "${ORIGINAL_ARGS[@]}"

@@ -23,8 +23,9 @@ fi
 [[ -z "${DEBUG_BASHRC:-}" ]] && export DEBUG_BASHRC=
 [[ -z "${DEBUG:-}" ]] && export DEBUG=
 [[ -z "${EMACS_TTY_SERVER:-}" ]] && export EMACS_TTY_SERVER="tty-server"
-# Ensure gMac Mule (/usr/local/bin, /usr/local/go/bin, Kitty.app) and optional Homebrew binaries are on PATH
-for _macos_dir in /opt/homebrew/bin /opt/homebrew/sbin /usr/local/go/bin /Applications/kitty.app/Contents/MacOS "${HOME}/.fzf/bin"; do
+export EMACS_SOCKET_NAME="${EMACS_TTY_SERVER}"
+# Ensure gMac Mule (/usr/local/bin, /usr/local/go/bin, Kitty.app, Emacs.app) and optional Homebrew binaries are on PATH
+for _macos_dir in /opt/homebrew/bin /opt/homebrew/sbin /usr/local/bin /usr/local/go/bin /Applications/kitty.app/Contents/MacOS /Applications/Emacs.app/Contents/MacOS/bin /Applications/Emacs.app/Contents/MacOS "${HOME}/.fzf/bin"; do
   if [[ -d "${_macos_dir}" && ":${PATH}:" != *":${_macos_dir}:"* ]]; then
     export PATH="${_macos_dir}:${PATH}"
   fi
@@ -286,7 +287,7 @@ if [[ "$(uname -s)" =~ ^(Linux|Darwin)$ ]]; then
     export EDITOR="emacs-client"
     export GIT_EDITOR="${EDITOR}"
   else
-    export EDITOR="emacsclient --socket-name=${EMACS_TTY_SERVER} --tty"
+    export EDITOR="emacs-client"
     export GIT_EDITOR="${EDITOR}"
   fi
   # if the terminal has not been initialized yet
@@ -314,9 +315,18 @@ if [[ "$(uname -s)" =~ ^(Linux|Darwin)$ ]]; then
   fi
 fi
 
-if ! pgrep -af '.*emacs.*'"--daemon=${EMACS_TTY_SERVER}"'.*' &>/dev/null; then
+if declare -F os::ensure_emacs_daemon &>/dev/null; then
+  if ! os::emacs_daemon_running "${EMACS_TTY_SERVER}"; then
+    log_debug "No emacs daemon running. Starting one."
+    os::ensure_emacs_daemon "${EMACS_TTY_SERVER}" || true
+  else
+    log_debug "Emacs daemon already running, not starting another one."
+  fi
+elif ! pgrep -if "emacs.*--(bg-|fg-)?daemon=${EMACS_TTY_SERVER}" &>/dev/null; then
   log_debug "No emacs daemon running. Starting one."
-  _emacs_bin="$(command -v emacs 2>/dev/null || echo /usr/bin/emacs)"
+  _emacs_bin="$(type -P emacs 2>/dev/null || echo /usr/local/bin/emacs)"
+  [[ ! -x "${_emacs_bin}" && -x /Applications/Emacs.app/Contents/MacOS/Emacs ]] && _emacs_bin="/Applications/Emacs.app/Contents/MacOS/Emacs"
+  [[ ! -x "${_emacs_bin}" && -x /usr/bin/emacs ]] && _emacs_bin="/usr/bin/emacs"
   if [[ -x "${_emacs_bin}" ]]; then
     (nohup "${_emacs_bin}" --daemon="${EMACS_TTY_SERVER}" &> "/tmp/emacs-${EMACS_TTY_SERVER}-server.log") & disown
   fi

@@ -43,8 +43,8 @@
 
 (package-initialize)
 ;; (add-to-list 'package-archives '("marmalade" . "http://marmalade-repo.org/packages/"))
-(add-to-list 'package-archives '("melpa" . "http://melpa.org/packages/"))
-(add-to-list 'package-archives '("elpa" . "http://elpa.gnu.org/packages/"))
+(add-to-list 'package-archives '("melpa" . "https://melpa.org/packages/"))
+(add-to-list 'package-archives '("elpa" . "https://elpa.gnu.org/packages/"))
 
 
 ;; TODO: cancel auto-complete mode when company-mode is enabled, as they
@@ -59,6 +59,12 @@
 (unless (package-installed-p 'use-package)
   (package-refresh-contents)
   (package-install 'use-package))
+
+;; Ensure host-role flags are always bound even when `at-office` (google.el) is
+;; unavailable on non-gLinux machines such as gMac laptops.
+(defvar at-office-is-work-laptop nil)
+(defvar at-office-is-workstation nil)
+(defvar at-office-is-gcloud nil)
 
 ;; loads packages only available at the office
 ;; uses the 'google package by default.

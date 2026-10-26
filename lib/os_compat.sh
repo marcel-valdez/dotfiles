@@ -678,3 +678,182 @@ os::play_audio() {
 os::play_sound() {
   os::play_audio "$@"
 }
+
+#######################################
+# Resolves the absolute filesystem path to the `emacs` executable binary,
+# bypassing any shell functions, aliases, or builtins via `type -P`.
+#
+# Arguments:
+#   None
+# Outputs:
+#   Absolute path to the `emacs` executable to stdout.
+# Returns:
+#   0 if an executable `emacs` binary was found, 1 otherwise.
+#
+# Usage Example:
+#   emacs_bin="$(os::emacs_bin)"
+#######################################
+os::emacs_bin() {
+  local cand
+  cand="$(type -P emacs 2>/dev/null || true)"
+  if [[ -n "${cand}" && -x "${cand}" ]]; then
+    printf '%s\n' "${cand}"
+    return 0
+  fi
+  for cand in \
+    /usr/local/bin/emacs \
+    /Applications/Emacs.app/Contents/MacOS/Emacs \
+    /opt/homebrew/bin/emacs \
+    /usr/bin/emacs; do
+    if [[ -x "${cand}" ]]; then
+      printf '%s\n' "${cand}"
+      return 0
+    fi
+  done
+  printf '%s\n' "/usr/bin/emacs"
+  return 1
+}
+
+#######################################
+# Resolves the absolute filesystem path to the `emacsclient` executable binary,
+# bypassing any shell functions, aliases, or builtins via `type -P`.
+#
+# Arguments:
+#   None
+# Outputs:
+#   Absolute path to the `emacsclient` executable to stdout.
+# Returns:
+#   0 if an executable `emacsclient` binary was found, 1 otherwise.
+#
+# Usage Example:
+#   emacsclient_bin="$(os::emacsclient_bin)"
+#######################################
+os::emacsclient_bin() {
+  local cand
+  cand="$(type -P emacsclient 2>/dev/null || true)"
+  if [[ -n "${cand}" && -x "${cand}" ]]; then
+    printf '%s\n' "${cand}"
+    return 0
+  fi
+  for cand in \
+    /usr/local/bin/emacsclient \
+    /Applications/Emacs.app/Contents/MacOS/bin/emacsclient \
+    /opt/homebrew/bin/emacsclient \
+    /usr/bin/emacsclient; do
+    if [[ -x "${cand}" ]]; then
+      printf '%s\n' "${cand}"
+      return 0
+    fi
+  done
+  printf '%s\n' "/usr/bin/emacsclient"
+  return 1
+}
+
+#######################################
+# Checks whether the Emacs daemon socket is live and accepting `emacsclient`
+# connections.
+#
+# Arguments:
+#   $1 - socket_name: Optional server socket name (default: EMACS_TTY_SERVER or
+#        'tty-server').
+# Returns:
+#   0 if the socket responds to `--eval 't'`, 1 otherwise.
+#
+# Usage Example:
+#   if os::emacs_socket_ready "tty-server"; then echo "Ready"; fi
+#######################################
+os::emacs_socket_ready() {
+  local socket_name="${1:-${EMACS_TTY_SERVER:-tty-server}}"
+  local emacsclient_bin
+  emacsclient_bin="$(os::emacsclient_bin)" || return 1
+  "${emacsclient_bin}" --socket-name="${socket_name}" --eval 't' &>/dev/null
+}
+
+#######################################
+# Checks whether the Emacs daemon for the given socket is either ready on its
+# socket or currently running/initializing in the process table.
+#
+# Arguments:
+#   $1 - socket_name: Optional server socket name (default: EMACS_TTY_SERVER or
+#        'tty-server').
+# Returns:
+#   0 if the daemon is running or socket is ready, 1 otherwise.
+#
+# Usage Example:
+#   if os::emacs_daemon_running "tty-server"; then echo "Running"; fi
+#######################################
+os::emacs_daemon_running() {
+  local socket_name="${1:-${EMACS_TTY_SERVER:-tty-server}}"
+  if os::emacs_socket_ready "${socket_name}"; then
+    return 0
+  fi
+  pgrep -if "emacs.*--(bg-|fg-)?daemon=${socket_name}" &>/dev/null
+}
+
+#######################################
+# Ensures the Emacs daemon for the specified socket is running. Starts it in the
+# background via `nohup` if not running, and optionally waits (`--wait`) until
+# the socket accepts connections.
+#
+# Arguments:
+#   [--wait|-w]     Block until the daemon socket is ready to accept clients.
+#   [socket_name]   Optional server socket name (default: EMACS_TTY_SERVER or
+#                   'tty-server').
+# Returns:
+#   0 if the daemon was started (or already running) and ready, 1 on failure.
+#
+# Usage Example:
+#   os::ensure_emacs_daemon --wait "tty-server"
+#######################################
+os::ensure_emacs_daemon() {
+  local socket_name="${EMACS_TTY_SERVER:-tty-server}"
+  local wait_for_socket=0
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --wait|-w)
+        wait_for_socket=1
+        shift
+        ;;
+      *)
+        socket_name="$1"
+        shift
+        ;;
+    esac
+  done
+
+  if os::emacs_socket_ready "${socket_name}"; then
+    return 0
+  fi
+
+  local emacs_bin
+  emacs_bin="$(os::emacs_bin)" || return 1
+  local log_file="/tmp/emacs-${socket_name}-server.log"
+
+  if ! pgrep -if "emacs.*--(bg-|fg-)?daemon=${socket_name}" &>/dev/null; then
+    (nohup "${emacs_bin}" --daemon="${socket_name}" &> "${log_file}") & disown
+  fi
+
+  if (( wait_for_socket == 1 )); then
+    local attempts=0
+    local max_attempts=300
+    while ! os::emacs_socket_ready "${socket_name}"; do
+      if (( attempts == 5 )); then
+        echo "Waiting for Emacs daemon (${socket_name}) to finish initializing (log: ${log_file})..." >&2
+      fi
+      if (( attempts >= max_attempts )); then
+        echo "ERROR: Timed out waiting for Emacs daemon (${socket_name}). Check ${log_file}." >&2
+        return 1
+      fi
+      if (( attempts > 3 )) && ! pgrep -if "emacs.*--(bg-|fg-)?daemon=${socket_name}" &>/dev/null; then
+        if ! os::emacs_socket_ready "${socket_name}"; then
+          echo "ERROR: Emacs daemon (${socket_name}) exited before creating socket. Log (${log_file}):" >&2
+          tail -n 20 "${log_file}" >&2 2>/dev/null || true
+          return 1
+        fi
+      fi
+      sleep 0.1
+      ((attempts++))
+    done
+  fi
+  return 0
+}

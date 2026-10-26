@@ -131,7 +131,7 @@ if [[ "$(uname -s)" != "Darwin" ]] && (( DRY_RUN == 0 )); then
   exit 1
 fi
 
-run_cmd mkdir -p "${HOME}/bin" "${HOME}/.local/bin" "${HOME}/modules" "${HOME}/.cache" "${HOME}/tmp"
+run_cmd mkdir -p "${HOME}/bin" "${HOME}/.local/bin" "${HOME}/modules" "${HOME}/.cache" "${HOME}/tmp" "${HOME}/notes" "${HOME}/gtd"
 
 # ------------------------------------------------------------------------------
 # Stage 1: Google Internal `mule` Package Manager (/usr/local/bin/mule)
@@ -179,10 +179,14 @@ else
 fi
 
 # NOTE: Never chown /usr/local on gMac (breaks mrmagoo CheckExecutableSafety).
-# Symlink Kitty CLI binaries from /Applications/kitty.app into ~/bin instead.
+# Symlink Kitty and Emacs CLI binaries from /Applications into ~/bin instead.
 if [[ -d "/Applications/kitty.app/Contents/MacOS" ]] || (( DRY_RUN == 1 )); then
   run_cmd ln -sfn "/Applications/kitty.app/Contents/MacOS/kitty" "${HOME}/bin/kitty"
   run_cmd ln -sfn "/Applications/kitty.app/Contents/MacOS/kitten" "${HOME}/bin/kitten"
+fi
+if [[ -d "/Applications/Emacs.app/Contents/MacOS" ]] || (( DRY_RUN == 1 )); then
+  run_cmd ln -sfn "/Applications/Emacs.app/Contents/MacOS/Emacs" "${HOME}/bin/emacs"
+  run_cmd ln -sfn "/Applications/Emacs.app/Contents/MacOS/bin/emacsclient" "${HOME}/bin/emacsclient"
 fi
 
 # ------------------------------------------------------------------------------

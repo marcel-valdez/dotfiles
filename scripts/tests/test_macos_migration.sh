@@ -539,6 +539,62 @@ EOF
     grep -q "CGO_ENABLED=1 GOOS=darwin GOARCH=arm64" "${HOME}/.googlerc.d/scripts/bootstrap_macos.sh"
 }
 
+# ------------------------------------------------------------------------------
+# Test 14: Emacs & emacsclient / emacs-client / tty-server Daemon Lifecycle
+# ------------------------------------------------------------------------------
+echo "[Test 14] Emacs & emacsclient / emacs-client / tty-server daemon lifecycle"
+{
+  fake_home="${TEST_TMP}/t14_home"
+  mock_bin="${TEST_TMP}/t14_bin"
+  mkdir -p "${fake_home}/lib" "${fake_home}/bin" "${mock_bin}"
+  cp "${HOME}/lib/os_compat.sh" "${fake_home}/lib/os_compat.sh"
+
+  cat << 'EOF' > "${mock_bin}/emacs"
+#!/usr/bin/env bash
+echo "MOCK_EMACS:$*"
+exit 0
+EOF
+  cat << 'EOF' > "${mock_bin}/emacsclient"
+#!/usr/bin/env bash
+echo "MOCK_EMACSCLIENT:$*"
+exit 0
+EOF
+  chmod +x "${mock_bin}/emacs" "${mock_bin}/emacsclient"
+
+  emacs_bin_resolved="$(
+    PATH="${mock_bin}:/usr/bin:/bin" bash -c "
+      source '${fake_home}/lib/os_compat.sh'
+      source '${HOME}/.bash_functions'
+      os::emacs_bin
+    "
+  )"
+  assert_eq "os::emacs_bin bypasses function emacs() and resolves mock binary" \
+    "${mock_bin}/emacs" "${emacs_bin_resolved}"
+
+  emacs_func_out="$(
+    PATH="${mock_bin}:/usr/bin:/bin" TERM="xterm-256color" bash -c "
+      source '${fake_home}/lib/os_compat.sh'
+      source '${HOME}/.bash_functions'
+      emacs test_file.txt
+    "
+  )"
+  assert_eq "function emacs() invokes real binary without recursion and preserves stdout" \
+    "MOCK_EMACS:--no-window-system test_file.txt" "${emacs_func_out}"
+
+  emacsclient_func_out="$(
+    PATH="${mock_bin}:/usr/bin:/bin" EMACS_TTY_SERVER="tty-server" bash -c "
+      source '${fake_home}/lib/os_compat.sh'
+      source '${HOME}/.bash_functions'
+      emacsclient test_file.txt
+    "
+  )"
+  assert_eq "function emacsclient() ensures daemon and passes --socket-name and --tty" \
+    "MOCK_EMACSCLIENT:--socket-name=tty-server --tty test_file.txt" "${emacsclient_func_out}"
+
+  assert_true "org-mode-config.el loads cleanly when ~/notes and ~/gtd are absent on fresh laptop" \
+    env HOME="${fake_home}" emacs -Q --batch -L "${HOME}/.emacs.d/lisp" -l "${HOME}/.emacs.d/lisp/org-mode-config.el"
+}
+
 echo "=============================================================================="
 echo "macOS Migration Test Summary: ${PASS_COUNT} passed, ${FAIL_COUNT} failed"
 echo "=============================================================================="

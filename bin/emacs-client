@@ -1,18 +1,42 @@
 #!/usr/bin/env bash
 
-[[ -z "${EMACS_TTY_SERVER}" ]] && EMACS_TTY_SERVER="tty-server"
+# Ensure gMac Mule (/usr/local/bin, Emacs.app) and optional Homebrew paths are on PATH
+for _dir in /opt/homebrew/bin /opt/homebrew/sbin /usr/local/bin /Applications/Emacs.app/Contents/MacOS/bin /Applications/Emacs.app/Contents/MacOS "${HOME}/bin"; do
+  if [[ -d "${_dir}" && ":${PATH}:" != *":${_dir}:"* ]]; then
+    export PATH="${_dir}:${PATH}"
+  fi
+done
+unset _dir
 
+[[ -f "${HOME}/lib/os_compat.sh" ]] && source "${HOME}/lib/os_compat.sh"
+
+[[ -z "${EMACS_TTY_SERVER:-}" ]] && EMACS_TTY_SERVER="tty-server"
 export EMACS_TTY_SERVER
+export EMACS_SOCKET_NAME="${EMACS_TTY_SERVER}"
 
-declare -a editor_cmd
-_emacsclient_bin="$(command -v emacsclient 2>/dev/null || echo /usr/bin/emacsclient)"
-editor_cmd+=("${_emacsclient_bin}" --create-frame --tty --socket-name="${EMACS_TTY_SERVER}")
-
-if ! pgrep -af '.*emacs.*'"--daemon=${EMACS_TTY_SERVER}"'.*' &>/dev/null; then
-  (emacs --daemon="${EMACS_TTY_SERVER}" &> "/tmp/emacs-${EMACS_TTY_SERVER}-server.log") & disown
-  # Give the server 125ms to start listening for connections.
-  sleep 0.125
+if declare -F os::emacsclient_bin &>/dev/null; then
+  _emacsclient_bin="$(os::emacsclient_bin)"
+else
+  _emacsclient_bin="$(type -P emacsclient 2>/dev/null || echo /usr/local/bin/emacsclient)"
+  [[ ! -x "${_emacsclient_bin}" && -x /Applications/Emacs.app/Contents/MacOS/bin/emacsclient ]] && _emacsclient_bin="/Applications/Emacs.app/Contents/MacOS/bin/emacsclient"
+  [[ ! -x "${_emacsclient_bin}" && -x /usr/bin/emacsclient ]] && _emacsclient_bin="/usr/bin/emacsclient"
 fi
 
-EDITOR="'""${editor_cmd[*]}""'" "${editor_cmd[@]}" "$@"
+declare -a editor_cmd
+editor_cmd+=("${_emacsclient_bin}" --create-frame --tty --socket-name="${EMACS_TTY_SERVER}")
+
+if declare -F os::ensure_emacs_daemon &>/dev/null; then
+  os::ensure_emacs_daemon --wait "${EMACS_TTY_SERVER}" || exit 1
+elif ! "${_emacsclient_bin}" --socket-name="${EMACS_TTY_SERVER}" --eval 't' &>/dev/null; then
+  _emacs_bin="$(type -P emacs 2>/dev/null || echo /usr/local/bin/emacs)"
+  [[ ! -x "${_emacs_bin}" && -x /Applications/Emacs.app/Contents/MacOS/Emacs ]] && _emacs_bin="/Applications/Emacs.app/Contents/MacOS/Emacs"
+  [[ ! -x "${_emacs_bin}" && -x /usr/bin/emacs ]] && _emacs_bin="/usr/bin/emacs"
+  (nohup "${_emacs_bin}" --daemon="${EMACS_TTY_SERVER}" &> "/tmp/emacs-${EMACS_TTY_SERVER}-server.log") & disown
+  for _ in {1..100}; do
+    "${_emacsclient_bin}" --socket-name="${EMACS_TTY_SERVER}" --eval 't' &>/dev/null && break
+    sleep 0.1
+  done
+fi
+
+EDITOR="'""${editor_cmd[*]}""'" exec "${editor_cmd[@]}" "$@"
 
