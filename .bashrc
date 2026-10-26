@@ -2,6 +2,11 @@
 # see /usr/share/doc/bash/examples/startup-files (in the package bash-doc)
 # for examples
 
+# Disable POSIX mode on macOS /bin/bash (3.2) so function names with '-' or '::'
+# and process substitution '< <(...)' are always permitted.
+unset POSIXLY_CORRECT
+set +o posix 2>/dev/null || true
+
 [[ -z "${DEBUG_BASHRC:-}" ]] && export DEBUG_BASHRC=
 [[ -z "${DEBUG:-}" ]] && export DEBUG=
 [[ -z "${EMACS_TTY_SERVER:-}" ]] && export EMACS_TTY_SERVER="tty-server"
@@ -115,6 +120,8 @@ log_debug "Loaded bash_completion"
 # See /usr/share/doc/bash-doc/examples in the bash-doc package.
 
 log_debug "Loading .bash* sources"
+unset POSIXLY_CORRECT
+set +o posix 2>/dev/null || true
 if [ -s "${HOME}/.bash_aliases" ]; then
   . "${HOME}/.bash_aliases"
 fi
@@ -374,9 +381,13 @@ if [[ ${BLE_FIRST_LOAD:-} ]]; then
 
   # These MUST be added after carapace.
   log_debug "START: Load fzf keybindings and completions."
+  unset POSIXLY_CORRECT
+  set +o posix 2>/dev/null || true
   [ -s "${HOME}/.fzf.bash" ] && . "${HOME}/.fzf.bash"
   log_debug "END: Load fzf keybindings and completions."
 fi
+unset POSIXLY_CORRECT
+set +o posix 2>/dev/null || true
 
 
 #+begin_src sh [ -n "$EAT_SHELL_INTEGRATION_DIR" ] && \ source "$EAT_SHELL_INTEGRATION_DIR/bash"
