@@ -2,9 +2,14 @@
 # ==============================================================================
 # airgradient.10s.sh: SwiftBar Menu Bar Plugin for AirGradient Monitor
 # ==============================================================================
-# Polls `airgradient-monitor -genmon` every 10 seconds, converts XFCE4 genmon
-# <txt>/<tool> XML tags and Pango <span> markup into SwiftBar menu bar format.
+# Disabled by default on gMac because custom Go binaries require Santa peer
+# upvotes. Set AIRGRADIENT_ENABLED=1 or touch
+# ~/.config/airgradient-monitor/enabled to enable.
 # ==============================================================================
+
+if [[ "${AIRGRADIENT_ENABLED:-0}" != "1" && ! -f "${HOME}/.config/airgradient-monitor/enabled" ]]; then
+  exit 0
+fi
 
 export PATH="/opt/homebrew/bin:/usr/local/bin:/usr/local/go/bin:${HOME}/.local/bin:${HOME}/bin:${PATH}"
 
@@ -24,28 +29,6 @@ find_ag_bin() {
 }
 
 AG_BIN="$(find_ag_bin)"
-
-# Self-heal on fresh machines: if airgradient-monitor has not been built yet
-# and Go is installed, clone marcel-valdez/air_gradient_alarm_daemon and build.
-if [[ -z "${AG_BIN}" ]] && command -v go &>/dev/null; then
-  mkdir -p "${HOME}/projects" "${HOME}/.local/bin"
-  if [[ ! -d "${AG_REPO_DIR}/.git" ]] && command -v git &>/dev/null; then
-    git clone --depth 1 https://github.com/marcel-valdez/air_gradient_alarm_daemon.git "${AG_REPO_DIR}" &>/dev/null || true
-  fi
-  if [[ -d "${AG_REPO_DIR}/cmd/airgradient-monitor" ]]; then
-    (
-      cd "${AG_REPO_DIR}" && \
-      CGO_ENABLED=0 go build -trimpath -o "${AG_REPO_DIR}/airgradient-monitor" ./cmd/airgradient-monitor &>/dev/null && \
-      cp -f "${AG_REPO_DIR}/airgradient-monitor" "${HOME}/.local/bin/airgradient-monitor" &>/dev/null
-    ) || true
-  fi
-  if [[ ! -f "${AG_CONFIG}" && -f "${HOME}/.config/airgradient-monitor/config.macos.json" ]]; then
-    mkdir -p -m 700 "${HOME}/.config/airgradient-monitor"
-    cp "${HOME}/.config/airgradient-monitor/config.macos.json" "${AG_CONFIG}"
-    chmod 600 "${AG_CONFIG}"
-  fi
-  AG_BIN="$(find_ag_bin)"
-fi
 
 if [[ -z "${AG_BIN}" ]]; then
   echo "AG: N/A"

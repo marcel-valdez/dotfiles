@@ -346,7 +346,7 @@ echo "--- Stage 3: External Modules & Native C++ Helper Compilation ---"
 if [[ ! -d "${HOME}/modules/pomodoro" ]]; then
   run_cmd git clone https://github.com/parantapa/pomodoro.git "${HOME}/modules/pomodoro"
 fi
-if [[ ! -d "${HOME}/projects/air_gradient_alarm_daemon/.git" ]]; then
+if [[ "${ENABLE_AIRGRADIENT:-0}" == "1" && ! -d "${HOME}/projects/air_gradient_alarm_daemon/.git" ]]; then
   run_cmd git clone https://github.com/marcel-valdez/air_gradient_alarm_daemon.git "${HOME}/projects/air_gradient_alarm_daemon" || \
     echo "[WARN] Could not clone air_gradient_alarm_daemon."
 fi
@@ -437,13 +437,15 @@ if command -v go >/dev/null 2>&1 || (( DRY_RUN == 1 )); then
     # whatsapp-notification uses github.com/mattn/go-sqlite3 (cgo) and requires CGO_ENABLED=1 + Xcode CLT
     run_cmd bash -c "cd '${HOME}/projects/whatsapp-notification' && CGO_ENABLED=1 GOOS=darwin GOARCH=arm64 go build -o bin/whatsapp-notification ."
   fi
-  if [[ -d "${HOME}/projects/air_gradient_alarm_daemon" ]] || (( DRY_RUN == 1 )); then
+  if [[ "${ENABLE_AIRGRADIENT:-0}" == "1" ]] && { [[ -d "${HOME}/projects/air_gradient_alarm_daemon" ]] || (( DRY_RUN == 1 )); }; then
     run_cmd bash -c "cd '${HOME}/projects/air_gradient_alarm_daemon' && CGO_ENABLED=0 GOOS=darwin GOARCH=arm64 go build -trimpath -o airgradient-monitor ./cmd/airgradient-monitor && cp -f airgradient-monitor '${HOME}/.local/bin/airgradient-monitor'"
     run_cmd mkdir -p -m 700 "${HOME}/.config/airgradient-monitor"
     if [[ -f "${HOME}/.config/airgradient-monitor/config.macos.json" && ! -f "${HOME}/.config/airgradient-monitor/config.json" ]]; then
       run_cmd cp "${HOME}/.config/airgradient-monitor/config.macos.json" "${HOME}/.config/airgradient-monitor/config.json"
       run_cmd chmod 600 "${HOME}/.config/airgradient-monitor/config.json"
     fi
+  else
+    echo "[INFO] airgradient-monitor is disabled by default on gMac (Santa binary policy); skipping build."
   fi
 else
   echo "[WARN] 'go' binary not found in PATH (/usr/local/go/bin/go); skipping Go daemon builds."
@@ -508,8 +510,22 @@ PLISTS=(
   "${HOME}/.googlerc.d/launchd/com.marcelvaldez.knock-daemon.plist"
   "${HOME}/.config/launchd/com.marcelvaldez.clipboard-daemon.plist"
   "${HOME}/.config/launchd/com.marcelvaldez.whatsapp-notification.plist"
-  "${HOME}/.config/launchd/com.marcelvaldez.airgradient-monitor.plist"
 )
+
+if [[ "${ENABLE_AIRGRADIENT:-0}" == "1" ]]; then
+  PLISTS+=("${HOME}/.config/launchd/com.marcelvaldez.airgradient-monitor.plist")
+  run_cmd chmod +x "${HOME}/.config/swiftbar/airgradient.10s.sh" || true
+else
+  # Keep airgradient-monitor disabled by default on gMac (Santa blocks unsigned personal Go binaries)
+  if [[ -f "${HOME}/.config/swiftbar/airgradient.10s.sh" ]] || (( DRY_RUN == 1 )); then
+    run_cmd chmod -x "${HOME}/.config/swiftbar/airgradient.10s.sh" || true
+  fi
+  if [[ -L "${HOME}/Library/LaunchAgents/com.marcelvaldez.airgradient-monitor.plist" || \
+        -f "${HOME}/Library/LaunchAgents/com.marcelvaldez.airgradient-monitor.plist" ]]; then
+    run_cmd launchctl bootout "gui/$(id -u)" "${HOME}/Library/LaunchAgents/com.marcelvaldez.airgradient-monitor.plist" || true
+    run_cmd rm -f "${HOME}/Library/LaunchAgents/com.marcelvaldez.airgradient-monitor.plist"
+  fi
+fi
 
 for plist_src in "${PLISTS[@]}"; do
   if [[ ! -f "${plist_src}" ]] && (( DRY_RUN == 0 )); then

@@ -425,8 +425,12 @@ EOF
   chmod +x "${mock_bin}/airgradient-monitor"
   export TEST_AG_BIN_LOG="${TEST_TMP}/t9_ag_bin.log"
 
-  sb_ag="$(HOME="${fake_home}" PATH="${mock_bin}:${PATH}" bash "${HOME}/.config/swiftbar/airgradient.10s.sh")"
-  assert_contains "SwiftBar airgradient strips XML/Pango tags from <txt>" \
+  sb_ag_default="$(HOME="${fake_home}" PATH="${mock_bin}:${PATH}" bash "${HOME}/.config/swiftbar/airgradient.10s.sh")"
+  assert_eq "SwiftBar airgradient is disabled by default on gMac (empty output)" \
+    "" "${sb_ag_default}"
+
+  sb_ag="$(HOME="${fake_home}" PATH="${mock_bin}:${PATH}" AIRGRADIENT_ENABLED=1 bash "${HOME}/.config/swiftbar/airgradient.10s.sh")"
+  assert_contains "SwiftBar airgradient strips XML/Pango tags from <txt> when enabled" \
     "CO2: 950ppm" "${sb_ag}"
   assert_contains "SwiftBar airgradient includes <tool> lines in dropdown" \
     "PM2.5: 8 ug/m3" "${sb_ag}"
@@ -476,10 +480,10 @@ echo "[Test 12] bootstrap_macos.sh --dry-run (Mule-first), launchd plists, and J
     "ln -sfn /Applications/kitty.app/Contents/MacOS/kitty ${HOME}/bin/kitty" "${dry_out}"
   assert_contains "bootstrap_macos.sh --dry-run ensures ~/.ssh/config contains Host gcloud" \
     "Ensure ~/.ssh/config contains Host gcloud" "${dry_out}"
-  assert_contains "bootstrap_macos.sh --dry-run clones air_gradient_alarm_daemon" \
-    "git clone https://github.com/marcel-valdez/air_gradient_alarm_daemon.git" "${dry_out}"
-  assert_contains "bootstrap_macos.sh --dry-run builds ./cmd/airgradient-monitor" \
-    "./cmd/airgradient-monitor" "${dry_out}"
+  assert_contains "bootstrap_macos.sh --dry-run keeps airgradient-monitor disabled by default" \
+    "airgradient-monitor is disabled by default on gMac" "${dry_out}"
+  assert_contains "bootstrap_macos.sh --dry-run marks airgradient.10s.sh non-executable by default" \
+    "chmod -x ${HOME}/.config/swiftbar/airgradient.10s.sh" "${dry_out}"
   assert_true "~/scripts/bootstrap_macos.sh and ~/.googlerc.d/scripts/bootstrap_macos.sh are identical" \
     cmp -s "${HOME}/scripts/bootstrap_macos.sh" "${HOME}/.googlerc.d/scripts/bootstrap_macos.sh"
 
