@@ -68,6 +68,30 @@ is_credential_valid_quiet() {
 # Usage Example:
 #   wait_for_valid_credentials
 #######################################
+#######################################
+# Reads a single character from stdin with a timeout (supporting fractional
+# timeouts on both Bash 4+ and macOS /bin/bash 3.2 via perl IO::Select).
+#
+# Arguments:
+#   $1 - timeout_sec: Timeout in seconds (integer or fractional, e.g. 0.2).
+#   $2 - out_var: Variable name to receive the character read (optional).
+# Returns:
+#   0 if a character was read, 1 on EOF, 142 on timeout.
+#######################################
+read_char_timeout() {
+  local timeout_sec="$1"
+  local out_var="${2:-REPLY}"
+  if (( BASH_VERSINFO[0] >= 4 )); then
+    IFS= read -r -s -t "${timeout_sec}" -n 1 "${out_var}"
+    return $?
+  fi
+  if ! perl -MIO::Select -e 'exit(IO::Select->new(\*STDIN)->can_read(shift) ? 0 : 1)' "${timeout_sec}" 2>/dev/null; then
+    return 142
+  fi
+  IFS= read -r -s -t 1 -n 1 "${out_var}"
+  return $?
+}
+
 wait_for_valid_credentials() {
   if is_credential_valid_quiet; then
     return 0
@@ -79,10 +103,11 @@ wait_for_valid_credentials() {
 
   while ! is_credential_valid_quiet; do
     local user_key=""
-    if read -r -s -t "${poll_interval}" -n 1 user_key; then
+    if read_char_timeout "${poll_interval}" user_key; then
       if [[ "${user_key}" == $'\e' ]]; then
         # Drain escape sequences (e.g. Kitty focus events ^[[I / ^[[O or arrow keys)
-        while read -r -s -t 0.05 -n 1; do :; done
+        local _discard=""
+        while read_char_timeout 0.05 _discard; do :; done
       elif [[ "${user_key}" == "g" || "${user_key}" == "G" ]]; then
         log::info "[$(date +%H:%M:%S)] Starting gcert authentication in this terminal..."
         if command -v gcert &>/dev/null; then
@@ -127,7 +152,7 @@ monitor_gmosh_session() {
   local timeline_file="$2"
   local expired_flag_file="$3"
   local watch_interval="${GMOSH_WATCH_INTERVAL:-2}"
-  local self_pid="${BASHPID:-$$}"
+  local self_pid="${BASHPID:-$(sh -c 'echo $PPID')}"
   local last_state=""
 
   while kill -0 "${parent_pid}" 2>/dev/null; do
@@ -272,7 +297,7 @@ while true; do
 
         timeline_file="$(mktemp "/tmp/gmosh_timeline_XXXXXX")"
         expired_flag_file="${timeline_file}.expired"
-        monitor_gmosh_session "$$" "${timeline_file}" "${expired_flag_file}" &
+        monitor_gmosh_session "$$" "${timeline_file}" "${expired_flag_file}" </dev/null >/dev/null 2>&1 &
         monitor_pid="$!"
 
         # mosh requires remote command tokens passed separately so mosh-server can execvp correctly
@@ -287,6 +312,7 @@ while true; do
         exit_code=$?
 
         if [[ -n "${monitor_pid}" ]]; then
+            pkill -TERM -P "${monitor_pid}" 2>/dev/null || true
             kill -TERM "${monitor_pid}" 2>/dev/null || true
             wait "${monitor_pid}" 2>/dev/null || true
         fi
@@ -322,10 +348,10 @@ while true; do
 
     log::warn "[$(date +%H:%M:%S)] Connection lost (Code ${exit_code}). Retrying in 3s... (Ctrl+C to stop)"
     # Flush focus-reporting garbage before sleeping
-    while read -r -t 0.05; do :; done
+    while read_char_timeout 0.05 _discard; do :; done
     sleep 3
     # Flush focus-reporting garbage after sleeping
-    while read -r -t 0.05; do :; done
+    while read_char_timeout 0.05 _discard; do :; done
 done
 
 
