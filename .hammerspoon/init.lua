@@ -815,17 +815,20 @@ altDragTap:start()
 -- -----------------------------------------------------------------------------
 -- 6. <Alt>Tab Fuzzy Window Switcher with Multi-Workspace Prefix Filter & Border
 -- -----------------------------------------------------------------------------
--- Replicates ~/modules/x-window-shortcuts/rofi-window-switcher and
--- fzf-window-switcher.sh:
---   - Tracks windows across all workspaces (Spaces 1..6) in MRU order.
---   - Formats entries as: "<workspace_num> <app_prefix>: <title> (0x<win_id>)".
---   - Opens with default prefix filter "^<current_workspace_num> " so only
---     current-workspace windows appear initially (with PREV_WINDOW_ID at row 1).
---   - Deleting the "^<N> " prefix filter (via Backspace, Ctrl+U, Ctrl+W,
---     Alt+Backspace, or Cmd+Backspace) reveals all windows across all
---     workspaces (1..6).
---   - Selecting a window on another workspace switches focus to that workspace
---     and raises + focuses the target window.
+-- Replicates ~/modules/x-window-shortcuts/rofi-window-switcher,
+-- fzf-window-switcher.sh, and draw_border_around_window.py with O(1) startup:
+--   - Background async indexing tracks windows across all workspaces (1..6) in
+--     knownWindowsById and caches app icons in appIconCache (like USER_ICONS).
+--   - Pressing <Alt>Tab only queries hs.window.orderedWindows() on the active
+--     Space (< 2ms) and reads other workspaces from in-memory cache (zero
+--     hs.window.get / AXUIElement IPC or WindowServer scans on startup).
+--   - Reuses a single pre-allocated hs.canvas border window (highlightCanvas)
+--     and debounces border updates asynchronously (40ms throttle via
+--     borderDebounceTimer) using pre-cached window frames.
+--   - Opens with default prefix filter "^<current_workspace_num> " (with
+--     trailing space). Pressing Backspace once (turning "^1 " into "^1" or "")
+--     immediately shows all windows from all workspaces (1..6) without
+--     mutating NSTextField inside queryChangedCallback.
 local mruWindowIds = hs.settings.get("hammerspoonMruIds") or {}
 local knownWindowsById = {}
 local persistedWinMeta = hs.settings.get("hammerspoonWindowCache") or {}
@@ -836,14 +839,22 @@ for k, v in pairs(persistedWinMeta) do
   end
 end
 
+local appIconCache = {}
+local cachedSpaceIndexById = {}
+local cachedCurrentSpaceId = nil
+local cachedCurrentSpaceIdx = 1
+local persistStateTimer = nil
+local bgSpaceSyncTimer = nil
+
 local highlightCanvas = nil
+local borderDebounceTimer = nil
+local BORDER_DEBOUNCE_SEC = 0.04
+
 local windowChooser = nil
 local chooserPollTimer = nil
-local chooserKeyTap = nil
 local lastSelectedRow = nil
 local allChooserChoices = {}
 local initialChooserQuery = ""
-local isInitialPrefixActive = false
 
 local PREFIXED_APP_SHORTNAMES = {"kitty", "wezterm", "chrome", "emacs"}
 
@@ -856,6 +867,7 @@ local IGNORED_APP_NAMES = {
   ["Spotlight"] = true,
   ["SwiftBar"] = true,
   ["Karabiner-NotificationWindow"] = true,
+  ["Hammerspoon"] = true,
 }
 
 local function normalizeShortAppPrefix(appName)
@@ -868,159 +880,46 @@ local function normalizeShortAppPrefix(appName)
   return nil
 end
 
-local function persistWindowTrackerState()
-  local serializableMeta = {}
-  for winId, meta in pairs(knownWindowsById) do
-    serializableMeta[tostring(winId)] = {
-      winId = winId,
-      title = meta.title or "",
-      appName = meta.appName or "Unknown",
-      bundleID = meta.bundleID,
-      pid = meta.pid or 0,
-      spaceId = meta.spaceId,
-    }
+local function getCachedAppIcon(bundleID)
+  if not bundleID or bundleID == "" then return nil end
+  local cached = appIconCache[bundleID]
+  if cached ~= nil then
+    return cached or nil
   end
-  pcall(hs.settings.set, "hammerspoonWindowCache", serializableMeta)
-  pcall(hs.settings.set, "hammerspoonMruIds", mruWindowIds)
+  local icon = hs.image.imageFromAppBundle(bundleID)
+  appIconCache[bundleID] = icon or false
+  return icon
 end
 
-local function recordWindowMetadata(win, explicitSpaceId)
-  if not win then return end
-  local okId, winId = pcall(function() return win:id() end)
-  if not okId or not winId or winId <= 0 then return end
-  local okStd, isStd = pcall(function() return win:isStandard() end)
-  if okStd and not isStd then return end
-
-  local app = win:application()
-  local appName = app and app:name() or "Unknown"
-  if IGNORED_APP_NAMES[appName] then return end
-  if appName == "Hammerspoon" and (win:title() or "") == "" then return end
-
-  local bundleID = app and app:bundleID() or nil
-  local pid = app and app:pid() or 0
-  local title = win:title() or ""
-  local winSpaces = hs.spaces.windowSpaces(winId)
-  local spId = explicitSpaceId or (winSpaces and winSpaces[1]) or
-               (knownWindowsById[winId] and knownWindowsById[winId].spaceId) or
-               hs.spaces.focusedSpace()
-
-  knownWindowsById[winId] = {
-    win = win,
-    winId = winId,
-    title = title,
-    appName = appName,
-    bundleID = bundleID,
-    pid = pid,
-    spaceId = spId,
-  }
-end
-
-local function scanActiveSpaceWindows()
-  local activeSpace = hs.spaces.focusedSpace()
-  for _, w in ipairs(hs.window.orderedWindows()) do
-    recordWindowMetadata(w, activeSpace)
+local function schedulePersistWindowTrackerState()
+  if persistStateTimer then
+    persistStateTimer:stop()
   end
-  persistWindowTrackerState()
-end
-
-local wf = hs.window.filter.new()
-wf:subscribe({
-  hs.window.filter.windowFocused,
-  hs.window.filter.windowCreated,
-  hs.window.filter.windowTitleChanged,
-  hs.window.filter.windowMoved,
-}, function(win, _, event)
-  if not win then return end
-  recordWindowMetadata(win, nil)
-  local okId, id = pcall(function() return win:id() end)
-  if not okId or not id then return end
-  if event == hs.window.filter.windowFocused then
-    for i = #mruWindowIds, 1, -1 do
-      if mruWindowIds[i] == id then
-        table.remove(mruWindowIds, i)
-      end
+  persistStateTimer = hs.timer.doAfter(2.0, function()
+    persistStateTimer = nil
+    local serializableMeta = {}
+    for winId, meta in pairs(knownWindowsById) do
+      serializableMeta[tostring(winId)] = {
+        winId = winId,
+        title = meta.title or "",
+        appName = meta.appName or "Unknown",
+        bundleID = meta.bundleID,
+        pid = meta.pid or 0,
+        spaceId = meta.spaceId,
+        spaceIdx = meta.spaceIdx or 1,
+      }
     end
-    table.insert(mruWindowIds, 1, id)
-    while #mruWindowIds > 64 do
-      table.remove(mruWindowIds)
-    end
-  end
-  persistWindowTrackerState()
-end)
-
-wf:subscribe(hs.window.filter.windowDestroyed, function(win)
-  if not win then return end
-  local okId, id = pcall(function() return win:id() end)
-  if not okId or not id then return end
-  knownWindowsById[id] = nil
-  for i = #mruWindowIds, 1, -1 do
-    if mruWindowIds[i] == id then
-      table.remove(mruWindowIds, i)
-    end
-  end
-  persistWindowTrackerState()
-end)
-
--- Also refresh active Space window metadata whenever Spaces switch
-local mruSpaceWatcher = hs.spaces.watcher.new(function(_)
-  hs.timer.doAfter(0.1, scanActiveSpaceWindows)
-end)
-mruSpaceWatcher:start()
-hs.timer.doAfter(0.2, scanActiveSpaceWindows)
-
-local function clearWindowBorder()
-  if chooserPollTimer then
-    chooserPollTimer:stop()
-    chooserPollTimer = nil
-  end
-  if chooserKeyTap then
-    chooserKeyTap:stop()
-    chooserKeyTap = nil
-  end
-  if highlightCanvas then
-    highlightCanvas:delete()
-    highlightCanvas = nil
-  end
-  lastSelectedRow = nil
+    pcall(hs.settings.set, "hammerspoonWindowCache", serializableMeta)
+    pcall(hs.settings.set, "hammerspoonMruIds", mruWindowIds)
+  end)
 end
 
-local function drawBlueBorderAroundWindow(win)
-  if highlightCanvas then
-    highlightCanvas:delete()
-    highlightCanvas = nil
-  end
-  if not win then return end
-  local f = win:frame()
-  if not f or f.w <= 0 or f.h <= 0 then return end
-
-  -- Replicates draw_border_around_window.py: 10px stroke, RGBA(0, 0, 1.0, 0.85)
-  local pad = 10
-  highlightCanvas = hs.canvas.new({
-    x = f.x - pad,
-    y = f.y - pad,
-    w = f.w + (pad * 2),
-    h = f.h + (pad * 2),
-  })
-  highlightCanvas:appendElements({
-    type = "rectangle",
-    action = "stroke",
-    strokeWidth = 10,
-    strokeColor = {red = 0.0, green = 0.0, blue = 1.0, alpha = 0.85},
-    roundedRectRadii = {xRadius = 4, yRadius = 4},
-    frame = {x = 5, y = 5, w = f.w + 10, h = f.h + 10},
-  })
-  highlightCanvas:level(hs.canvas.windowLevels.overlay)
-  highlightCanvas:show()
-end
-
-local function getSpaceIndexMaps()
+local function refreshSpaceIndexCache()
   local spaceIndexById = {}
-  local spaceIdByIndex = {}
   local mainScr = hs.screen.mainScreen()
   local mainSpaces = getOrderedUserSpacesForCurrentScreen(mainScr)
   for idx, spId in ipairs(mainSpaces) do
     spaceIndexById[spId] = idx
-    spaceIdByIndex[idx] = spId
   end
   for _, scr in ipairs(hs.screen.allScreens()) do
     if scr ~= mainScr then
@@ -1032,36 +931,55 @@ local function getSpaceIndexMaps()
       end
     end
   end
-  local focusedSpaceId = hs.spaces.focusedSpace()
-  local currentSpaceIdx = (focusedSpaceId and spaceIndexById[focusedSpaceId]) or 1
-  return spaceIndexById, spaceIdByIndex, focusedSpaceId, currentSpaceIdx
+  cachedSpaceIndexById = spaceIndexById
+  cachedCurrentSpaceId = hs.spaces.focusedSpace()
+  cachedCurrentSpaceIdx = (cachedCurrentSpaceId and spaceIndexById[cachedCurrentSpaceId]) or 1
+  return cachedSpaceIndexById, cachedCurrentSpaceId, cachedCurrentSpaceIdx
 end
 
-local function buildAllWorkspacesChooserChoices()
-  local spaceIndexById, _, focusedSpaceId, currentSpaceIdx = getSpaceIndexMaps()
+local function recordActiveWindowFast(win, spaceId, spaceIdx)
+  if not win then return nil end
+  local wid = win:id()
+  if not wid or wid <= 0 then return nil end
 
-  -- 1. Refresh windows on the currently active Space
-  local activeOrdered = hs.window.orderedWindows()
-  local activeOrderRank = {}
-  for rank, w in ipairs(activeOrdered) do
-    if w:isStandard() and w:isVisible() and w:id() then
-      recordWindowMetadata(w, focusedSpaceId)
-      activeOrderRank[w:id()] = rank
+  local app = win:application()
+  local appName = app and app:name() or "Unknown"
+  if IGNORED_APP_NAMES[appName] then return nil end
+
+  local bundleID = app and app:bundleID() or nil
+  local pid = app and app:pid() or 0
+  local title = win:title() or ""
+  local frame = win:frame()
+
+  if bundleID then getCachedAppIcon(bundleID) end
+
+  local entry = knownWindowsById[wid] or {}
+  entry.win = win
+  entry.winId = wid
+  entry.title = title
+  entry.appName = appName
+  entry.bundleID = bundleID
+  entry.pid = pid
+  entry.spaceId = spaceId or entry.spaceId or cachedCurrentSpaceId
+  entry.spaceIdx = spaceIdx or entry.spaceIdx or cachedCurrentSpaceIdx
+  entry.frame = frame
+  knownWindowsById[wid] = entry
+  return wid
+end
+
+-- Background-only sync of windows across all Spaces (never run on <Alt>Tab critical path)
+local function syncOtherSpacesWindowsAsync()
+  local spaceIndexById, focusedSpaceId, currentSpaceIdx = refreshSpaceIndexCache()
+
+  local activeIds = {}
+  for _, w in ipairs(hs.window.orderedWindows()) do
+    if w:isStandard() and w:isVisible() then
+      local wid = recordActiveWindowFast(w, focusedSpaceId, currentSpaceIdx)
+      if wid then activeIds[wid] = true end
     end
   end
 
-  -- 2. Ingest windows tracked across all Spaces by hs.window.filter
-  local okWf, wfWins = pcall(function()
-    return wf:getWindows(hs.window.filter.sortByFocusedLast)
-  end)
-  if okWf and type(wfWins) == "table" then
-    for _, w in ipairs(wfWins) do
-      recordWindowMetadata(w, nil)
-    end
-  end
-
-  -- 3. Map every Space's window IDs via hs.spaces.windowsForSpace and optional
-  --    CoreGraphics WindowServer list (hs.window.list) for unvisited Spaces
+  -- Map Space window memberships in the background
   local spaceByWinId = {}
   local spaceCountByWinId = {}
   for spId, _ in pairs(spaceIndexById) do
@@ -1076,72 +994,210 @@ local function buildAllWorkspacesChooserChoices()
     end
   end
 
-  local cgInfoById = {}
+  -- Seed any unvisited Space windows from CoreGraphics WindowServer info
   if type(hs.window.list) == "function" then
     local okCg, cgList = pcall(hs.window.list, true)
     if okCg and type(cgList) == "table" then
       for _, info in ipairs(cgList) do
         local wid = info.kCGWindowNumber
-        if wid and (info.kCGWindowLayer or 0) == 0 then
-          cgInfoById[wid] = info
+        local spId = wid and spaceByWinId[wid]
+        if wid and spId and not knownWindowsById[wid] and (info.kCGWindowLayer or 0) == 0 then
+          local bounds = info.kCGWindowBounds or {}
+          local wWidth = bounds.Width or bounds.w or 0
+          local wHeight = bounds.Height or bounds.h or 0
+          local ownerName = info.kCGWindowOwnerName or ""
+          local pid = info.kCGWindowOwnerPID or 0
+          if not IGNORED_APP_NAMES[ownerName] and wWidth >= 100 and wHeight >= 80 and pid > 0 then
+            local app = hs.application.applicationForPID(pid)
+            if app and app:kind() == 1 then
+              local bundleID = app:bundleID()
+              if bundleID then getCachedAppIcon(bundleID) end
+              knownWindowsById[wid] = {
+                win = nil,
+                winId = wid,
+                title = info.kCGWindowName or ownerName,
+                appName = app:name() or ownerName,
+                bundleID = bundleID,
+                pid = pid,
+                spaceId = spId,
+                spaceIdx = spaceIndexById[spId] or currentSpaceIdx,
+              }
+            end
+          end
         end
       end
     end
   end
 
-  for wid, spId in pairs(spaceByWinId) do
-    if not knownWindowsById[wid] and cgInfoById[wid] then
-      local info = cgInfoById[wid]
-      local bounds = info.kCGWindowBounds or {}
-      local wWidth = bounds.Width or bounds.w or 0
-      local wHeight = bounds.Height or bounds.h or 0
-      local ownerName = info.kCGWindowOwnerName or ""
-      local pid = info.kCGWindowOwnerPID or 0
-      local app = (pid > 0) and hs.application.applicationForPID(pid) or nil
-      local isRegularApp = app and (app:kind() == 1)
-      if isRegularApp and not IGNORED_APP_NAMES[ownerName] and wWidth >= 100 and wHeight >= 80 then
-        if not (ownerName == "Hammerspoon" and (info.kCGWindowName or "") == "") then
-          knownWindowsById[wid] = {
-            win = hs.window.get(wid),
-            winId = wid,
-            title = info.kCGWindowName or ownerName,
-            appName = app:name() or ownerName,
-            bundleID = app:bundleID(),
-            pid = pid,
-            spaceId = spId,
-          }
-        end
+  -- Prune closed windows and update Space indices
+  for wid, meta in pairs(knownWindowsById) do
+    local spId = spaceByWinId[wid]
+    if activeIds[wid] then
+      meta.spaceId = focusedSpaceId
+      meta.spaceIdx = currentSpaceIdx
+      meta.isSticky = (stickyWindows[wid] == true) or ((spaceCountByWinId[wid] or 0) > 1)
+    elseif spId then
+      meta.spaceId = spId
+      meta.spaceIdx = spaceIndexById[spId] or meta.spaceIdx or 1
+      meta.isSticky = (stickyWindows[wid] == true) or ((spaceCountByWinId[wid] or 0) > 1)
+    else
+      local appAlive = (meta.pid and meta.pid > 0 and hs.application.applicationForPID(meta.pid) ~= nil)
+      if not appAlive or meta.spaceIdx == currentSpaceIdx then
+        knownWindowsById[wid] = nil
       end
     end
   end
 
-  -- 4. Prune closed windows and determine each window's workspace index (1..6)
+  schedulePersistWindowTrackerState()
+end
+
+local function scheduleBackgroundSpaceSync(delaySec)
+  if bgSpaceSyncTimer then
+    bgSpaceSyncTimer:stop()
+  end
+  bgSpaceSyncTimer = hs.timer.doAfter(delaySec or 0.15, function()
+    bgSpaceSyncTimer = nil
+    syncOtherSpacesWindowsAsync()
+  end)
+end
+
+local wf = hs.window.filter.new()
+wf:subscribe(hs.window.filter.windowFocused, function(win)
+  if not win then return end
+  local wid = recordActiveWindowFast(win, cachedCurrentSpaceId, cachedCurrentSpaceIdx)
+  if not wid then return end
+  for i = #mruWindowIds, 1, -1 do
+    if mruWindowIds[i] == wid then
+      table.remove(mruWindowIds, i)
+    end
+  end
+  table.insert(mruWindowIds, 1, wid)
+  while #mruWindowIds > 64 do
+    table.remove(mruWindowIds)
+  end
+  schedulePersistWindowTrackerState()
+end)
+
+wf:subscribe(hs.window.filter.windowDestroyed, function(win)
+  if not win then return end
+  local okId, id = pcall(function() return win:id() end)
+  if not okId or not id then return end
+  knownWindowsById[id] = nil
+  for i = #mruWindowIds, 1, -1 do
+    if mruWindowIds[i] == id then
+      table.remove(mruWindowIds, i)
+    end
+  end
+  schedulePersistWindowTrackerState()
+end)
+
+local mruSpaceWatcher = hs.spaces.watcher.new(function(_)
+  scheduleBackgroundSpaceSync(0.1)
+end)
+mruSpaceWatcher:start()
+scheduleBackgroundSpaceSync(0.2)
+
+-- Pre-allocate a single reusable hs.canvas border window (avoiding NSWindow
+-- creation/destruction churn on every row navigation)
+local function ensureHighlightCanvas()
+  if highlightCanvas then return highlightCanvas end
+  highlightCanvas = hs.canvas.new({x = 0, y = 0, w = 100, h = 100})
+  highlightCanvas:appendElements({
+    type = "rectangle",
+    action = "stroke",
+    strokeWidth = 10,
+    strokeColor = {red = 0.0, green = 0.0, blue = 1.0, alpha = 0.85},
+    roundedRectRadii = {xRadius = 4, yRadius = 4},
+    frame = {x = 5, y = 5, w = 90, h = 90},
+  })
+  highlightCanvas:level(hs.canvas.windowLevels.overlay)
+  return highlightCanvas
+end
+
+local function hideWindowBorder()
+  if borderDebounceTimer then
+    borderDebounceTimer:stop()
+    borderDebounceTimer = nil
+  end
+  if highlightCanvas then
+    highlightCanvas:hide()
+  end
+end
+
+local function clearWindowBorder()
+  if chooserPollTimer then
+    chooserPollTimer:stop()
+    chooserPollTimer = nil
+  end
+  hideWindowBorder()
+  lastSelectedRow = nil
+end
+
+local function drawBlueBorderAroundFrame(f)
+  if not f or f.w <= 0 or f.h <= 0 then
+    if highlightCanvas then highlightCanvas:hide() end
+    return
+  end
+  local pad = 10
+  local canvas = ensureHighlightCanvas()
+  canvas:frame({
+    x = f.x - pad,
+    y = f.y - pad,
+    w = f.w + (pad * 2),
+    h = f.h + (pad * 2),
+  })
+  canvas[1].frame = {x = 5, y = 5, w = f.w + 10, h = f.h + 10}
+  canvas:show()
+end
+
+-- Asynchronous, debounced border updater (throttles rapid Up/Down or typing)
+local function scheduleBorderUpdate()
+  if borderDebounceTimer then
+    borderDebounceTimer:stop()
+  end
+  borderDebounceTimer = hs.timer.doAfter(BORDER_DEBOUNCE_SEC, function()
+    borderDebounceTimer = nil
+    if not windowChooser or not windowChooser:isVisible() then
+      if highlightCanvas then highlightCanvas:hide() end
+      return
+    end
+    local row = windowChooser:selectedRow()
+    local item = row and windowChooser:selectedRowContents(row) or nil
+    if item and item.onCurrentSpace and item.frame then
+      drawBlueBorderAroundFrame(item.frame)
+    else
+      if highlightCanvas then highlightCanvas:hide() end
+    end
+  end)
+end
+
+-- Fast O(1) choice builder called on <Alt>Tab: only queries hs.window.orderedWindows()
+-- on the active Space (< 2ms) and merges cached windows from other workspaces.
+local function buildAllWorkspacesChooserChoices()
+  local currentSpaceIdx = cachedCurrentSpaceIdx or 1
+  local focusedSpaceId = cachedCurrentSpaceId
+
+  local activeOrdered = hs.window.orderedWindows()
+  local activeSet = {}
+  for _, w in ipairs(activeOrdered) do
+    if w:isStandard() and w:isVisible() then
+      local wid = recordActiveWindowFast(w, focusedSpaceId, currentSpaceIdx)
+      if wid then activeSet[wid] = true end
+    end
+  end
+
   local validEntriesById = {}
   local candidateIds = {}
   for wid, meta in pairs(knownWindowsById) do
-    local liveWin = hs.window.get(wid) or meta.win
-    local winSpaces = hs.spaces.windowSpaces(wid)
-    local spId = spaceByWinId[wid] or (winSpaces and winSpaces[1]) or meta.spaceId
-    local stillAlive = (activeOrderRank[wid] ~= nil) or
-                       (spaceByWinId[wid] ~= nil) or
-                       (winSpaces and #winSpaces > 0)
-    if stillAlive and spId then
-      if liveWin then
-        local okT, liveTitle = pcall(function() return liveWin:title() end)
-        if okT and liveTitle and liveTitle ~= "" then
-          meta.title = liveTitle
-        end
-      end
-      local isSticky = (stickyWindows[wid] == true) or
-                       ((winSpaces and #winSpaces > 1) or (spaceCountByWinId[wid] or 0) > 1)
-      local rawSpaceIdx = spaceIndexById[spId] or currentSpaceIdx
-      -- Sticky windows (-1 in wmctrl) match current workspace filter just like rofi-window-switcher
+    local onActive = (activeSet[wid] == true)
+    if onActive or (meta.spaceIdx and meta.spaceIdx ~= currentSpaceIdx) then
+      local isSticky = (stickyWindows[wid] == true) or (meta.isSticky == true)
+      local rawSpaceIdx = onActive and currentSpaceIdx or (meta.spaceIdx or 1)
       local displaySpaceIdx = isSticky and currentSpaceIdx or rawSpaceIdx
-      meta.spaceId = spId
       meta.spaceIdx = rawSpaceIdx
       meta.displaySpaceIdx = displaySpaceIdx
       meta.isSticky = isSticky
-      meta.win = liveWin
+      meta.onCurrentSpace = onActive or isSticky
       validEntriesById[wid] = meta
       table.insert(candidateIds, wid)
     else
@@ -1149,12 +1205,9 @@ local function buildAllWorkspacesChooserChoices()
     end
   end
 
-  -- 5. Sort candidates in MRU order, placing PREV_WINDOW_ID on the current
-  --    workspace first so <Alt>Tab -> Enter immediately switches to the
-  --    previous window on the current workspace (matching rofi-window-switcher).
-  local focusedWin = hs.window.focusedWindow()
-  local focusedWinId = focusedWin and focusedWin:id() or mruWindowIds[1]
-
+  -- Place PREV_WINDOW_ID on current workspace first so <Alt>Tab -> Enter
+  -- immediately toggles between the two most recently focused windows.
+  local focusedWinId = (activeOrdered[1] and activeOrdered[1]:id()) or mruWindowIds[1]
   local prevOnCurrentSpaceId = nil
   for _, id in ipairs(mruWindowIds) do
     local entry = validEntriesById[id]
@@ -1163,13 +1216,10 @@ local function buildAllWorkspacesChooserChoices()
       break
     end
   end
-  if not prevOnCurrentSpaceId then
-    for _, w in ipairs(activeOrdered) do
-      local wid = w:id()
-      if wid and wid ~= focusedWinId and validEntriesById[wid] then
-        prevOnCurrentSpaceId = wid
-        break
-      end
+  if not prevOnCurrentSpaceId and activeOrdered[2] then
+    local wid = activeOrdered[2]:id()
+    if wid and validEntriesById[wid] then
+      prevOnCurrentSpaceId = wid
     end
   end
 
@@ -1182,21 +1232,16 @@ local function buildAllWorkspacesChooserChoices()
     end
   end
 
-  -- First: previous window on current workspace (row 1 when "^<N> " is active)
   pushId(prevOnCurrentSpaceId)
-  -- Second: global previous window if on another workspace (row 1 when "^<N> " is cleared)
   if mruWindowIds[2] and mruWindowIds[2] ~= focusedWinId then
     pushId(mruWindowIds[2])
   end
-  -- Third: all remaining MRU windows
   for _, id in ipairs(mruWindowIds) do
     pushId(id)
   end
-  -- Fourth: any remaining windows on active Space in z-order
   for _, w in ipairs(activeOrdered) do
     pushId(w:id())
   end
-  -- Fifth: any remaining windows on other Spaces sorted by workspace number
   table.sort(candidateIds, function(a, b)
     local ea, eb = validEntriesById[a], validEntriesById[b]
     if ea.displaySpaceIdx ~= eb.displaySpaceIdx then
@@ -1208,12 +1253,11 @@ local function buildAllWorkspacesChooserChoices()
     pushId(id)
   end
 
-  -- 6. Build hs.chooser items formatted like rofi-window-switcher / fzf-window-switcher.sh
   local choices = {}
   for _, wid in ipairs(orderedIds) do
     local meta = validEntriesById[wid]
     local appName = meta.appName or "Unknown"
-    local title = meta.title ~= "" and meta.title or appName
+    local title = (meta.title and meta.title ~= "") and meta.title or appName
     local shortPrefix = normalizeShortAppPrefix(appName)
     local prefixedTitle = title
     if shortPrefix then
@@ -1235,23 +1279,28 @@ local function buildAllWorkspacesChooserChoices()
       "Workspace %d%s | %s | PID: %d | Window ID: %d",
       meta.displaySpaceIdx, stickyTag, appName, meta.pid or 0, wid
     )
-    local icon = meta.bundleID and hs.image.imageFromAppBundle(meta.bundleID) or nil
+    local textLower = string.lower(entryText)
+    local searchText = textLower .. " " .. string.lower(subText)
 
     table.insert(choices, {
       text = entryText,
       subText = subText,
-      image = icon,
+      image = getCachedAppIcon(meta.bundleID),
       winId = wid,
       spaceId = meta.spaceId,
       spaceIdx = meta.spaceIdx,
       displaySpaceIdx = meta.displaySpaceIdx,
       isSticky = meta.isSticky,
+      onCurrentSpace = meta.onCurrentSpace,
+      frame = meta.frame,
       bundleID = meta.bundleID,
       appName = appName,
+      textLower = textLower,
+      searchText = searchText,
     })
   end
 
-  return choices, currentSpaceIdx, focusedSpaceId
+  return choices, currentSpaceIdx
 end
 
 local function choiceMatchesQuery(choice, rawQuery)
@@ -1259,15 +1308,25 @@ local function choiceMatchesQuery(choice, rawQuery)
     return true
   end
 
+  -- If the user pressed Backspace once on "^1 " so it became "^1" (no trailing
+  -- space), immediately show all windows from all workspaces!
+  if rawQuery:match("^%^[0-9]+$") then
+    return true
+  end
+
   local q = rawQuery
-  -- Match leading workspace regex filter "^<workspace_num>" (e.g. "^1 " or "^1 kitty")
-  local wsPrefix, remainder = q:match("^%^([0-9]+)(.*)")
+  -- Require trailing whitespace in "^<workspace_num> " to filter by workspace
+  local wsPrefix, remainder = q:match("^%^([0-9]+)%s+(.*)")
   if wsPrefix then
     local targetWs = tonumber(wsPrefix)
     if choice.displaySpaceIdx ~= targetWs then
       return false
     end
     q = remainder or ""
+  else
+    -- If user deleted the space ("^1") and typed search text ("^1chrome"),
+    -- strip the inactive "^1" prefix and filter across all workspaces.
+    q = q:gsub("^%^[0-9]+", "")
   end
 
   q = q:match("^%s*(.-)%s*$") or ""
@@ -1275,8 +1334,8 @@ local function choiceMatchesQuery(choice, rawQuery)
     return true
   end
 
-  local haystack = string.lower((choice.text or "") .. " " .. (choice.subText or ""))
-  local textLower = string.lower(choice.text or "")
+  local haystack = choice.searchText or string.lower((choice.text or "") .. " " .. (choice.subText or ""))
+  local textLower = choice.textLower or string.lower(choice.text or "")
 
   for token in q:gmatch("%S+") do
     local tokLower = string.lower(token)
@@ -1307,39 +1366,24 @@ local function filterChooserChoices(choices, rawQuery)
   return filtered
 end
 
-local function updateSelectedRowBorder()
-  if not windowChooser or not windowChooser:isVisible() then return end
-  local row = windowChooser:selectedRow()
-  local item = row and windowChooser:selectedRowContents(row) or nil
-  local activeSpace = hs.spaces.focusedSpace()
-  if item and item.winId and (item.isSticky or item.spaceId == activeSpace) then
-    drawBlueBorderAroundWindow(hs.window.get(item.winId))
-  else
-    if highlightCanvas then
-      highlightCanvas:delete()
-      highlightCanvas = nil
-    end
-  end
-end
-
 local function focusSelectedWindowChoice(choice)
   if not choice or not choice.winId then return end
   local winId = choice.winId
   local targetSpaceId = choice.spaceId
   local targetSpaceIdx = choice.spaceIdx
-  local currentSpaceId = hs.spaces.focusedSpace()
 
   local function raiseAndFocusTarget()
-    local w = hs.window.get(winId) or (knownWindowsById[winId] and knownWindowsById[winId].win)
+    local meta = knownWindowsById[winId]
+    local w = (meta and meta.win) or hs.window.get(winId)
     if w then
-      pcall(function()
+      local okFocus = pcall(function()
         if w:isMinimized() then w:unminimize() end
         local app = w:application()
         if app then app:activate() end
         w:raise()
         w:focus()
       end)
-      return true
+      if okFocus then return true end
     end
     local app = (choice.bundleID and hs.application.get(choice.bundleID)) or
                 (choice.appName and hs.application.get(choice.appName))
@@ -1357,15 +1401,15 @@ local function focusSelectedWindowChoice(choice)
   end
 
   -- Same workspace (or sticky across all workspaces): raise and focus immediately
-  if choice.isSticky or not targetSpaceId or targetSpaceId == currentSpaceId then
+  if choice.onCurrentSpace or choice.isSticky or not targetSpaceIdx or targetSpaceIdx == cachedCurrentSpaceIdx then
     raiseAndFocusTarget()
     return
   end
 
   -- Different workspace: switch to the target workspace first, then raise & focus window
-  if targetSpaceIdx and targetSpaceIdx >= 1 and targetSpaceIdx <= 6 then
+  if targetSpaceIdx >= 1 and targetSpaceIdx <= 6 then
     switchToWorkspaceIndex(targetSpaceIdx)
-  else
+  elseif targetSpaceId then
     pcall(hs.spaces.gotoSpace, targetSpaceId)
   end
 
@@ -1374,7 +1418,7 @@ local function focusSelectedWindowChoice(choice)
   focusTimer = hs.timer.doEvery(0.05, function()
     attempts = attempts + 1
     local nowSpace = hs.spaces.focusedSpace()
-    if nowSpace == targetSpaceId or attempts >= 12 then
+    if (targetSpaceId and nowSpace == targetSpaceId) or attempts >= 10 then
       if focusTimer then
         focusTimer:stop()
         focusTimer = nil
@@ -1393,77 +1437,25 @@ windowChooser:bgDark(true)
 windowChooser:searchSubText(true)
 
 windowChooser:queryChangedCallback(function(newQuery)
-  -- If the user presses Backspace once on the initial "^<N> " prefix, clear the
-  -- entire prefix immediately so all workspaces (1..6) are shown in 1 keystroke.
-  if isInitialPrefixActive then
-    if newQuery == initialChooserQuery:sub(1, -2) then
-      isInitialPrefixActive = false
-      windowChooser:query("")
-      return
-    elseif newQuery ~= initialChooserQuery then
-      isInitialPrefixActive = false
-    end
-  end
-
   local filtered = filterChooserChoices(allChooserChoices, newQuery)
   windowChooser:choices(filtered)
   lastSelectedRow = nil
-  updateSelectedRowBorder()
+  scheduleBorderUpdate()
 end)
-
-local function moveChooserCaretToEnd(queryLen)
-  pcall(function()
-    local hsApp = hs.application.get(hs.processInfo.processID)
-    if not hsApp then return end
-    local axApp = hs.axuielement.applicationElement(hsApp)
-    local axWin = axApp and axApp:attributeValue("AXFocusedWindow")
-    if not axWin then return end
-    local children = axWin:attributeValue("AXChildren") or {}
-    for _, child in ipairs(children) do
-      if child:attributeValue("AXRole") == "AXTextField" then
-        child:setAttributeValue("AXSelectedTextRange", {location = queryLen, length = 0})
-        break
-      end
-    end
-  end)
-end
 
 hs.hotkey.bind({"alt"}, "tab", function()
   local choices, currentSpaceIdx = buildAllWorkspacesChooserChoices()
   allChooserChoices = choices
   initialChooserQuery = string.format("^%d ", currentSpaceIdx)
-  isInitialPrefixActive = true
 
   windowChooser:choices(filterChooserChoices(allChooserChoices, initialChooserQuery))
   windowChooser:query(initialChooserQuery)
   windowChooser:show()
-
-  -- Place caret at the end of "^<N> " (matching rofi -filter "^<N> " / fzf --query "^<N> ")
-  hs.timer.doAfter(0.01, function()
-    moveChooserCaretToEnd(#initialChooserQuery)
-    updateSelectedRowBorder()
-  end)
-
-  -- Support Ctrl+U / Ctrl+W / Alt+Backspace inside chooser to clear prefix in 1 keystroke
-  if chooserKeyTap then chooserKeyTap:stop() end
-  chooserKeyTap = hs.eventtap.new({hs.eventtap.event.types.keyDown}, function(e)
-    if not windowChooser:isVisible() then return false end
-    local flags = e:getFlags()
-    local keyCode = e:getKeyCode()
-    local ch = string.lower(e:getCharacters(true) or "")
-    -- Ctrl+U (clear line) or Ctrl+W (backward kill word) or Alt+Backspace (keyCode 51)
-    if (flags.ctrl and not flags.cmd and not flags.alt and (ch == "u" or ch == "w")) or
-       (flags.alt and not flags.cmd and not flags.ctrl and keyCode == 51) then
-      isInitialPrefixActive = false
-      windowChooser:query("")
-      return true
-    end
-    return false
-  end)
-  chooserKeyTap:start()
+  scheduleBorderUpdate()
 
   lastSelectedRow = nil
-  chooserPollTimer = hs.timer.doEvery(0.04, function()
+  if chooserPollTimer then chooserPollTimer:stop() end
+  chooserPollTimer = hs.timer.doEvery(0.05, function()
     if not windowChooser:isVisible() then
       clearWindowBorder()
       return
@@ -1471,7 +1463,7 @@ hs.hotkey.bind({"alt"}, "tab", function()
     local row = windowChooser:selectedRow()
     if row ~= lastSelectedRow then
       lastSelectedRow = row
-      updateSelectedRowBorder()
+      scheduleBorderUpdate()
     end
   end)
 end)

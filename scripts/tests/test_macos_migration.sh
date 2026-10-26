@@ -635,6 +635,14 @@ echo "[Test 15] ~/.hammerspoon/init.lua macOS 15+ space-moving & multi-workspace
     grep -Fq 'initialChooserQuery = string.format("^%d ", currentSpaceIdx)' "${HOME}/.hammerspoon/init.lua"
   assert_true "init.lua defines focusSelectedWindowChoice to switch workspace and raise window" \
     grep -q "local function focusSelectedWindowChoice" "${HOME}/.hammerspoon/init.lua"
+  assert_true "init.lua reuses single pre-allocated border canvas via ensureHighlightCanvas" \
+    grep -q "local function ensureHighlightCanvas" "${HOME}/.hammerspoon/init.lua"
+  assert_true "init.lua debounces border updates asynchronously via scheduleBorderUpdate" \
+    grep -q "local function scheduleBorderUpdate" "${HOME}/.hammerspoon/init.lua"
+  assert_true "init.lua caches app icons in appIconCache (getCachedAppIcon)" \
+    grep -q "local function getCachedAppIcon" "${HOME}/.hammerspoon/init.lua"
+  assert_true "init.lua never calls hs.axuielement on hs.processInfo.processID (no self-AX deadlock)" \
+    bash -c "! grep -q 'processInfo.processID' '${HOME}/.hammerspoon/init.lua'"
   assert_true "init.lua has no hardcoded /opt/homebrew/bin/bash paths" \
     bash -c "! grep -q '/opt/homebrew/bin/bash' '${HOME}/.hammerspoon/init.lua'"
 }
