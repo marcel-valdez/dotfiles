@@ -27,9 +27,26 @@
         {
           "identifiers": {
             "is_keyboard": true,
+            "is_pointing_device": false,
+            "vendor_id": 7504,
+            "product_id": 24926
+          },
+          "ignore": true
+        },
+        {
+          "identifiers": {
+            "is_keyboard": true,
             "is_pointing_device": true,
             "vendor_id": 7504,
             "product_id": 24926
+          },
+          "ignore": true
+        },
+        {
+          "identifiers": {
+            "is_keyboard": true,
+            "is_pointing_device": false,
+            "vendor_id": 20547
           },
           "ignore": true
         },
@@ -79,6 +96,42 @@
     {
       "name": "Linux Physical Modifier Layout (Swap Option & Command on Built-in Keyboard)",
       "selected": false,
+      "devices": [
+        {
+          "identifiers": {
+            "is_keyboard": true,
+            "is_pointing_device": false,
+            "vendor_id": 7504,
+            "product_id": 24926
+          },
+          "ignore": true
+        },
+        {
+          "identifiers": {
+            "is_keyboard": true,
+            "is_pointing_device": true,
+            "vendor_id": 7504,
+            "product_id": 24926
+          },
+          "ignore": true
+        },
+        {
+          "identifiers": {
+            "is_keyboard": true,
+            "is_pointing_device": false,
+            "vendor_id": 20547
+          },
+          "ignore": true
+        },
+        {
+          "identifiers": {
+            "is_keyboard": true,
+            "is_pointing_device": true,
+            "vendor_id": 20547
+          },
+          "ignore": true
+        }
+      ],
       "simple_modifications": [],
       "complex_modifications": {
         "parameters": {

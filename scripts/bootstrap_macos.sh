@@ -359,6 +359,9 @@ run_cmd defaults write NSGlobalDomain KeyRepeat -int 1
 run_cmd defaults write NSGlobalDomain InitialKeyRepeat -int 10
 run_cmd defaults write NSGlobalDomain ApplePressAndHoldEnabled -bool false
 
+# Ensure macOS Full Keyboard Access does not hijack Space in Kitty / Emacs.app
+run_cmd defaults write com.apple.Accessibility FullKeyboardAccessEnabled -int 0 || true
+
 # Native Ctrl+Cmd click-drag window move backup alongside Hammerspoon Alt+Drag
 run_cmd defaults write -g NSWindowShouldDragOnGesture -bool true
 
