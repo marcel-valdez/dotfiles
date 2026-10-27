@@ -7,8 +7,8 @@
 --      {1.0, 0.75, 0.666, 0.5, 0.334, 0.25} on WM_MOD (Ctrl+Cmd) + Arrows/K.
 --   2. Cross-monitor window movement & dual-screen spanning (both-screens) on
 --      both WFH (<Ctrl><Cmd>Page_Up) and MTV (<Alt><Cmd>Left/Right/Page_Up).
---   3. 6-Space workspace navigation (<Ctrl><Alt>1..6) and window migration
---      (<Ctrl><Shift><Alt>Left/Right).
+--   3. 6-Space workspace navigation (<Ctrl><Alt>1..6) and window migration that
+--      follows the window (<Ctrl><Shift><Alt>Left/Right and <Ctrl><Shift><Alt>1..6).
 --   4. Sticky Window toggle (<Alt>F6) + automatic Sticky Kitty watcher via
 --      hs.spaces.watcher (bypassing macOS SIP restrictions on third-party apps).
 --   5. Borderless Alt+Left-Drag window move & Alt+Right-Drag window resize
@@ -17,6 +17,11 @@
 --      blue highlight border (hs.canvas, replicating draw_border_around_window.py).
 --   7. <WM_MOD>z Zen Mode toggle & <WM_MOD>n terminal-scoped Notes launcher.
 -- =============================================================================
+
+-- Live Hammerspoon CLI (`/Applications/Hammerspoon.app/Contents/Frameworks/hs/hs -c '<lua>'`)
+-- and `open -g hammerspoon://reload` for interactive debugging and config reloads.
+require("hs.ipc")
+hs.urlevent.bind("reload", function() hs.reload() end)
 
 hs.window.animationDuration = 0
 
@@ -196,10 +201,37 @@ hs.hotkey.bind(WM_MOD,       "pagedown", function()
 end)
 
 -- -----------------------------------------------------------------------------
--- 3. 6-Space Workspace Switching (<Ctrl><Alt>1..6 & <Ctrl><Shift><Alt>Left/Right)
+-- 3. 6-Space Workspace Switching (<Ctrl><Alt>1..6) & Window-to-Space Moves that
+--    follow the window (<Ctrl><Shift><Alt>Left/Right & <Ctrl><Shift><Alt>1..6)
 -- -----------------------------------------------------------------------------
-local altDragTap = nil
-local isMovingWindowToSpace = false
+-- macOS 14.5+ (15 Sequoia, 26 Tahoe) NOPs CGSMoveWindowsToManagedSpace, so
+-- hs.spaces.moveWindowToSpace() returns true while the window stays put. Windows
+-- are therefore moved the way a human moves them (verified live on macOS 26.7):
+--   A. Titled windows: hold the window by a draggable titlebar point (synthetic
+--      leftMouseDown + leftMouseDragged) and post the user's *own* macOS
+--      "Move left/right a space" (symbolic hotkeys 79/81) or "Switch to Desktop N"
+--      (118..133) shortcut, read live from com.apple.symbolichotkeys (e.g.
+--      Ctrl+Alt+Arrow on the gMac rather than the stock Ctrl+Arrow; arrow-key
+--      shortcuts must carry the fn flag). WindowServer carries the held window to
+--      the new Space. hs.spaces.gotoSpace() switches via a Mission Control AXPress
+--      and does NOT carry a held window, so it cannot be used for this.
+--   B. Borderless windows (kitty hide_window_decorations yes), titlebars with no
+--      draggable spot, or no enabled Spaces shortcut: open Mission Control, wait
+--      for the thumbnails to settle, press the window's thumbnail and lift it (the
+--      Spaces bar expands only once a drag is in progress), drop it onto the
+--      *expanded* target Space thumbnail, then AXPress that Space to follow it.
+-- Both paths first wait for the physically held hotkey modifiers to be released
+-- (taps made meanwhile accumulate: hold Ctrl+Alt+Shift and tap Right twice to move
+-- two Spaces), keep strong references to every pending hs.timer (unreferenced
+-- hs.timer.doAfter timers are garbage-collected and silently never fire), and
+-- always release the synthetic mouse button and restore the cursor in finishMove().
+local altDragTap = nil            -- assigned in Section 5
+local stickyWindows = {}          -- Section 4: winId -> true (pinned) | false (explicitly unpinned)
+local onWindowMovedToSpace = nil  -- assigned in Section 6: refreshes the <Alt>Tab window tracker
+local spaceMoveLog = hs.logger.new("spacemove", "info")
+
+local evTypes = hs.eventtap.event.types
+local evProps = hs.eventtap.event.properties
 local nextMouseEventNumber = 32000
 
 local function allocMouseEventNumber()
@@ -210,17 +242,32 @@ local function allocMouseEventNumber()
   return nextMouseEventNumber
 end
 
-local function postRawMouseMove(pt)
-  hs.eventtap.event.newMouseEvent(hs.eventtap.event.types.mouseMoved, pt):rawFlags(0):post()
+local function roundPt(pt)
+  return { x = math.floor(pt.x + 0.5), y = math.floor(pt.y + 0.5) }
 end
 
+local function indexOf(list, value)
+  for i, v in ipairs(list or {}) do
+    if v == value then return i end
+  end
+  return nil
+end
+
+local function postRawMouseMove(pt)
+  hs.eventtap.event.newMouseEvent(evTypes.mouseMoved, roundPt(pt)):rawFlags(0):post()
+end
+
+-- Integer event fields must receive integral Lua numbers: hs.geometry centers are
+-- fractional (e.g. 512.5) and setProperty() then raises "number has no integer
+-- representation", which used to abort the Mission Control drag mid-way with the
+-- synthetic left mouse button still held down.
 local function postRawMouseButton(evType, pt, evNum, dx, dy)
-  local ev = hs.eventtap.event.newMouseEvent(evType, pt)
+  local ev = hs.eventtap.event.newMouseEvent(evType, roundPt(pt))
     :rawFlags(0)
-    :setProperty(hs.eventtap.event.properties.mouseEventNumber, evNum)
-    :setProperty(hs.eventtap.event.properties.mouseEventClickState, 1)
-    :setProperty(hs.eventtap.event.properties.mouseEventDeltaX, dx or 0)
-    :setProperty(hs.eventtap.event.properties.mouseEventDeltaY, dy or 0)
+    :setProperty(evProps.mouseEventNumber, math.floor(evNum))
+    :setProperty(evProps.mouseEventClickState, 1)
+    :setProperty(evProps.mouseEventDeltaX, math.floor((dx or 0) + 0.5))
+    :setProperty(evProps.mouseEventDeltaY, math.floor((dy or 0) + 0.5))
   ev:post()
 end
 
@@ -239,125 +286,373 @@ local function getOrderedUserSpacesForCurrentScreen(scr)
   return userSpaces
 end
 
+-- Adds Spaces until scr has minCount user Spaces. hs.spaces.addSpaceToScreen()
+-- presses Mission Control's "mc.spaces.add" button (closeMC=false keeps Mission
+-- Control open between presses); Space creation is asynchronous, so poll
+-- allSpaces() for each new Space and close Mission Control afterwards.
 local function ensureUserSpacesCount(scr, minCount)
   scr = scr or hs.screen.mainScreen()
   if not scr then return {} end
   local spaces = getOrderedUserSpacesForCurrentScreen(scr)
+  local openedMissionControl = false
   while #spaces < minCount do
+    openedMissionControl = true
     local ok, added = pcall(hs.spaces.addSpaceToScreen, scr, false)
-    if not ok or not added then break end
-    local updated = getOrderedUserSpacesForCurrentScreen(scr)
+    if not ok or not added then
+      spaceMoveLog.w("hs.spaces.addSpaceToScreen failed: " .. tostring(added))
+      break
+    end
+    local updated = spaces
+    local deadline = hs.timer.secondsSinceEpoch() + 1.5
+    while #updated <= #spaces and hs.timer.secondsSinceEpoch() < deadline do
+      hs.timer.usleep(50000)
+      updated = getOrderedUserSpacesForCurrentScreen(scr)
+    end
     if #updated <= #spaces then break end
     spaces = updated
+  end
+  if openedMissionControl then
+    pcall(hs.spaces.closeMissionControl)
   end
   return spaces
 end
 
--- Mission Control Accessibility tree helpers for macOS 15 Sequoia & macOS 26 Tahoe
-local function getMissionControlGroup()
-  local wm = hs.application.applicationsForBundleID("com.apple.WindowManager")[1]
-  if wm then
-    local wmEl = hs.axuielement.applicationElement(wm)
-    if wmEl then
-      for _, el in ipairs(wmEl) do
-        if el.AXIdentifier == "mc.display" then
-          return wmEl, true
-        end
-      end
-    end
+-- Fading "Desktop N" banner (with position dots) shown only for desktop switches
+-- made through these Hammerspoon shortcuts -- OS-level switches are never hooked.
+-- Each banner is a fresh canvas that joins all Spaces and is stationary, so it is
+-- visible at once and stays put through the Space-switch animation; a new banner
+-- replaces the previous one instead of stacking.
+local BANNER_VISIBLE_SEC = 0.9
+local BANNER_FADE_SEC = 0.35
+local workspaceBanner = nil
+local workspaceBannerTimer = nil
+
+local function showWorkspaceBanner(scr, idx, total, detail)
+  scr = scr or hs.screen.mainScreen()
+  if not scr or not idx then return end
+  total = math.max(total or idx, idx)
+  local full = scr:fullFrame()
+  local spacing = 22
+  local w = math.max(230, (total - 1) * spacing + 90)
+  local h = detail and 118 or 96
+  local elements = {
+    { type = "rectangle", action = "fill", fillColor = { white = 0.08, alpha = 0.82 },
+      roundedRectRadii = { xRadius = 16, yRadius = 16 } },
+    { type = "text", text = string.format("Desktop %d", idx), textFont = ".AppleSystemUIFontBold",
+      textSize = 30, textColor = { white = 1, alpha = 1 }, textAlignment = "center",
+      frame = { x = 0, y = 12, w = w, h = 40 } },
+  }
+  local x0 = (w - (total - 1) * spacing) / 2
+  for i = 1, total do
+    table.insert(elements, {
+      type = "circle", center = { x = x0 + (i - 1) * spacing, y = 66 }, radius = 5,
+      action = "strokeAndFill", strokeWidth = 1.5, strokeColor = { white = 1, alpha = 0.9 },
+      fillColor = { white = 1, alpha = (i == idx) and 1 or 0.12 },
+    })
   end
-  local dock = hs.application.applicationsForBundleID("com.apple.dock")[1]
-  if dock then
-    local dockEl = hs.axuielement.applicationElement(dock)
-    if dockEl then
-      for _, el in ipairs(dockEl) do
-        if el.AXIdentifier == "mc" then
-          return el, false
-        end
-      end
-    end
+  if detail then
+    table.insert(elements, {
+      type = "text", text = detail, textSize = 13, textColor = { white = 1, alpha = 0.85 },
+      textAlignment = "center", frame = { x = 8, y = 86, w = w - 16, h = 22 },
+    })
   end
-  return nil, false
+
+  if workspaceBannerTimer then workspaceBannerTimer:stop() end
+  if workspaceBanner then workspaceBanner:delete(0.1) end
+  local banner = hs.canvas.new({ x = full.x + (full.w - w) / 2, y = full.y + full.h * 0.36 - h / 2, w = w, h = h })
+  banner:level(hs.canvas.windowLevels.overlay)
+  banner:behaviorAsLabels({ "canJoinAllSpaces", "stationary" })
+  banner:clickActivating(false)
+  banner:replaceElements(elements)
+  banner:show(0.08)
+  workspaceBanner = banner
+  workspaceBannerTimer = hs.timer.doAfter(BANNER_VISIBLE_SEC, function()
+    workspaceBannerTimer = nil
+    if workspaceBanner == banner then workspaceBanner = nil end
+    banner:delete(BANNER_FADE_SEC)
+  end)
 end
 
-local function getMissionControlDisplayGroups()
-  local mcGroup, isWM = getMissionControlGroup()
-  if not mcGroup then return nil, false end
-  local rawGroups = {}
-  for _, el in ipairs(mcGroup) do
-    if el.AXIdentifier == "mc.display" then
-      table.insert(rawGroups, el)
-    end
-  end
-  local ordered = {}
-  for _, scr in ipairs(hs.screen.allScreens()) do
-    local f = scr:fullFrame()
-    for i, grp in ipairs(rawGroups) do
-      local gf = grp.AXFrame
-      if gf and gf.x == f.x and gf.y == f.y then
-        table.insert(ordered, table.remove(rawGroups, i))
-        break
-      end
-    end
-  end
-  for _, grp in ipairs(rawGroups) do
-    table.insert(ordered, grp)
-  end
-  return ordered, isWM
+local function showBannerForSpace(scr, spaceId, detail)
+  local spaces = getOrderedUserSpacesForCurrentScreen(scr)
+  local idx = indexOf(spaces, spaceId)
+  if idx then showWorkspaceBanner(scr, idx, #spaces, detail) end
 end
 
-local function getMissionControlWindows()
-  local groups, isWM = getMissionControlDisplayGroups()
-  if not groups then return nil, false end
-  local wins = {}
-  for _, grp in ipairs(groups) do
-    for _, el in ipairs(grp) do
-      if el.AXIdentifier == "mc.windows" then
-        for _, w in ipairs(el) do
-          table.insert(wins, w)
-        end
-      elseif el.AXIdentifier and el.AXIdentifier:find("%.space%.%d+$") then
-        table.insert(wins, el)
-      end
-    end
+-- macOS Spaces shortcuts (System Settings > Keyboard > Keyboard Shortcuts >
+-- Mission Control) live in com.apple.symbolichotkeys as {ascii, keycode, flags},
+-- where flags use the CGEventFlags bits (0x20000 shift, 0x40000 ctrl, 0x80000 alt,
+-- 0x100000 cmd, 0x800000 fn).
+local SYMBOLIC_MOVE_LEFT_SPACE     = 79
+local SYMBOLIC_MOVE_RIGHT_SPACE    = 81
+local SYMBOLIC_SWITCH_TO_DESKTOP_1 = 118  -- 118..133 = "Switch to Desktop 1..16"
+local SYMBOLIC_HOTKEY_DEFAULTS = {        -- macOS defaults when the plist has no entry
+  [SYMBOLIC_MOVE_LEFT_SPACE]  = { keycode = 123, flags = 0x840000 },  -- Ctrl+Left
+  [SYMBOLIC_MOVE_RIGHT_SPACE] = { keycode = 124, flags = 0x840000 },  -- Ctrl+Right
+}
+local HOTKEY_MOD_FLAGS = { shift = 0x20000, ctrl = 0x40000, alt = 0x80000, cmd = 0x100000 }
+local MODIFIER_FLAGS_MASK = 0x1E0000      -- shift | ctrl | alt | cmd
+local symbolicHotkeysCache, symbolicHotkeysReadAt = nil, 0
+
+local function readSymbolicHotkeys()
+  local now = hs.timer.secondsSinceEpoch()
+  -- Cached for 5 minutes; also invalidated whenever a posted shortcut has no effect
+  if symbolicHotkeysCache and (now - symbolicHotkeysReadAt) < 300 then
+    return symbolicHotkeysCache
   end
-  return wins, isWM
+  local data = nil
+  -- `defaults export` goes through cfprefsd, so recent Settings changes are seen
+  local xml = hs.execute("/usr/bin/defaults export com.apple.symbolichotkeys - 2>/dev/null")
+  if xml and #xml > 0 then
+    local ok, parsed = pcall(hs.plist.readString, xml)
+    if ok and type(parsed) == "table" then data = parsed end
+  end
+  if not data then
+    data = hs.plist.read(os.getenv("HOME") .. "/Library/Preferences/com.apple.symbolichotkeys.plist")
+  end
+  symbolicHotkeysCache = (type(data) == "table" and data.AppleSymbolicHotKeys) or {}
+  symbolicHotkeysReadAt = now
+  return symbolicHotkeysCache
 end
 
-local function getMissionControlSpaces()
-  local groups, isWM = getMissionControlDisplayGroups()
-  if not groups then return nil, false end
-  local spaces = {}
-  for _, grp in ipairs(groups) do
-    for _, el in ipairs(grp) do
-      if el.AXIdentifier == "mc.spaces" then
-        for _, sub in ipairs(el) do
-          if sub.AXIdentifier == "mc.spaces.list" then
-            for _, sp in ipairs(sub) do
-              table.insert(spaces, sp)
-            end
-          end
-        end
-      end
-    end
+-- Returns { keycode = n, flags = n } for an enabled symbolic hotkey id, or nil.
+local function getSymbolicHotkey(id)
+  local entry = readSymbolicHotkeys()[tostring(id)]
+  if entry == nil then
+    return SYMBOLIC_HOTKEY_DEFAULTS[id]
   end
-  return spaces, isWM
+  if entry.enabled == false or entry.enabled == 0 then return nil end
+  local params = type(entry.value) == "table" and entry.value.parameters or nil
+  local keycode = type(params) == "table" and tonumber(params[2]) or nil
+  if not keycode or keycode == 65535 then return nil end
+  return { keycode = math.floor(keycode), flags = math.floor(tonumber(params[3]) or 0) }
 end
 
-local function getGlobalSpaceIndex(targetSpaceId)
-  local layout = hs.spaces.allSpaces()
-  if not layout then return nil end
-  local idx = 0
-  for _, scr in ipairs(hs.screen.allScreens()) do
-    local uuid = scr:getUUID()
-    for i, spId in ipairs(layout[uuid] or {}) do
-      if spId == targetSpaceId then
-        return idx + i
-      end
+-- Section 3 hotkeys are recorded so that a synthetic Spaces shortcut colliding with
+-- one of them (e.g. "Switch to Desktop 1" bound to Ctrl+Alt+1) is not swallowed by
+-- Hammerspoon itself while it is being posted.
+local workspaceHotkeys = {}
+
+local function bindWorkspaceHotkey(mods, key, fn)
+  local flags = 0
+  for _, m in ipairs(mods) do
+    flags = flags | (HOTKEY_MOD_FLAGS[m] or 0)
+  end
+  local hk = hs.hotkey.bind(mods, key, fn)
+  table.insert(workspaceHotkeys, { hk = hk, keycode = hs.keycodes.map[key:lower()], flags = flags })
+  return hk
+end
+
+-- -- Move operations ------------------------------------------------------------
+local spaceMove = {
+  op = nil,            -- active move operation (see moveWindowToTargetSpace)
+  pending = nil,       -- queued request { kind = "delta" | "index", value = n }
+  waitTimer = nil,     -- modifier-release poll timer (strong reference)
+  waitDeadline = 0,
+  requestedAt = nil,   -- when the first not-yet-executed request arrived
+  lastModifierWait = nil,
+  lastResult = nil,    -- outcome of the last move (see workspaceMover.lastResult())
+}
+local finishMove, startPendingMove  -- forward declarations
+
+-- Runs fn after sec seconds as part of op, holding a strong reference to the timer
+-- (an unreferenced hs.timer.doAfter timer is garbage-collected and never fires,
+-- which used to strand moves halfway). Lua errors abort the move cleanly.
+local function opAfter(op, sec, fn)
+  if op.done then return end
+  local t
+  t = hs.timer.doAfter(sec, function()
+    op.timers[t] = nil
+    if op.done then return end
+    local ok, err = xpcall(fn, debug.traceback)
+    if not ok then finishMove(op, false, "Lua error: " .. tostring(err)) end
+  end)
+  op.timers[t] = true
+end
+
+-- Polls cond() every interval seconds; calls onDone(true, value) as soon as it
+-- returns a truthy value, or onDone(false) after timeout seconds.
+local function opPoll(op, interval, timeout, cond, onDone)
+  local deadline = hs.timer.secondsSinceEpoch() + timeout
+  local function tick()
+    local ok, value = pcall(cond)
+    if ok and value then return onDone(true, value) end
+    if hs.timer.secondsSinceEpoch() >= deadline then return onDone(false) end
+    opAfter(op, interval, tick)
+  end
+  tick()
+end
+
+local function releaseMouse(op)
+  if op.mouseDown then
+    op.mouseDown = false
+    postRawMouseButton(evTypes.leftMouseUp, op.dragPt or hs.mouse.absolutePosition(), op.evNum, 0, 0)
+  end
+end
+
+-- Compact per-phase timeline, exposed as workspaceMover.lastResult().trace
+local function trace(op, msg)
+  table.insert(op.trace, string.format("+%.2fs %s", hs.timer.secondsSinceEpoch() - op.startedAt, msg))
+end
+
+local function restoreSuspendedHotkeys(op)
+  for _, hk in ipairs(op.suspendedHotkeys or {}) do
+    hk:enable()
+  end
+  op.suspendedHotkeys = nil
+end
+
+-- Posts leftMouseDragged events through pts, one every interval seconds.
+local function dragMouseAlong(op, pts, interval, onDone)
+  local i = 0
+  local function step()
+    i = i + 1
+    local p = roundPt(pts[i])
+    local prev = op.dragPt or p
+    postRawMouseButton(evTypes.leftMouseDragged, p, op.evNum, p.x - prev.x, p.y - prev.y)
+    op.dragPt = p
+    if i >= #pts then return onDone() end
+    opAfter(op, interval, step)
+  end
+  opAfter(op, interval, step)
+end
+
+local function dragMouseLine(op, fromPt, toPt, steps, interval, onDone)
+  local pts = {}
+  for i = 1, steps do
+    table.insert(pts, {
+      x = fromPt.x + (toPt.x - fromPt.x) * i / steps,
+      y = fromPt.y + (toPt.y - fromPt.y) * i / steps,
+    })
+  end
+  dragMouseAlong(op, pts, interval, onDone)
+end
+
+-- Posts a symbolic hotkey exactly as configured, then releases its modifiers so
+-- Ctrl/Alt/Fn don't stay latched in the session modifier state.
+local function postSymbolicHotkey(op, hotkey)
+  local mods = hotkey.flags & MODIFIER_FLAGS_MASK
+  for _, h in ipairs(workspaceHotkeys) do
+    if h.keycode == hotkey.keycode and h.flags == mods and h.hk then
+      h.hk:disable()
+      op.suspendedHotkeys = op.suspendedHotkeys or {}
+      table.insert(op.suspendedHotkeys, h.hk)
     end
-    idx = idx + #(layout[uuid] or {})
+  end
+  local down = hs.eventtap.event.newKeyEvent(hotkey.keycode, true)
+  down:rawFlags(hotkey.flags)
+  down:post()
+  local up = hs.eventtap.event.newKeyEvent(hotkey.keycode, false)
+  up:rawFlags(hotkey.flags)
+  up:post()
+  local remaining = mods
+  for _, mod in ipairs({ "shift", "cmd", "alt", "ctrl" }) do
+    if (remaining & HOTKEY_MOD_FLAGS[mod]) ~= 0 then
+      remaining = remaining & ~HOTKEY_MOD_FLAGS[mod]
+      hs.eventtap.event.newKeyEvent(mod, false):rawFlags(remaining):post()
+    end
+  end
+  if op.suspendedHotkeys then
+    opAfter(op, 0.3, function() restoreSuspendedHotkeys(op) end)
+  end
+end
+
+finishMove = function(op, ok, reason)
+  if op.done then return end
+  op.done = true
+  for t in pairs(op.timers) do t:stop() end
+  op.timers = {}
+  pcall(releaseMouse, op)
+  restoreSuspendedHotkeys(op)
+  if op.mcOpen and not ok then pcall(hs.spaces.closeMissionControl) end
+  if op.savedCursor then hs.mouse.absolutePosition(op.savedCursor) end
+  if op.dragTapWasEnabled and altDragTap then altDragTap:start() end
+  if spaceMove.op == op then spaceMove.op = nil end
+
+  if ok then
+    -- An explicit move unpins the window (false, so the kitty auto-sticky watcher
+    -- doesn't re-enroll it) and tells <Alt>Tab about its new workspace right away.
+    stickyWindows[op.winId] = false
+    if onWindowMovedToSpace then pcall(onWindowMovedToSpace, op.win, op.targetSpace) end
+    pcall(function() op.win:focus() end)
+    local okName, appName = pcall(function() return op.win:application():name() end)
+    showBannerForSpace(op.scr, op.targetSpace, "moved " .. ((okName and appName) or "window"))
+  else
+    spaceMove.pending = nil
+    hs.alert.show(string.format("Could not move window to Space %d", op.targetIdx or 0), 1.0)
+  end
+  spaceMove.lastResult = {
+    ok = ok,
+    reason = reason,
+    method = op.method,
+    winId = op.winId,
+    fromSpace = op.fromSpace,
+    targetSpace = op.targetSpace,
+    targetIdx = op.targetIdx,
+    winSpaces = hs.spaces.windowSpaces(op.winId),
+    focusedSpace = hs.spaces.focusedSpace(),
+    seconds = hs.timer.secondsSinceEpoch() - op.startedAt,
+    modifierWait = op.modifierWait,
+    trace = op.trace,
+  }
+  local msg = string.format("%s window %d -> Space %d (id %d) via %s in %.2fs: %s",
+    ok and "moved" or "FAILED to move", op.winId, op.targetIdx or 0, op.targetSpace or 0,
+    tostring(op.method), spaceMove.lastResult.seconds, tostring(reason))
+  if ok then
+    spaceMoveLog.i(msg)
+  else
+    spaceMoveLog.e(msg .. "\n  " .. table.concat(op.trace, "\n  "))
+  end
+  if spaceMove.pending then startPendingMove() end
+end
+
+-- -- B. Mission Control thumbnail drag (defined first: path A falls back to it) --
+-- Mission Control is owned by the Dock (com.apple.WindowManager exposes nothing):
+-- dock > "mc" > "mc.display" (AXDisplayID == hs.screen:id()) > "mc.windows" >
+-- window thumbnail AXButtons (AXTitle = window title, no window id), and
+-- "mc.spaces" > "mc.spaces.list" > one AXButton per Space ("exit to Desktop N")
+-- in hs.spaces.allSpaces() order. Space buttons report collapsed, offscreen frames
+-- (y < 0) until the Spaces bar expands.
+local function mcChild(parent, identifier)
+  for _, el in ipairs(parent or {}) do
+    if el.AXIdentifier == identifier then return el end
   end
   return nil
+end
+
+local function getMissionControlDisplay(scr)
+  local dock = hs.application.applicationsForBundleID("com.apple.dock")[1]
+  local mc = mcChild(dock and hs.axuielement.applicationElement(dock), "mc")
+  if not mc then return nil end
+  local displays = {}
+  for _, el in ipairs(mc) do
+    if el.AXIdentifier == "mc.display" then table.insert(displays, el) end
+  end
+  local scrId, full = scr:id(), scr:fullFrame()
+  for _, d in ipairs(displays) do
+    if d.AXDisplayID == scrId then return d end
+  end
+  for _, d in ipairs(displays) do
+    local df = d.AXFrame
+    if df and df.x == full.x and df.y == full.y then return d end
+  end
+  return displays[1]
+end
+
+local function getMissionControlWindows(display)
+  local list = {}
+  for _, el in ipairs(mcChild(display, "mc.windows") or {}) do
+    table.insert(list, el)
+  end
+  return list
+end
+
+local function getMissionControlSpaces(display)
+  local list = {}
+  for _, el in ipairs(mcChild(mcChild(display, "mc.spaces"), "mc.spaces.list") or {}) do
+    table.insert(list, el)
+  end
+  return list
 end
 
 local function mcTitleMatches(candidate, title)
@@ -369,219 +664,129 @@ local function mcTitleMatches(candidate, title)
          (suffix == "" or title:sub(#title - #suffix + 1) == suffix)
 end
 
--- Universal Mission Control thumbnail drag-to-space (works on borderless Kitty
--- windows and all macOS 14.5+ / 15 Sequoia / 26 Tahoe windows).
-local function moveWindowViaMissionControl(win, targetSpaceId, switchToSpace)
-  if isMovingWindowToSpace or not win then return end
-  isMovingWindowToSpace = true
-  local savedCursor = hs.mouse.absolutePosition()
-  local wasDragTapEnabled = altDragTap and altDragTap:isEnabled()
-  if wasDragTapEnabled then altDragTap:stop() end
-
-  local function cleanupAndFinish()
-    if wasDragTapEnabled and altDragTap then altDragTap:start() end
-    hs.mouse.absolutePosition(savedCursor)
-    isMovingWindowToSpace = false
-  end
-
-  local app = win:application()
-  local bundleId = app and app:bundleID() or ""
-  local winTitle = win:title() or ""
-  if #winTitle == 0 and app then winTitle = app:title() or "" end
-  local winCenter = hs.geometry(win:frame()).center
-  local scr = win:screen() or hs.screen.mainScreen()
-  local full = scr:fullFrame()
-  local activeSpace = hs.spaces.activeSpaceOnScreen(scr)
-  local spaceGlobalIdx = getGlobalSpaceIndex(targetSpaceId)
-  if not spaceGlobalIdx then
-    cleanupAndFinish()
-    return
-  end
-
-  win:focus()
-  hs.spaces.openMissionControl()
-  postRawMouseMove({ x = math.floor(full.x + full.w / 2), y = math.floor(full.y + 20) })
-
-  local waitAttempts = 0
-  local pollTimer = nil
-  pollTimer = hs.timer.doEvery(0.04, function()
-    waitAttempts = waitAttempts + 1
-    local mcGroup = getMissionControlGroup()
-    if not mcGroup then
-      if waitAttempts >= 25 then
-        pollTimer:stop()
-        pcall(hs.spaces.closeMissionControl)
-        cleanupAndFinish()
+-- Picks win's thumbnail by title, then aspect ratio (thumbnails are scaled-down
+-- copies), then Mission Control's front-to-back order (win was focused first).
+-- Refuses to guess when neither title nor shape identifies the window.
+local function findWindowThumbnail(thumbs, winTitle, winFrame)
+  local aspect = winFrame.w / math.max(1, winFrame.h)
+  local scored = {}
+  for idx, th in ipairs(thumbs) do
+    local tf = th.AXFrame
+    if tf and tf.w > 0 and tf.h > 0 then
+      local title = th.AXTitle or ""
+      local titleScore = 0
+      if winTitle ~= "" and title == winTitle then
+        titleScore = 2
+      elseif winTitle ~= "" and mcTitleMatches(title, winTitle) then
+        titleScore = 1
       end
-      return
+      local aspectErr = math.abs(math.log((tf.w / tf.h) / aspect))
+      table.insert(scored, {
+        el = th, frame = tf, idx = idx, titleScore = titleScore,
+        aspectErr = aspectErr, shapeOk = aspectErr < 0.06,
+      })
     end
-    pollTimer:stop()
-
-    -- Allow Mission Control thumbnail layout & top Spaces bar expansion to settle
-    hs.timer.doAfter(hs.spaces.MCwaitTime or 0.3, function()
-      local mcWins, isWM = getMissionControlWindows()
-      local mcSpaces = getMissionControlSpaces()
-      local targetMcSpace = mcSpaces and mcSpaces[spaceGlobalIdx]
-      if not mcWins or not targetMcSpace or not targetMcSpace.AXFrame then
-        pcall(hs.spaces.closeMissionControl)
-        cleanupAndFinish()
-        return
-      end
-
-      local bestThumb = nil
-      local bestDist = math.huge
-      for _, cand in ipairs(mcWins) do
-        local ident = cand.AXIdentifier or ""
-        local candSpace = tonumber(ident:match("%.space%.(%d+)$"))
-        local sameSpace = (not candSpace) or (candSpace == activeSpace)
-        local sameApp = (not candSpace) or (bundleId ~= "" and ident:sub(1, #bundleId + 7) == bundleId .. ".space.")
-        if sameSpace and sameApp and cand.AXFrame then
-          local cCenter = hs.geometry(cand.AXFrame).center
-          local dist = hs.geometry(cCenter):distance(winCenter)
-          if mcTitleMatches(cand.AXTitle, winTitle) then
-            dist = dist - 100000
-          end
-          if dist < bestDist then
-            bestDist = dist
-            bestThumb = cand
-          end
-        end
-      end
-
-      if not bestThumb or not bestThumb.AXFrame then
-        pcall(hs.spaces.closeMissionControl)
-        cleanupAndFinish()
-        return
-      end
-
-      local startPt = hs.geometry(bestThumb.AXFrame).center
-      local endPt = isWM and targetMcSpace.AXPosition or hs.geometry(targetMcSpace.AXFrame).center
-      if not endPt then
-        endPt = hs.geometry(targetMcSpace.AXFrame).center
-      end
-
-      local evNum = allocMouseEventNumber()
-      postRawMouseMove(startPt)
-      hs.timer.doAfter(0.02, function()
-        postRawMouseButton(hs.eventtap.event.types.leftMouseDown, startPt, evNum, 0, 0)
-        local steps = 6
-        local stepIdx = 0
-        local dragTimer = nil
-        local prevPt = { x = startPt.x, y = startPt.y }
-        dragTimer = hs.timer.doEvery(0.015, function()
-          stepIdx = stepIdx + 1
-          local frac = stepIdx / steps
-          local curPt = {
-            x = math.floor(startPt.x + (endPt.x - startPt.x) * frac),
-            y = math.floor(startPt.y + (endPt.y - startPt.y) * frac),
-          }
-          postRawMouseButton(
-            hs.eventtap.event.types.leftMouseDragged,
-            curPt,
-            evNum,
-            curPt.x - prevPt.x,
-            curPt.y - prevPt.y
-          )
-          prevPt = curPt
-          if stepIdx >= steps then
-            dragTimer:stop()
-            hs.timer.doAfter(0.03, function()
-              postRawMouseButton(hs.eventtap.event.types.leftMouseUp, endPt, evNum, 0, 0)
-              hs.timer.doAfter(0.03, function()
-                local switched = false
-                if switchToSpace then
-                  local freshSpaces = getMissionControlSpaces()
-                  local spEl = freshSpaces and freshSpaces[spaceGlobalIdx]
-                  if spEl then
-                    switched = spEl:performAction("AXPress") or false
-                  end
-                end
-                if not switched then
-                  pcall(hs.spaces.closeMissionControl)
-                end
-                hs.timer.doAfter(0.25, function()
-                  win:focus()
-                  cleanupAndFinish()
-                end)
-              end)
-            end)
-          end
-        end)
-      end)
-    end)
+  end
+  table.sort(scored, function(a, b)
+    if a.titleScore ~= b.titleScore then return a.titleScore > b.titleScore end
+    if a.shapeOk ~= b.shapeOk then return a.shapeOk end
+    return a.idx < b.idx
   end)
+  local best, second = scored[1], scored[2]
+  if not best then return nil end
+  local unique = not second or second.titleScore < best.titleScore or
+                 (best.shapeOk and not second.shapeOk)
+  if best.titleScore > 0 or (best.shapeOk and unique) then
+    return best.el, best.frame
+  end
+  return nil
 end
 
--- Fast titlebar-drag + Space-switch path for standard titled windows, with
--- automatic fallback to moveWindowViaMissionControl for borderless windows
--- (e.g. Kitty) or if macOS Ctrl+Arrow shortcuts are disabled.
-local function moveFocusedWindowToTargetSpace(win, targetSpace, direction)
-  if isMovingWindowToSpace or not win then return end
-  if win:isFullScreen() then return end
-
-  -- First attempt native API (works on macOS < 14.5)
-  pcall(hs.spaces.moveWindowToSpace, win:id(), targetSpace)
-  local currentWinSpaces = hs.spaces.windowSpaces(win)
-  if currentWinSpaces and currentWinSpaces[1] == targetSpace then
-    hs.spaces.gotoSpace(targetSpace)
-    win:focus()
-    return
+local function moveWindowViaMissionControl(op)
+  local win, scr = op.win, op.scr
+  op.method = (op.method and op.method ~= "mission-control") and (op.method .. "+mission-control") or "mission-control"
+  local full = scr:fullFrame()
+  local winTitle = win:title() or ""
+  local winFrame = win:frame()
+  local spaceListIdx = indexOf((hs.spaces.allSpaces() or {})[scr:getUUID()], op.targetSpace)
+  if not spaceListIdx then
+    return finishMove(op, false, "target Space is not on the window's display")
   end
+  pcall(function() win:focus() end)
+  hs.spaces.openMissionControl()
+  op.mcOpen = true
+  trace(op, string.format("Mission Control opened for %q", winTitle))
+  local openedAt = hs.timer.secondsSinceEpoch()
+  local lastKey, stableTicks = nil, 0
 
-  local zoomRect = win:zoomButtonRect()
-  local hasTitlebar = zoomRect and zoomRect.w and zoomRect.w > 0
-  if not hasTitlebar or (direction ~= "left" and direction ~= "right") then
-    moveWindowViaMissionControl(win, targetSpace, true)
-    return
-  end
-
-  isMovingWindowToSpace = true
-  local savedCursor = hs.mouse.absolutePosition()
-  local origFrame = win:frame()
-  local clickPos = {
-    x = math.min(origFrame.x + origFrame.w - 12, math.floor(zoomRect.x + zoomRect.w + 10)),
-    y = math.floor(zoomRect.y + zoomRect.h / 2),
-  }
-  local evNum = allocMouseEventNumber()
-  local wasDragTapEnabled = altDragTap and altDragTap:isEnabled()
-  if wasDragTapEnabled then altDragTap:stop() end
-
-  win:unminimize()
-  win:raise()
-  postRawMouseMove(clickPos)
-
-  hs.timer.doAfter(0.02, function()
-    postRawMouseButton(hs.eventtap.event.types.leftMouseDown, clickPos, evNum, 0, 0)
-    hs.timer.doAfter(0.03, function()
-      local dragPt = { x = clickPos.x + 2, y = clickPos.y }
-      postRawMouseButton(hs.eventtap.event.types.leftMouseDragged, dragPt, evNum, 2, 0)
-      hs.timer.doAfter(0.04, function()
-        -- Release held Alt/Shift modifiers so macOS sees pure Ctrl+Left/Right
-        hs.eventtap.event.newKeyEvent("alt", false):post()
-        hs.eventtap.event.newKeyEvent("shift", false):post()
-        hs.eventtap.event.newKeyEvent("ctrl", true):post()
-        hs.timer.doAfter(0.02, function()
-          hs.eventtap.event.newKeyEvent(direction, true):setFlags({ctrl = true, fn = true}):post()
-          hs.timer.doAfter(0.02, function()
-            hs.eventtap.event.newKeyEvent(direction, false):setFlags({ctrl = true, fn = true}):post()
-            hs.eventtap.event.newKeyEvent("ctrl", false):post()
-            hs.timer.doAfter(0.45, function()
-              postRawMouseButton(hs.eventtap.event.types.leftMouseUp, hs.mouse.absolutePosition(), evNum, 0, 0)
-              hs.timer.doAfter(0.02, function()
-                if win:isVisible() then
-                  win:setFrame(origFrame)
-                end
-                win:raise()
-                win:focus()
-                hs.mouse.absolutePosition(savedCursor)
-                if wasDragTapEnabled and altDragTap then altDragTap:start() end
-                isMovingWindowToSpace = false
-
-                -- Verify window reached targetSpace; if not, fall back to Mission Control drag
-                local afterSpaces = hs.spaces.windowSpaces(win)
-                if not (afterSpaces and afterSpaces[1] == targetSpace) then
-                  moveWindowViaMissionControl(win, targetSpace, true)
-                end
+  -- 1. Wait for the opening animation to settle (presses mid-animation are ignored)
+  opPoll(op, 0.05, 3.0, function()
+    local display = getMissionControlDisplay(scr)
+    local _, tf = findWindowThumbnail(getMissionControlWindows(display), winTitle, winFrame)
+    if not tf then return false end
+    local key = string.format("%.0f,%.0f,%.0f,%.0f", tf.x, tf.y, tf.w, tf.h)
+    stableTicks = (key == lastKey) and (stableTicks + 1) or 0
+    lastKey = key
+    return stableTicks >= 2 and (hs.timer.secondsSinceEpoch() - openedAt) >= 0.45 and tf
+  end, function(ready, thumbFrame)
+    trace(op, ready and string.format("thumbnail settled at %.0f,%.0f %.0fx%.0f",
+      thumbFrame.x, thumbFrame.y, thumbFrame.w, thumbFrame.h) or "thumbnail not found")
+    if not ready then
+      return finishMove(op, false, "window thumbnail not found in Mission Control")
+    end
+    local startPt = roundPt(hs.geometry(thumbFrame).center)
+    postRawMouseMove(startPt)
+    opAfter(op, 0.05, function()
+      op.dragPt = startPt
+      postRawMouseButton(evTypes.leftMouseDown, startPt, op.evNum, 0, 0)
+      op.mouseDown = true
+      -- 2. Lift the thumbnail; the Spaces bar expands once a drag is in progress
+      dragMouseAlong(op, {
+        { x = startPt.x, y = startPt.y - 8 },
+        { x = startPt.x, y = startPt.y - 30 },
+        { x = startPt.x, y = startPt.y - 80 },
+      }, 0.03, function()
+        opPoll(op, 0.05, 1.5, function()
+          local sp = getMissionControlSpaces(getMissionControlDisplay(scr))[spaceListIdx]
+          local sf = sp and sp.AXFrame
+          return sf and sf.y >= full.y and sf.h >= 30 and sf
+        end, function(expanded, targetFrame)
+          trace(op, expanded and string.format("Spaces bar expanded; target at %.0f,%.0f",
+            targetFrame.x, targetFrame.y) or "Spaces bar did not expand")
+          if not expanded then
+            return finishMove(op, false, "Mission Control Spaces bar did not expand")
+          end
+          -- 3. Drop onto the expanded target Space thumbnail
+          local endPt = roundPt(hs.geometry(targetFrame).center)
+          dragMouseLine(op, op.dragPt, endPt, 6, 0.025, function()
+            opAfter(op, 0.2, function()
+              dragMouseAlong(op, { { x = endPt.x + 1, y = endPt.y } }, 0.01, function()
+                opAfter(op, 0.06, function()
+                  releaseMouse(op)
+                  -- 4. Verify, then follow the window by pressing the target Space
+                  opPoll(op, 0.05, 1.5, function()
+                    return indexOf(hs.spaces.windowSpaces(win) or {}, op.targetSpace)
+                  end, function(dropped)
+                    trace(op, dropped and "drop moved the window" or "drop did not move the window")
+                    if not dropped then
+                      return finishMove(op, false, "Mission Control drop did not move the window")
+                    end
+                    local sp = getMissionControlSpaces(getMissionControlDisplay(scr))[spaceListIdx]
+                    local okPress, pressed = pcall(function() return sp and sp:performAction("AXPress") end)
+                    trace(op, "AXPress target Space: " .. ((okPress and pressed) and "ok" or "failed"))
+                    if not (okPress and pressed) then
+                      pcall(hs.spaces.closeMissionControl)
+                      pcall(hs.spaces.gotoSpace, op.targetSpace)
+                    end
+                    op.mcOpen = false
+                    opPoll(op, 0.05, 2.5, function()
+                      return hs.spaces.focusedSpace() == op.targetSpace
+                    end, function(arrived)
+                      finishMove(op, true, arrived and "dragged in Mission Control"
+                        or "dragged in Mission Control (Space switch still pending)")
+                    end)
+                  end)
+                end)
               end)
             end)
           end)
@@ -591,6 +796,281 @@ local function moveFocusedWindowToTargetSpace(win, targetSpace, direction)
   end)
 end
 
+-- -- A. Titlebar drag + the user's macOS Spaces shortcut ---------------------------
+local INTERACTIVE_AX_ROLES = {
+  AXButton = true, AXPopUpButton = true, AXMenuButton = true, AXRadioButton = true,
+  AXCheckBox = true, AXTextField = true, AXTextArea = true, AXComboBox = true,
+  AXSearchField = true, AXSlider = true, AXIncrementor = true, AXLink = true,
+  AXTab = true, AXDisclosureTriangle = true, AXSegmentedControl = true,
+  AXMenuBar = true, AXMenuBarItem = true,
+}
+
+-- Returns a titlebar point that drags the window frame itself (not a traffic light,
+-- toolbar button or browser tab), validated with an Accessibility hit-test. In
+-- Chrome the strip right of the zoom button is the draggable caption, while ~30px
+-- further right is the "Tab search" button and then the tabs.
+local function findTitlebarGrabPoint(win)
+  local zoom = win:zoomButtonRect()
+  if not (zoom and zoom.w and zoom.w > 0) then return nil end
+  local f = win:frame()
+  local full = (win:screen() or hs.screen.mainScreen()):fullFrame()
+  local y = math.floor(zoom.y + zoom.h / 2)
+  local xs = { zoom.x + zoom.w + 10, zoom.x + zoom.w + 4, f.x + f.w / 2 }
+  for x = zoom.x + zoom.w + 60, f.x + f.w - 60, 80 do
+    table.insert(xs, x)
+  end
+  local app = win:application()
+  local appPid = app and app:pid()
+  -- Never hit-test our own process over AX (it would deadlock until the AX timeout)
+  local canHitTest = not (app and app:bundleID() == hs.processInfo.bundleID)
+  local sys = hs.axuielement.systemWideElement()
+  local firstCandidate, anyHitTest = nil, false
+  for _, x in ipairs(xs) do
+    local pt = { x = math.floor(x), y = y }
+    local inside = pt.x > f.x + 2 and pt.x < f.x + f.w - 2 and pt.y > f.y and
+      pt.x >= full.x and pt.x < full.x + full.w and pt.y >= full.y and pt.y < full.y + full.h
+    if inside then
+      firstCandidate = firstCandidate or pt
+      if not canHitTest then return pt end
+      local ok, role, pid = pcall(function()
+        local el = sys:elementAtPosition(pt.x, pt.y)
+        if not el then return nil end
+        return el.AXRole or "", el:pid()
+      end)
+      if ok and role then
+        anyHitTest = true
+        if pid == appPid and not INTERACTIVE_AX_ROLES[role] then
+          return pt
+        end
+      end
+    end
+  end
+  -- Apps without AX hit-testing: rely on the drag-engagement check instead
+  if not anyHitTest then return firstCandidate end
+  return nil
+end
+
+-- Keystrokes that switch scr from fromSpace to targetSpace, each paired with the
+-- Space it lands on: one "Move left/right a space" hop for adjacent Spaces, else
+-- a direct "Switch to Desktop N" shortcut when enabled (single display only, where
+-- Desktop N is our workspace N), else one hop per Space.
+local function planSpaceSwitchKeys(scr, fromSpace, targetSpace, targetIdx)
+  local onScreen = (hs.spaces.allSpaces() or {})[scr:getUUID()] or {}
+  local fromPos, toPos = indexOf(onScreen, fromSpace), indexOf(onScreen, targetSpace)
+  if not fromPos or not toPos or fromPos == toPos then return nil end
+  local hop = getSymbolicHotkey((toPos > fromPos) and SYMBOLIC_MOVE_RIGHT_SPACE or SYMBOLIC_MOVE_LEFT_SPACE)
+  if hop and math.abs(toPos - fromPos) == 1 then
+    return { { hotkey = hop, space = targetSpace } }
+  end
+  if targetIdx and targetIdx <= 16 and #hs.screen.allScreens() == 1 then
+    local direct = getSymbolicHotkey(SYMBOLIC_SWITCH_TO_DESKTOP_1 + targetIdx - 1)
+    if direct then return { { hotkey = direct, space = targetSpace } } end
+  end
+  if not hop then return nil end
+  local plan = {}
+  local step = (toPos > fromPos) and 1 or -1
+  for pos = fromPos + step, toPos, step do
+    table.insert(plan, { hotkey = hop, space = onScreen[pos] })
+  end
+  return plan
+end
+
+local function moveViaTitlebarDrag(op, grabPt, plan)
+  local win = op.win
+  op.method = "titlebar-drag"
+  trace(op, string.format("titlebar drag at %d,%d with %d Spaces shortcut step(s)", grabPt.x, grabPt.y, #plan))
+
+  local function settle()
+    releaseMouse(op)
+    opAfter(op, 0.06, function()
+      pcall(function() win:setFrame(op.origFrame) end)  -- undo the nudge (and Chrome's drag-unmaximize)
+      local winSpaces = hs.spaces.windowSpaces(win) or {}
+      local here = hs.spaces.activeSpaceOnScreen(op.scr) or hs.spaces.focusedSpace()
+      trace(op, "released; window on " .. table.concat(winSpaces, ",") .. ", active Space " .. tostring(here))
+      if indexOf(winSpaces, op.targetSpace) then
+        return finishMove(op, true, "carried along by the macOS Spaces shortcut")
+      elseif indexOf(winSpaces, here) then
+        -- Shortcut disabled/ignored or a hop fell short: the window is still with us
+        op.fromSpace = here
+        spaceMoveLog.w("titlebar drag + Spaces shortcut fell short; continuing via Mission Control")
+        return opAfter(op, 0.15, function() moveWindowViaMissionControl(op) end)
+      end
+      if winSpaces[1] then pcall(hs.spaces.gotoSpace, winSpaces[1]) end
+      finishMove(op, false, "window did not follow the Space switch (drag interrupted?)")
+    end)
+  end
+
+  local function runStep(i)
+    local step = plan[i]
+    if not step then
+      return opPoll(op, 0.03, 0.8, function()
+        return indexOf(hs.spaces.windowSpaces(win) or {}, op.targetSpace)
+      end, settle)
+    end
+    trace(op, string.format("post shortcut keycode %d flags 0x%X (expect Space %d)",
+      step.hotkey.keycode, step.hotkey.flags, step.space))
+    postSymbolicHotkey(op, step.hotkey)
+    opPoll(op, 0.03, 2.5, function()
+      return hs.spaces.focusedSpace() == step.space
+    end, function(switched)
+      trace(op, switched and ("now on Space " .. step.space) or "shortcut had no effect")
+      if switched then return runStep(i + 1) end
+      symbolicHotkeysCache = nil  -- the user may have changed the shortcut; re-read next time
+      settle()
+    end)
+  end
+
+  postRawMouseMove(grabPt)
+  opAfter(op, 0.03, function()
+    op.dragPt = { x = grabPt.x, y = grabPt.y }
+    postRawMouseButton(evTypes.leftMouseDown, op.dragPt, op.evNum, 0, 0)
+    op.mouseDown = true
+    dragMouseAlong(op, { { x = grabPt.x + 2, y = grabPt.y }, { x = grabPt.x + 4, y = grabPt.y } }, 0.035, function()
+      -- Only switch Spaces once WindowServer is really dragging the window
+      opPoll(op, 0.02, 0.35, function()
+        local fr, o = win:frame(), op.origFrame
+        return fr.x ~= o.x or fr.y ~= o.y or fr.w ~= o.w or fr.h ~= o.h
+      end, function(engaged)
+        trace(op, engaged and "window drag engaged" or "window drag did not engage")
+        if engaged then return runStep(1) end
+        releaseMouse(op)
+        spaceMoveLog.w("titlebar drag did not engage; falling back to Mission Control")
+        opAfter(op, 0.15, function() moveWindowViaMissionControl(op) end)
+      end)
+    end)
+  end)
+end
+
+-- -- Entry points -----------------------------------------------------------------
+local function moveWindowToTargetSpace(win, scr, fromSpace, targetSpace, targetIdx)
+  -- Native API first: works on macOS < 14.5 (a silent NOP returning true on 14.5+)
+  pcall(hs.spaces.moveWindowToSpace, win:id(), targetSpace)
+  local nowSpaces = hs.spaces.windowSpaces(win)
+  if nowSpaces and #nowSpaces == 1 and nowSpaces[1] == targetSpace then
+    hs.spaces.gotoSpace(targetSpace)
+    stickyWindows[win:id()] = false
+    if onWindowMovedToSpace then pcall(onWindowMovedToSpace, win, targetSpace) end
+    win:focus()
+    spaceMove.lastResult = { ok = true, method = "native", winId = win:id(), targetSpace = targetSpace, targetIdx = targetIdx }
+    local app = win:application()
+    showBannerForSpace(scr, targetSpace, "moved " .. ((app and app:name()) or "window"))
+    return
+  end
+
+  local op = {
+    win = win, winId = win:id(), scr = scr,
+    fromSpace = fromSpace, targetSpace = targetSpace, targetIdx = targetIdx,
+    origFrame = win:frame(), timers = {}, evNum = allocMouseEventNumber(),
+    startedAt = hs.timer.secondsSinceEpoch(), savedCursor = hs.mouse.absolutePosition(),
+    trace = {}, modifierWait = spaceMove.lastModifierWait,
+  }
+  op.dragTapWasEnabled = (altDragTap and altDragTap:isEnabled()) or false
+  if op.dragTapWasEnabled then altDragTap:stop() end
+  spaceMove.op = op
+  opAfter(op, 15, function() finishMove(op, false, "watchdog timeout") end)
+  opAfter(op, 0, function()
+    local plan = planSpaceSwitchKeys(scr, fromSpace, targetSpace, targetIdx)
+    local grabPt = plan and findTitlebarGrabPoint(win)
+    local app = win:application()
+    trace(op, string.format("%s %q: Space %d -> %d, shortcut plan: %s, titlebar grab: %s",
+      app and app:name() or "?", win:title() or "", fromSpace, targetSpace,
+      plan and (#plan .. " step(s)") or "none", grabPt and (grabPt.x .. "," .. grabPt.y) or "none"))
+    if grabPt then
+      moveViaTitlebarDrag(op, grabPt, plan)
+    else
+      moveWindowViaMissionControl(op)
+    end
+  end)
+end
+
+local function executeMoveRequest(req)
+  local win = hs.window.focusedWindow()
+  if not win then return end
+  if win:isFullScreen() then
+    hs.alert.show("Fullscreen windows can't be moved between Spaces", 0.8)
+    return
+  end
+  local scr = win:screen() or hs.screen.mainScreen()
+  local spaces = getOrderedUserSpacesForCurrentScreen(scr)
+  local currentSpace = hs.spaces.activeSpaceOnScreen(scr) or hs.spaces.focusedSpace()
+  local currentIdx = indexOf(spaces, currentSpace)
+  local targetIdx
+  if req.kind == "delta" then
+    if not currentIdx then return end
+    targetIdx = currentIdx + req.value
+    if targetIdx > #spaces and #spaces < 6 then
+      spaces = ensureUserSpacesCount(scr, math.min(targetIdx, 6))
+    end
+    targetIdx = math.max(1, math.min(targetIdx, #spaces))
+    if targetIdx == currentIdx then
+      showWorkspaceBanner(scr, currentIdx, #spaces,
+        string.format("Already at Space %d of %d", currentIdx, #spaces))
+      return
+    end
+  else
+    targetIdx = req.value
+    if #spaces < targetIdx and targetIdx <= 6 then
+      spaces = ensureUserSpacesCount(scr, targetIdx)
+    end
+    if not spaces[targetIdx] then
+      hs.alert.show(string.format("Space %d does not exist", targetIdx), 0.7)
+      return
+    end
+    if spaces[targetIdx] == currentSpace then
+      showWorkspaceBanner(scr, targetIdx, #spaces)
+      return
+    end
+  end
+  moveWindowToTargetSpace(win, scr, currentSpace, spaces[targetIdx], targetIdx)
+end
+
+-- The hotkey fires while Ctrl/Alt/Shift are still physically held (~100-250ms).
+-- Posting synthetic events then would mix those modifiers in (Ctrl+click = right
+-- click, Ctrl+Alt+Shift+Arrow = our own hotkey), and posting a synthetic "alt up"
+-- does not release a physically held key, so wait for the real release first.
+local MODIFIER_RELEASE_TIMEOUT = 2.0
+
+local function hotkeyModifiersHeld()
+  local mods = hs.eventtap.checkKeyboardModifiers()
+  return (mods.ctrl or mods.alt or mods.shift or mods.cmd) and true or false
+end
+
+startPendingMove = function()
+  if spaceMove.op or spaceMove.waitTimer or not spaceMove.pending then return end
+  local function poll()
+    spaceMove.waitTimer = nil
+    if hotkeyModifiersHeld() and hs.timer.secondsSinceEpoch() < spaceMove.waitDeadline then
+      spaceMove.waitTimer = hs.timer.doAfter(0.015, poll)
+      return
+    end
+    local req = spaceMove.pending
+    spaceMove.pending = nil
+    if not req then return end
+    spaceMove.lastModifierWait = hs.timer.secondsSinceEpoch() - (spaceMove.requestedAt or 0)
+    spaceMove.requestedAt = nil
+    local ok, err = xpcall(executeMoveRequest, debug.traceback, req)
+    if not ok then
+      spaceMoveLog.e("move request failed: " .. tostring(err))
+      if spaceMove.op then finishMove(spaceMove.op, false, "Lua error: " .. tostring(err)) end
+    end
+  end
+  poll()
+end
+
+local function requestSpaceMove(kind, value)
+  local pending = spaceMove.pending
+  if pending and pending.kind == "delta" and kind == "delta" then
+    pending.value = pending.value + value
+  else
+    spaceMove.pending = { kind = kind, value = value }
+  end
+  spaceMove.requestedAt = spaceMove.requestedAt or hs.timer.secondsSinceEpoch()
+  spaceMove.waitDeadline = hs.timer.secondsSinceEpoch() + MODIFIER_RELEASE_TIMEOUT
+  startPendingMove()
+end
+
+local workspaceSwitchTimer = nil
+
 local function switchToWorkspaceIndex(idx)
   local scr = hs.screen.mainScreen()
   local spaces = getOrderedUserSpacesForCurrentScreen(scr)
@@ -599,71 +1079,67 @@ local function switchToWorkspaceIndex(idx)
   end
   local targetSpace = spaces[idx]
   if targetSpace then
-    hs.spaces.gotoSpace(targetSpace)
+    showWorkspaceBanner(scr, idx, #spaces)
+    if targetSpace == hs.spaces.activeSpaceOnScreen(scr) then return end
+    -- Let the banner paint before gotoSpace() busy-waits on Mission Control
+    if workspaceSwitchTimer then workspaceSwitchTimer:stop() end
+    workspaceSwitchTimer = hs.timer.doAfter(0.01, function()
+      workspaceSwitchTimer = nil
+      hs.spaces.gotoSpace(targetSpace)
+    end)
   end
 end
 
 local function moveFocusedWindowToWorkspaceIndex(idx)
-  local win = hs.window.focusedWindow()
-  if not win then return end
-  local scr = win:screen() or hs.screen.mainScreen()
-  local spaces = getOrderedUserSpacesForCurrentScreen(scr)
-  if #spaces < idx and idx <= 6 then
-    spaces = ensureUserSpacesCount(scr, idx)
-  end
-  local targetSpace = spaces[idx]
-  if not targetSpace then return end
-  local currentSpace = hs.spaces.activeSpaceOnScreen(scr) or hs.spaces.focusedSpace()
-  if targetSpace == currentSpace then return end
-  moveFocusedWindowToTargetSpace(win, targetSpace, nil)
+  requestSpaceMove("index", idx)
 end
 
 local function moveFocusedWindowToAdjacentSpace(delta)
-  local win = hs.window.focusedWindow()
-  if not win then return end
-  local scr = win:screen() or hs.screen.mainScreen()
-  local spaces = getOrderedUserSpacesForCurrentScreen(scr)
-  if #spaces < 2 then
-    spaces = ensureUserSpacesCount(scr, 6)
-  end
-  local currentSpace = hs.spaces.activeSpaceOnScreen(scr) or hs.spaces.focusedSpace()
-  local currentIdx = nil
-  for i, spId in ipairs(spaces) do
-    if spId == currentSpace then
-      currentIdx = i
-      break
-    end
-  end
-  if not currentIdx then return end
-  local targetIdx = currentIdx + delta
-  if targetIdx > #spaces and targetIdx <= 6 then
-    spaces = ensureUserSpacesCount(scr, targetIdx)
-  end
-  if targetIdx >= 1 and targetIdx <= #spaces then
-    local targetSpace = spaces[targetIdx]
-    local dir = (delta > 0) and "right" or "left"
-    moveFocusedWindowToTargetSpace(win, targetSpace, dir)
-  else
-    hs.alert.show(string.format("Already at Space %d of %d", currentIdx, #spaces), 0.7)
-  end
+  requestSpaceMove("delta", delta)
 end
 
 for i = 1, 6 do
-  hs.hotkey.bind({"ctrl", "alt"}, tostring(i), function()
+  bindWorkspaceHotkey({"ctrl", "alt"}, tostring(i), function()
     switchToWorkspaceIndex(i)
   end)
-  hs.hotkey.bind({"ctrl", "shift", "alt"}, tostring(i), function()
+  bindWorkspaceHotkey({"ctrl", "shift", "alt"}, tostring(i), function()
     moveFocusedWindowToWorkspaceIndex(i)
   end)
 end
 
-hs.hotkey.bind({"ctrl", "shift", "alt"}, "Left",  function() moveFocusedWindowToAdjacentSpace(-1) end)
-hs.hotkey.bind({"ctrl", "shift", "alt"}, "Right", function() moveFocusedWindowToAdjacentSpace(1)  end)
+bindWorkspaceHotkey({"ctrl", "shift", "alt"}, "Left",  function() moveFocusedWindowToAdjacentSpace(-1) end)
+bindWorkspaceHotkey({"ctrl", "shift", "alt"}, "Right", function() moveFocusedWindowToAdjacentSpace(1)  end)
+
+-- Pre-warm the Spaces-shortcut cache off the config-load path (`defaults export` ~50ms).
+-- Declared before assignment so the callback captures (and thus keeps alive) the timer.
+local symbolicHotkeysWarmTimer
+symbolicHotkeysWarmTimer = hs.timer.doAfter(1.0, function()
+  symbolicHotkeysWarmTimer = nil
+  pcall(readSymbolicHotkeys)
+end)
+
+-- Live debugging / testing over IPC (hs.ipc is loaded at the top), e.g.:
+--   hs -c 'workspaceMover.moveFocusedWindowToAdjacentSpace(1)'
+--   hs -c 'return hs.inspect(workspaceMover.lastResult())'
+workspaceMover = {
+  switchToWorkspaceIndex = switchToWorkspaceIndex,
+  moveFocusedWindowToWorkspaceIndex = moveFocusedWindowToWorkspaceIndex,
+  moveFocusedWindowToAdjacentSpace = moveFocusedWindowToAdjacentSpace,
+  ensureUserSpacesCount = ensureUserSpacesCount,
+  getSymbolicHotkey = getSymbolicHotkey,
+  showWorkspaceBanner = showWorkspaceBanner,
+  isBannerVisible = function() return workspaceBanner ~= nil and workspaceBanner:isShowing() end,
+  isBusy = function()
+    return spaceMove.op ~= nil or spaceMove.waitTimer ~= nil or spaceMove.pending ~= nil
+  end,
+  lastResult = function() return spaceMove.lastResult end,
+}
 
 -- -----------------------------------------------------------------------------
 -- 4. Sticky Window Toggle (<Alt>F6) & Auto-Sticky Kitty Watcher
 -- -----------------------------------------------------------------------------
-local stickyWindows = {}
+-- stickyWindows is declared in Section 3 so that explicit <Ctrl><Shift><Alt> moves
+-- can unpin a window (false = explicitly unpinned, never auto-re-enrolled below).
 local autoStickyApps = {["kitty"] = true}
 
 local function syncStickyWindowsToFocusedSpace()
@@ -965,6 +1441,18 @@ local function recordActiveWindowFast(win, spaceId, spaceIdx)
   entry.frame = frame
   knownWindowsById[wid] = entry
   return wid
+end
+
+-- Called by Section 3 right after <Ctrl><Shift><Alt>Left/Right/1..6 moved a window,
+-- so <Alt>Tab lists it under its new workspace immediately (before the async sync).
+onWindowMovedToSpace = function(win, spaceId)
+  local spaceIndexById = refreshSpaceIndexCache()
+  local wid = recordActiveWindowFast(win, spaceId, spaceIndexById[spaceId])
+  local entry = wid and knownWindowsById[wid]
+  if entry then
+    entry.isSticky = false
+  end
+  schedulePersistWindowTrackerState()
 end
 
 -- Background-only sync of windows across all Spaces (never run on <Alt>Tab critical path)

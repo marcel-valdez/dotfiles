@@ -623,28 +623,67 @@ EOF
 # ------------------------------------------------------------------------------
 echo "[Test 15] ~/.hammerspoon/init.lua macOS 15+ space-moving & multi-workspace Alt-Tab"
 {
+  hs_init="${HOME}/.hammerspoon/init.lua"
   assert_true "init.lua defines ensureUserSpacesCount for auto-creating 6 Spaces" \
-    grep -q "local function ensureUserSpacesCount" "${HOME}/.hammerspoon/init.lua"
-  assert_true "init.lua defines moveWindowViaMissionControl for borderless & direct Space jumps" \
-    grep -q "local function moveWindowViaMissionControl" "${HOME}/.hammerspoon/init.lua"
+    grep -q "local function ensureUserSpacesCount" "${hs_init}"
+  assert_true "init.lua defines moveWindowViaMissionControl for borderless (kitty) windows" \
+    grep -q "local function moveWindowViaMissionControl" "${hs_init}"
   assert_true "init.lua clears hardware modifiers via :rawFlags(0) on synthetic mouse drag" \
-    grep -q ":rawFlags(0)" "${HOME}/.hammerspoon/init.lua"
+    grep -q ":rawFlags(0)" "${hs_init}"
+  assert_true "init.lua loads hs.ipc and binds hammerspoon://reload for live CLI debugging" \
+    bash -c "grep -q '^require(\"hs.ipc\")' '${hs_init}' && grep -q 'hs.urlevent.bind(\"reload\"' '${hs_init}'"
+  assert_true "init.lua reads the user's own Spaces shortcuts from com.apple.symbolichotkeys" \
+    bash -c "grep -q 'local function getSymbolicHotkey' '${hs_init}' && grep -q 'com.apple.symbolichotkeys' '${hs_init}'"
+  assert_true "init.lua no longer hardcodes a synthetic Ctrl+Fn+Arrow Space switch" \
+    bash -c "! grep -q 'setFlags({ctrl = true, fn = true})' '${hs_init}'"
+  assert_true "init.lua waits for physically held hotkey modifiers to be released" \
+    grep -q "local function hotkeyModifiersHeld" "${hs_init}"
+  assert_true "init.lua keeps strong references to pending move timers (GC-safe opAfter)" \
+    bash -c "grep -q 'local function opAfter' '${hs_init}' && grep -q 'op.timers\[t\] = true' '${hs_init}'"
+  assert_true "init.lua passes only integral values to integer mouse event fields" \
+    bash -c "grep -q 'math.floor(evNum)' '${hs_init}' && grep -q 'local function roundPt' '${hs_init}'"
+  assert_true "init.lua matches Mission Control thumbnails by title/shape (not nearest distance)" \
+    grep -q "local function findWindowThumbnail" "${hs_init}"
+  assert_true "init.lua unpins explicitly moved windows from stickyWindows" \
+    grep -Fq "stickyWindows[op.winId] = false" "${hs_init}"
+  assert_true "init.lua declares stickyWindows exactly once (shared by Sections 3, 4 and 6)" \
+    test "$(grep -c '^local stickyWindows' "${hs_init}")" -eq 1
+  assert_true "init.lua refreshes the Alt-Tab tracker right after a move (onWindowMovedToSpace)" \
+    grep -q "^onWindowMovedToSpace = function" "${hs_init}"
+  assert_true "init.lua shows an all-Spaces fading Desktop banner for Hammerspoon switches" \
+    bash -c "grep -q 'local function showWorkspaceBanner' '${hs_init}' && grep -q 'canJoinAllSpaces' '${hs_init}'"
+  assert_true "init.lua never shows the Desktop banner from OS-level hs.spaces.watcher callbacks" \
+    bash -c "! grep -A3 'hs.spaces.watcher.new' '${hs_init}' | grep -q 'Banner'"
+  assert_true "init.lua exposes workspaceMover for live IPC testing" \
+    grep -q "^workspaceMover = {" "${hs_init}"
   assert_true "init.lua defines buildAllWorkspacesChooserChoices for cross-workspace Alt-Tab" \
-    grep -q "local function buildAllWorkspacesChooserChoices" "${HOME}/.hammerspoon/init.lua"
+    grep -q "local function buildAllWorkspacesChooserChoices" "${hs_init}"
   assert_true "init.lua pre-populates default workspace prefix filter ^<N> " \
-    grep -Fq 'initialChooserQuery = string.format("^%d ", currentSpaceIdx)' "${HOME}/.hammerspoon/init.lua"
+    grep -Fq 'initialChooserQuery = string.format("^%d ", currentSpaceIdx)' "${hs_init}"
   assert_true "init.lua defines focusSelectedWindowChoice to switch workspace and raise window" \
-    grep -q "local function focusSelectedWindowChoice" "${HOME}/.hammerspoon/init.lua"
+    grep -q "local function focusSelectedWindowChoice" "${hs_init}"
   assert_true "init.lua reuses single pre-allocated border canvas via ensureHighlightCanvas" \
-    grep -q "local function ensureHighlightCanvas" "${HOME}/.hammerspoon/init.lua"
+    grep -q "local function ensureHighlightCanvas" "${hs_init}"
   assert_true "init.lua debounces border updates asynchronously via scheduleBorderUpdate" \
-    grep -q "local function scheduleBorderUpdate" "${HOME}/.hammerspoon/init.lua"
+    grep -q "local function scheduleBorderUpdate" "${hs_init}"
   assert_true "init.lua caches app icons in appIconCache (getCachedAppIcon)" \
-    grep -q "local function getCachedAppIcon" "${HOME}/.hammerspoon/init.lua"
+    grep -q "local function getCachedAppIcon" "${hs_init}"
   assert_true "init.lua never calls hs.axuielement on hs.processInfo.processID (no self-AX deadlock)" \
-    bash -c "! grep -q 'processInfo.processID' '${HOME}/.hammerspoon/init.lua'"
+    bash -c "! grep -q 'processInfo.processID' '${hs_init}'"
   assert_true "init.lua has no hardcoded /opt/homebrew/bin/bash paths" \
-    bash -c "! grep -q '/opt/homebrew/bin/bash' '${HOME}/.hammerspoon/init.lua'"
+    bash -c "! grep -q '/opt/homebrew/bin/bash' '${hs_init}'"
+
+  # Live checks against the running Hammerspoon over hs.ipc (skipped when it isn't running)
+  hs_cli="/Applications/Hammerspoon.app/Contents/Frameworks/hs/hs"
+  if [[ -x "${hs_cli}" ]] && pgrep -x Hammerspoon >/dev/null 2>&1 &&
+     [[ "$("${hs_cli}" -t 3 -q -c 'return "pong"' </dev/null 2>/dev/null || true)" == *pong* ]]; then
+    hs_syntax="$("${hs_cli}" -t 5 -q -c "local f, e = loadfile('${hs_init}'); return f and 'SYNTAX_OK' or tostring(e)" </dev/null 2>&1 || true)"
+    assert_contains "init.lua compiles in Hammerspoon's Lua runtime (loadfile)" "SYNTAX_OK" "${hs_syntax}"
+    hs_api="$("${hs_cli}" -t 3 -q -c "return type(workspaceMover) == 'table' and type(workspaceMover.moveFocusedWindowToAdjacentSpace) == 'function' and 'API_OK' or 'API_MISSING'" </dev/null 2>&1 || true)"
+    assert_contains "running Hammerspoon exposes workspaceMover move functions over IPC" "API_OK" "${hs_api}"
+  else
+    echo "  [SKIP] live Hammerspoon IPC checks (Hammerspoon not running or hs.ipc unavailable)"
+  fi
 }
 
 echo "=============================================================================="
