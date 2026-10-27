@@ -485,13 +485,18 @@ run_cmd defaults write com.apple.dock mru-spaces -bool false
 # Synchronize Spaces across external monitors & allow dual-monitor window spanning (both-screens)
 run_cmd defaults write com.apple.spaces spans-displays -bool true
 
-# Configure SwiftBar plugin directory
+# Configure SwiftBar plugin directory & Hammerspoon auto-launch at login
 run_cmd defaults write com.ameba.SwiftBar PluginDirectory -string "${HOME}/.config/swiftbar"
+run_cmd defaults write org.hammerspoon.Hammerspoon MJAutoLaunchKey -bool true
 
-# Launch desktop integration apps (Hammerspoon, SwiftBar, LinearMouse, Maccy, AutoRaise)
+# Launch & register Login Items for desktop integration apps
+# (Hammerspoon, SwiftBar, LinearMouse, Maccy, AutoRaise) so they survive logouts/reboots
 for _app in "Hammerspoon" "SwiftBar" "LinearMouse" "Maccy" "AutoRaise"; do
   if [[ -d "/Applications/${_app}.app" || -d "${HOME}/Applications/${_app}.app" ]] || (( DRY_RUN == 1 )); then
     run_cmd open -g -a "${_app}" || true
+    if [[ -d "/Applications/${_app}.app" ]] && (( DRY_RUN == 0 )); then
+      osascript -e "tell application \"System Events\" to if not (exists login item \"${_app}\") then make login item at end with properties {name:\"${_app}\", path:\"/Applications/${_app}.app\", hidden:true}" 2>/dev/null || true
+    fi
   fi
 done
 unset _app

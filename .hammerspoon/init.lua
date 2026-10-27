@@ -22,6 +22,7 @@
 -- and `open -g hammerspoon://reload` for interactive debugging and config reloads.
 require("hs.ipc")
 hs.urlevent.bind("reload", function() hs.reload() end)
+pcall(hs.autoLaunch, true)
 
 hs.window.animationDuration = 0
 
@@ -1948,7 +1949,7 @@ windowChooser:queryChangedCallback(function(newQuery)
   scheduleBorderUpdate()
 end)
 
-hs.hotkey.bind({"alt"}, "tab", function()
+local function openWindowSwitcherChooser()
   local choices, currentSpaceIdx = buildAllWorkspacesChooserChoices()
   allChooserChoices = choices
   initialChooserQuery = string.format("^%d ", currentSpaceIdx)
@@ -1971,7 +1972,23 @@ hs.hotkey.bind({"alt"}, "tab", function()
       scheduleBorderUpdate()
     end
   end)
+end
+
+hs.hotkey.bind({"alt"}, "tab", openWindowSwitcherChooser)
+
+-- High-priority CGEventTap for <Alt>Tab so macOS Spotlight or symbolic hotkeys
+-- registered at login can never hijack Option+Tab before Hammerspoon sees it.
+local TAB_KEYCODE = (hs.keycodes and hs.keycodes.map and hs.keycodes.map["tab"]) or 48
+local altTabTap = hs.eventtap.new({hs.eventtap.event.types.keyDown}, function(e)
+  if e:getKeyCode() ~= TAB_KEYCODE then return false end
+  local flags = e:getFlags()
+  if flags.alt and not flags.cmd and not flags.ctrl and not flags.shift then
+    hs.timer.doAfter(0, openWindowSwitcherChooser)
+    return true
+  end
+  return false
 end)
+altTabTap:start()
 
 -- -----------------------------------------------------------------------------
 -- 7. Zen Mode (<WM_MOD>z), Terminal-Scoped Notes (<WM_MOD>n), & App Shortcuts
