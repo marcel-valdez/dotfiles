@@ -1,94 +1,149 @@
 {
-  "$schema": "https://schema.linearmouse.app/0.10.0",
-  "schemes": [
+  "$schema" : "https:\/\/schema.linearmouse.app\/0.12.0",
+  "schemes" : [
     {
-      "if": {
-        "device": {
-          "category": "mouse"
+      "if" : {
+        "device" : {
+          "category" : "mouse"
         }
       },
-      "pointer": {
-        "disableAcceleration": true
+      "pointer" : {
+        "disableAcceleration" : true
       },
-      "scrolling": {
-        "reverse": {
-          "vertical": true,
-          "horizontal": false
+      "scrolling" : {
+        "reverse" : {
+          "horizontal" : false,
+          "vertical" : true
         }
       }
     },
     {
-      "if": {
-        "device": {
-          "vendorID": "0x046d",
-          "productID": "0xc408",
-          "productName": "Logitech USB Trackball"
-        }
-      },
-      "pointer": {
-        "disableAcceleration": true,
-        "speed": 0.25
-      },
-      "scrolling": {
-        "reverse": {
-          "vertical": true
-        }
-      },
-      "buttons": {
-        "mappings": [
+      "buttons" : {
+        "mappings" : [
           {
-            "button": 0,
-            "action": {
-              "mouseButton": "right"
+            "outcomes" : {
+              "shortPress" : "auto"
+            },
+            "trigger" : {
+              "input" : {
+                "button" : 0
+              }
             }
           },
           {
-            "button": 1,
-            "action": {
-              "mouseButton": "left"
+            "outcomes" : {
+              "shortPress" : "auto"
+            },
+            "trigger" : {
+              "input" : {
+                "button" : 1
+              }
             }
           }
         ],
-        "universalBackForward": false
+        "universalBackForward" : false
+      },
+      "if" : {
+        "device" : {
+          "productID" : "0xc408",
+          "productName" : "Logitech USB Trackball",
+          "vendorID" : "0x46d"
+        }
+      },
+      "pointer" : {
+        "disableAcceleration" : true,
+        "speed" : 0.25
+      },
+      "scrolling" : {
+        "reverse" : {
+          "vertical" : true
+        }
       }
     },
     {
-      "if": {
-        "device": {
-          "vendorID": "0x046d",
-          "productName": "MX Ergo S"
+      "if" : {
+        "device" : {
+          "productName" : "MX Ergo S",
+          "vendorID" : "0x46d"
         }
       },
-      "pointer": {
-        "acceleration": 0,
-        "disableAcceleration": true,
-        "speed": 0.25
+      "pointer" : {
+        "acceleration" : 0,
+        "disableAcceleration" : true,
+        "speed" : 0.25
       },
-      "scrolling": {
-        "reverse": {
-          "vertical": true,
-          "horizontal": false
+      "scrolling" : {
+        "distance" : {
+          "vertical" : "auto"
         },
-        "distance": {
-          "vertical": "auto"
+        "reverse" : {
+          "horizontal" : false,
+          "vertical" : true
         }
       }
     },
     {
-      "if": {
-        "device": {
-          "vendorID": "0x5043"
+      "if" : {
+        "device" : {
+          "vendorID" : "0x5043"
         }
       },
-      "pointer": {
-        "acceleration": 0,
-        "disableAcceleration": true,
-        "speed": 0.25
+      "pointer" : {
+        "acceleration" : 0,
+        "disableAcceleration" : true,
+        "speed" : 0.25
       },
-      "scrolling": {
-        "reverse": {
-          "vertical": true,
-          "horizontal": false
+      "scrolling" : {
+        "reverse" : {
+          "horizontal" : false,
+          "vertical" : true
+        }
+      }
+    },
+    {
+      "if" : {
+        "device" : {
+          "category" : "mouse",
+          "productID" : "0xc548",
+          "productName" : "USB Receiver",
+          "vendorID" : "0x46d"
+        }
+      },
+      "pointer" : {
+        "acceleration" : 0.5,
+        "disableAcceleration" : false,
+        "hardwareDPI" : 900
+      }
+    },
+    {
+      "if" : {
+        "device" : {
+          "category" : "mouse",
+          "productID" : "0x5c48",
+          "productName" : "Ploopy PAW Test",
+          "vendorID" : "0x5043"
+        }
+      },
+      "pointer" : {
+        "disableAcceleration" : false
+      }
+    },
+    {
+      "if" : {
+        "device" : {
+          "category" : "mouse",
+          "productID" : "0x63c3",
+          "productName" : "Ploopy Knob",
+          "serialNumber" : "E66130F0C7351E250000000000000000",
+          "vendorID" : "0x5043"
+        }
+      },
+      "scrolling" : {
+        "acceleration" : {
+          "vertical" : 0.5
+        },
+        "speed" : {
+          "vertical" : 0
         }
       }
     }
