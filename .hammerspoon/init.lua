@@ -1801,7 +1801,7 @@ local function buildAllWorkspacesChooserChoices()
     })
   end
 
-  return choices, currentSpaceIdx
+  return choices, currentSpaceIdx, activeOrdered
 end
 
 local function choiceMatchesQuery(choice, rawQuery)
@@ -1944,14 +1944,41 @@ windowChooser:queryChangedCallback(function(newQuery)
   scheduleBorderUpdate()
 end)
 
+local function getFocusedWindowScreen(activeOrdered)
+  local fw = hs.window.focusedWindow()
+  if fw then
+    local app = fw:application()
+    if not (app and app:name() == "Hammerspoon") then
+      local s = fw:screen()
+      if s then return s end
+    end
+  end
+  if type(activeOrdered) == "table" and activeOrdered[1] then
+    local s = activeOrdered[1]:screen()
+    if s then return s end
+  end
+  return hs.screen.mainScreen() or hs.screen.primaryScreen()
+end
+
 local function openWindowSwitcherChooser()
-  local choices, currentSpaceIdx = buildAllWorkspacesChooserChoices()
+  local choices, currentSpaceIdx, activeOrdered = buildAllWorkspacesChooserChoices()
+  local targetScreen = getFocusedWindowScreen(activeOrdered)
   allChooserChoices = choices
   initialChooserQuery = string.format("^%d ", currentSpaceIdx)
 
   windowChooser:choices(filterChooserChoices(allChooserChoices, initialChooserQuery))
   windowChooser:query(initialChooserQuery)
-  windowChooser:show()
+  if targetScreen then
+    local sf = targetScreen:frame()
+    local widthPct = windowChooser:width()
+    local chooserW = math.floor(sf.w * (((widthPct and widthPct > 0) and widthPct or 40) / 100.0))
+    windowChooser:show({
+      x = math.floor(sf.x + (sf.w - chooserW) / 2),
+      y = math.floor(sf.y + sf.h * 0.20),
+    })
+  else
+    windowChooser:show()
+  end
   scheduleBorderUpdate()
 
   lastSelectedRow = nil

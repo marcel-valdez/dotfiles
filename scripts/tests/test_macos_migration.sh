@@ -678,6 +678,8 @@ echo "[Test 15] ~/.hammerspoon/init.lua macOS 15+ space-moving & multi-workspace
     bash -c "! grep -q 'processInfo.processID' '${hs_init}'"
   assert_true "init.lua roots altTabTap, watchers, filters, and timers in _G.HS_KEEPALIVE (no Lua GC drop)" \
     bash -c "grep -q '_G.HS_KEEPALIVE.taps.altTabTap = altTabTap' '${hs_init}' && grep -q '_G.HS_KEEPALIVE.timers.tapWatchdog = tapWatchdog' '${hs_init}'"
+  assert_true "init.lua positions windowChooser on the focused window's display (getFocusedWindowScreen)" \
+    grep -q "local function getFocusedWindowScreen" "${hs_init}"
   assert_true "init.lua has no hardcoded /opt/homebrew/bin/bash paths" \
     bash -c "! grep -q '/opt/homebrew/bin/bash' '${hs_init}'"
 
