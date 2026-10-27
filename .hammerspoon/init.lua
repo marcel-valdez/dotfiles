@@ -271,12 +271,27 @@ local function postRawMouseButton(evType, pt, evNum, dx, dy)
   ev:post()
 end
 
-local function getOrderedUserSpacesForCurrentScreen(scr)
+local function getRawSpacesForScreen(scr)
   scr = scr or hs.screen.mainScreen()
-  if not scr then return {} end
   local allSpaces = hs.spaces.allSpaces()
-  local uuid = scr:getUUID()
-  local rawSpaces = allSpaces and allSpaces[uuid] or {}
+  if not allSpaces then return {} end
+  if scr then
+    local byScreen = allSpaces[scr:getUUID()]
+    if byScreen and #byScreen > 0 then return byScreen end
+  end
+  local primary = hs.screen.primaryScreen()
+  if primary then
+    local byPrimary = allSpaces[primary:getUUID()]
+    if byPrimary and #byPrimary > 0 then return byPrimary end
+  end
+  for _, list in pairs(allSpaces) do
+    if type(list) == "table" and #list > 0 then return list end
+  end
+  return {}
+end
+
+local function getOrderedUserSpacesForCurrentScreen(scr)
+  local rawSpaces = getRawSpacesForScreen(scr)
   local userSpaces = {}
   for _, spId in ipairs(rawSpaces) do
     if hs.spaces.spaceType(spId) == "user" then
@@ -708,7 +723,7 @@ local function moveWindowViaMissionControl(op)
   local full = scr:fullFrame()
   local winTitle = win:title() or ""
   local winFrame = win:frame()
-  local spaceListIdx = indexOf((hs.spaces.allSpaces() or {})[scr:getUUID()], op.targetSpace)
+  local spaceListIdx = indexOf(getRawSpacesForScreen(scr), op.targetSpace)
   if not spaceListIdx then
     return finishMove(op, false, "target Space is not on the window's display")
   end
@@ -855,14 +870,16 @@ end
 -- a direct "Switch to Desktop N" shortcut when enabled (single display only, where
 -- Desktop N is our workspace N), else one hop per Space.
 local function planSpaceSwitchKeys(scr, fromSpace, targetSpace, targetIdx)
-  local onScreen = (hs.spaces.allSpaces() or {})[scr:getUUID()] or {}
+  local onScreen = getRawSpacesForScreen(scr)
   local fromPos, toPos = indexOf(onScreen, fromSpace), indexOf(onScreen, targetSpace)
   if not fromPos or not toPos or fromPos == toPos then return nil end
   local hop = getSymbolicHotkey((toPos > fromPos) and SYMBOLIC_MOVE_RIGHT_SPACE or SYMBOLIC_MOVE_LEFT_SPACE)
   if hop and math.abs(toPos - fromPos) == 1 then
     return { { hotkey = hop, space = targetSpace } }
   end
-  if targetIdx and targetIdx <= 16 and #hs.screen.allScreens() == 1 then
+  local sharedSpaces = (type(hs.spaces.screensHaveSeparateSpaces) == "function") and
+                       (not hs.spaces.screensHaveSeparateSpaces())
+  if targetIdx and targetIdx <= 16 and (#hs.screen.allScreens() == 1 or sharedSpaces) then
     local direct = getSymbolicHotkey(SYMBOLIC_SWITCH_TO_DESKTOP_1 + targetIdx - 1)
     if direct then return { { hotkey = direct, space = targetSpace } } end
   end
