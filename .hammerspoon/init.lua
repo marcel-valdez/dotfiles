@@ -24,6 +24,24 @@ require("hs.ipc")
 hs.urlevent.bind("reload", function() hs.reload() end)
 pcall(hs.autoLaunch, true)
 
+-- Root table in _G so Lua 5.4 garbage collection never collects hotkeys,
+-- CGEventTaps, space watchers, window filters, choosers, or pending timers
+-- a few seconds after init.lua finishes executing.
+_G.HS_KEEPALIVE = {
+  hotkeys = {},
+  watchers = {},
+  taps = {},
+  timers = {},
+  filters = {},
+  choosers = {},
+}
+
+local function keepHotkey(mods, key, fn)
+  local hk = hs.hotkey.bind(mods, key, fn)
+  table.insert(_G.HS_KEEPALIVE.hotkeys, hk)
+  return hk
+end
+
 hs.window.animationDuration = 0
 
 local WM_MOD       = {"ctrl", "cmd"}
@@ -129,16 +147,16 @@ local function cycleWindowSnap(direction, reverseOrder)
 end
 
 -- Bind WM_MOD (Ctrl+Cmd) + Arrows / K for 6-tier window cycling
-hs.hotkey.bind(WM_MOD,       "Left",  function() cycleWindowSnap("left",   false) end)
-hs.hotkey.bind(WM_MOD_SHIFT, "Left",  function() cycleWindowSnap("left",   true)  end)
-hs.hotkey.bind(WM_MOD,       "Right", function() cycleWindowSnap("right",  false) end)
-hs.hotkey.bind(WM_MOD_SHIFT, "Right", function() cycleWindowSnap("right",  true)  end)
-hs.hotkey.bind(WM_MOD,       "Up",    function() cycleWindowSnap("up",     false) end)
-hs.hotkey.bind(WM_MOD_SHIFT, "Up",    function() cycleWindowSnap("up",     true)  end)
-hs.hotkey.bind(WM_MOD,       "Down",  function() cycleWindowSnap("down",   false) end)
-hs.hotkey.bind(WM_MOD_SHIFT, "Down",  function() cycleWindowSnap("down",   true)  end)
-hs.hotkey.bind(WM_MOD,       "k",     function() cycleWindowSnap("center", false) end)
-hs.hotkey.bind(WM_MOD_SHIFT, "k",     function() cycleWindowSnap("center", true)  end)
+keepHotkey(WM_MOD,       "Left",  function() cycleWindowSnap("left",   false) end)
+keepHotkey(WM_MOD_SHIFT, "Left",  function() cycleWindowSnap("left",   true)  end)
+keepHotkey(WM_MOD,       "Right", function() cycleWindowSnap("right",  false) end)
+keepHotkey(WM_MOD_SHIFT, "Right", function() cycleWindowSnap("right",  true)  end)
+keepHotkey(WM_MOD,       "Up",    function() cycleWindowSnap("up",     false) end)
+keepHotkey(WM_MOD_SHIFT, "Up",    function() cycleWindowSnap("up",     true)  end)
+keepHotkey(WM_MOD,       "Down",  function() cycleWindowSnap("down",   false) end)
+keepHotkey(WM_MOD_SHIFT, "Down",  function() cycleWindowSnap("down",   true)  end)
+keepHotkey(WM_MOD,       "k",     function() cycleWindowSnap("center", false) end)
+keepHotkey(WM_MOD_SHIFT, "k",     function() cycleWindowSnap("center", true)  end)
 
 -- -----------------------------------------------------------------------------
 -- 2. Cross-Monitor Movement, Maximize, & Dual-Monitor Span (both-screens)
@@ -188,15 +206,15 @@ local function toggleSpanBothScreens()
 end
 
 -- MTV & WFH cross-monitor bindings (<Alt><Cmd>Left/Right/Page_Up and <Ctrl><Cmd>Page_Up/Page_Down)
-hs.hotkey.bind(ALT_SUPER,    "Left",     function() moveWindowToScreenInDirection("west") end)
-hs.hotkey.bind(ALT_SUPER,    "Right",    function() moveWindowToScreenInDirection("east") end)
-hs.hotkey.bind(ALT_SUPER,    "pageup",   toggleSpanBothScreens)
-hs.hotkey.bind(WM_MOD,       "pageup",   toggleSpanBothScreens)
-hs.hotkey.bind(WM_MOD_SHIFT, "pageup",   function()
+keepHotkey(ALT_SUPER,    "Left",     function() moveWindowToScreenInDirection("west") end)
+keepHotkey(ALT_SUPER,    "Right",    function() moveWindowToScreenInDirection("east") end)
+keepHotkey(ALT_SUPER,    "pageup",   toggleSpanBothScreens)
+keepHotkey(WM_MOD,       "pageup",   toggleSpanBothScreens)
+keepHotkey(WM_MOD_SHIFT, "pageup",   function()
   local win = hs.window.focusedWindow()
   if win then win:maximize() end
 end)
-hs.hotkey.bind(WM_MOD,       "pagedown", function()
+keepHotkey(WM_MOD,       "pagedown", function()
   local win = hs.window.focusedWindow()
   if win then win:minimize() end
 end)
@@ -1190,12 +1208,19 @@ local function syncStickyWindowsToFocusedSpace()
   end
 end
 
-local spaceWatcher = hs.spaces.watcher.new(function(_)
-  hs.timer.doAfter(0.05, syncStickyWindowsToFocusedSpace)
-end)
-spaceWatcher:start()
+  local stickySyncTimer = nil
+  local spaceWatcher = hs.spaces.watcher.new(function(_)
+    if stickySyncTimer then stickySyncTimer:stop() end
+    stickySyncTimer = hs.timer.doAfter(0.05, function()
+      stickySyncTimer = nil
+      syncStickyWindowsToFocusedSpace()
+    end)
+    _G.HS_KEEPALIVE.timers.stickySyncTimer = stickySyncTimer
+  end)
+  spaceWatcher:start()
+  _G.HS_KEEPALIVE.watchers.spaceWatcher = spaceWatcher
 
-hs.hotkey.bind({"alt"}, "f6", function()
+  keepHotkey({"alt"}, "f6", function()
   local win = hs.window.focusedWindow()
   if not win then return end
   local winId = win:id()
@@ -1485,7 +1510,9 @@ local function syncOtherSpacesWindowsAsync()
     end
   end
 
-  -- Map Space window memberships in the background
+  -- Map Space window memberships in the background (without hs.window.list(true),
+  -- which stalls the main CFRunLoop and causes WindowServer to disable CGEventTaps
+  -- via kCGEventTapDisabledByTimeout).
   local spaceByWinId = {}
   local spaceCountByWinId = {}
   for spId, _ in pairs(spaceIndexById) do
@@ -1495,41 +1522,6 @@ local function syncOtherSpacesWindowsAsync()
         spaceCountByWinId[wid] = (spaceCountByWinId[wid] or 0) + 1
         if spId == focusedSpaceId or not spaceByWinId[wid] then
           spaceByWinId[wid] = spId
-        end
-      end
-    end
-  end
-
-  -- Seed any unvisited Space windows from CoreGraphics WindowServer info
-  if type(hs.window.list) == "function" then
-    local okCg, cgList = pcall(hs.window.list, true)
-    if okCg and type(cgList) == "table" then
-      for _, info in ipairs(cgList) do
-        local wid = info.kCGWindowNumber
-        local spId = wid and spaceByWinId[wid]
-        if wid and spId and not knownWindowsById[wid] and (info.kCGWindowLayer or 0) == 0 then
-          local bounds = info.kCGWindowBounds or {}
-          local wWidth = bounds.Width or bounds.w or 0
-          local wHeight = bounds.Height or bounds.h or 0
-          local ownerName = info.kCGWindowOwnerName or ""
-          local pid = info.kCGWindowOwnerPID or 0
-          if not IGNORED_APP_NAMES[ownerName] and wWidth >= 100 and wHeight >= 80 and pid > 0 then
-            local app = hs.application.applicationForPID(pid)
-            if app and app:kind() == 1 then
-              local bundleID = app:bundleID()
-              if bundleID then getCachedAppIcon(bundleID) end
-              knownWindowsById[wid] = {
-                win = nil,
-                winId = wid,
-                title = info.kCGWindowName or ownerName,
-                appName = app:name() or ownerName,
-                bundleID = bundleID,
-                pid = pid,
-                spaceId = spId,
-                spaceIdx = spaceIndexById[spId] or currentSpaceIdx,
-              }
-            end
-          end
         end
       end
     end
@@ -1601,6 +1593,9 @@ local mruSpaceWatcher = hs.spaces.watcher.new(function(_)
   scheduleBackgroundSpaceSync(0.1)
 end)
 mruSpaceWatcher:start()
+_G.HS_KEEPALIVE.filters.wf = wf
+_G.HS_KEEPALIVE.watchers.mruSpaceWatcher = mruSpaceWatcher
+_G.HS_KEEPALIVE.taps.altDragTap = altDragTap
 scheduleBackgroundSpaceSync(0.2)
 
 -- Pre-allocate a single reusable hs.canvas border window (avoiding NSWindow
@@ -1974,31 +1969,56 @@ local function openWindowSwitcherChooser()
   end)
 end
 
-hs.hotkey.bind({"alt"}, "tab", openWindowSwitcherChooser)
+_G.HS_KEEPALIVE.choosers.windowChooser = windowChooser
+keepHotkey({"alt"}, "tab", openWindowSwitcherChooser)
 
 -- High-priority CGEventTap for <Alt>Tab so macOS Spotlight or symbolic hotkeys
 -- registered at login can never hijack Option+Tab before Hammerspoon sees it.
+-- Stored in _G.HS_KEEPALIVE.taps.altTabTap (and monitored by tapWatchdog) so
+-- neither Lua 5.4 garbage collection nor macOS kCGEventTapDisabledByTimeout
+-- can ever stop it after a few seconds.
 local TAB_KEYCODE = (hs.keycodes and hs.keycodes.map and hs.keycodes.map["tab"]) or 48
-local altTabTap = hs.eventtap.new({hs.eventtap.event.types.keyDown}, function(e)
+local altTabOpenTimer = nil
+local altTabTap = nil
+altTabTap = hs.eventtap.new({hs.eventtap.event.types.keyDown}, function(e)
   if e:getKeyCode() ~= TAB_KEYCODE then return false end
   local flags = e:getFlags()
   if flags.alt and not flags.cmd and not flags.ctrl and not flags.shift then
-    hs.timer.doAfter(0, openWindowSwitcherChooser)
+    if altTabOpenTimer then altTabOpenTimer:stop() end
+    altTabOpenTimer = hs.timer.doAfter(0, function()
+      altTabOpenTimer = nil
+      openWindowSwitcherChooser()
+    end)
+    _G.HS_KEEPALIVE.timers.altTabOpenTimer = altTabOpenTimer
     return true
   end
   return false
 end)
 altTabTap:start()
+_G.HS_KEEPALIVE.taps.altTabTap = altTabTap
+
+-- Watchdog that re-enables altTabTap and altDragTap if macOS WindowServer ever
+-- disables a CGEventTap due to kCGEventTapDisabledByTimeout.
+local tapWatchdog = nil
+tapWatchdog = hs.timer.doEvery(2.0, function()
+  if altTabTap and not altTabTap:isEnabled() then
+    altTabTap:start()
+  end
+  if altDragTap and not altDragTap:isEnabled() and not (spaceMove and spaceMove.op) then
+    altDragTap:start()
+  end
+end)
+_G.HS_KEEPALIVE.timers.tapWatchdog = tapWatchdog
 
 -- -----------------------------------------------------------------------------
 -- 7. Zen Mode (<WM_MOD>z), Terminal-Scoped Notes (<WM_MOD>n), & App Shortcuts
 -- -----------------------------------------------------------------------------
-hs.hotkey.bind(WM_MOD, "z", function()
+keepHotkey(WM_MOD, "z", function()
   hs.task.new("/bin/bash", nil, {os.getenv("HOME") .. "/scripts/zen-mode.sh"}):start()
 end)
 
 -- Terminal-scoped Notes launcher (replicates `if-terminal-has-focus ...`)
-hs.hotkey.bind(WM_MOD, "n", function()
+keepHotkey(WM_MOD, "n", function()
   local frontApp = hs.application.frontmostApplication()
   local name = frontApp and string.lower(frontApp:name() or "") or ""
   if name == "kitty" or name == "wezterm" or name == "iterm2" or name == "terminal" then
@@ -2007,10 +2027,10 @@ hs.hotkey.bind(WM_MOD, "n", function()
 end)
 
 -- Launchers matching xfce4-keyboard-shortcuts.xml
-hs.hotkey.bind({"ctrl", "alt"}, "t", function()
+keepHotkey({"ctrl", "alt"}, "t", function()
   hs.application.launchOrFocus("kitty")
 end)
 
-hs.hotkey.bind({"ctrl", "alt"}, "l", function()
+keepHotkey({"ctrl", "alt"}, "l", function()
   hs.caffeinate.lockScreen()
 end)

@@ -476,6 +476,37 @@ fi
 # Ensure macOS Full Keyboard Access does not hijack Space in Kitty / Emacs.app
 run_cmd defaults write com.apple.Accessibility FullKeyboardAccessEnabled -int 0 || true
 
+# Unbind any macOS built-in symbolic hotkey bound to Option+Tab / Alt+Tab
+# (keycode 48, flags 0x80000 = 524288) in com.apple.symbolichotkeys.plist.
+# Note: Merely setting enabled=false in System Settings while keeping the
+# Option+Tab keybinding in parameters still blocks Hammerspoon's Alt+Tab hook;
+# the binding itself must be cleared to [65535, 65535, 0].
+if [[ -x "/usr/bin/python3" ]] && (( DRY_RUN == 0 )); then
+  /usr/bin/python3 -c '
+import os, plistlib, subprocess
+p = os.path.expanduser("~/Library/Preferences/com.apple.symbolichotkeys.plist")
+if os.path.exists(p):
+    with open(p, "rb") as f:
+        data = plistlib.load(f)
+    hk = data.get("AppleSymbolicHotKeys", {})
+    changed = False
+    for k, v in hk.items():
+        params = (v.get("value") or {}).get("parameters") if isinstance(v, dict) else None
+        if isinstance(params, list) and len(params) >= 3:
+            if params[1] == 48 and (int(params[2]) & 0x1E0000) == 0x80000:
+                v["enabled"] = False
+                v["value"]["parameters"] = [65535, 65535, 0]
+                changed = True
+    if changed:
+        with open(p, "wb") as f:
+            plistlib.dump(data, f)
+        subprocess.run(["/usr/bin/killall", "cfprefsd"], check=False)
+' 2>/dev/null || true
+  if [[ -x "/System/Library/PrivateFrameworks/SystemAdministration.framework/Resources/activateSettings" ]]; then
+    /System/Library/PrivateFrameworks/SystemAdministration.framework/Resources/activateSettings -u 2>/dev/null || true
+  fi
+fi
+
 # Native Ctrl+Cmd click-drag window move backup alongside Hammerspoon Alt+Drag
 run_cmd defaults write -g NSWindowShouldDragOnGesture -bool true
 
