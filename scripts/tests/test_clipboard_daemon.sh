@@ -829,10 +829,24 @@ EOF
 }
 
 # -----------------------------------------------------------------------------
+# Item 13: macOS /bin/bash 3.2 Compatibility (no Bash 4-only builtins)
+# -----------------------------------------------------------------------------
+test_bash32_compat_no_bash4_builtins() {
+  echo "Running test_bash32_compat_no_bash4_builtins..."
+  # readarray/mapfile do not exist in macOS /bin/bash 3.2 and fail at runtime
+  # ("command not found"), which `bash -n` cannot detect.
+  local bash4_hits
+  bash4_hits="$(grep -nE '^[^#]*(^|[^[:alnum:]_])(readarray|mapfile)([^[:alnum:]_]|$)' \
+    "${HOME}/bin/clipboard-daemon.sh" || true)"
+  assert_equals "" "${bash4_hits}" \
+    "clipboard-daemon.sh uses no Bash 4-only readarray/mapfile builtins (macOS /bin/bash 3.2)"
+}
+
+# -----------------------------------------------------------------------------
 # Test Runner
 # -----------------------------------------------------------------------------
 echo "================================================================="
-echo "Running Clipboard Daemon Unit Tests (12 Test Plan Items)"
+echo "Running Clipboard Daemon Unit Tests (13 Test Plan Items)"
 echo "================================================================="
 test_flock_singleton_mutual_exclusion
 test_restart_bounded_pid_polling_and_kill_escalation
@@ -853,6 +867,7 @@ test_gcert_missing_blocks_recreate
 test_network_drop_progressive_backoff
 test_log_isolation_no_false_conflict
 test_macos_darwin_port_launchctl_and_lsof_support
+test_bash32_compat_no_bash4_builtins
 
 echo "================================================================="
 echo "Test Results: ${PASSED_TESTS} passed, ${FAILED_TESTS} failed."

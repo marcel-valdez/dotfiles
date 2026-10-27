@@ -14,6 +14,19 @@ export JETSKI_TEST_NOTIFY_LOG="/tmp/jetski_test_notify_$$.log"
 export JETSKI_TEST_TMUX_LOG="/tmp/jetski_test_tmux_$$.log"
 export JETSKI_ENABLE_OSC99="false" # Disable OSC99 dispatch to avoid tty noise during tests
 
+# Hermetic desktop notifications: the hooks dispatch os::notify from detached
+# background processes, which would otherwise pop real terminal-notifier /
+# osascript (macOS) or notify-send (Linux) notifications (or Google Santa block
+# dialogs) during the test run. Per-test mocks prepended later (e.g. TC-20's
+# DARWIN_MOCK_BIN) still take precedence.
+JETSKI_NOTIFY_MOCK_BIN="$(mktemp -d "/tmp/jetski_notify_mocks.XXXXXX")"
+for _mock_cmd in terminal-notifier osascript notify-send; do
+  printf '#!/bin/sh\nexit 0\n' > "${JETSKI_NOTIFY_MOCK_BIN}/${_mock_cmd}"
+  chmod +x "${JETSKI_NOTIFY_MOCK_BIN}/${_mock_cmd}"
+done
+unset _mock_cmd
+export PATH="${JETSKI_NOTIFY_MOCK_BIN}:${PATH}"
+
 TOTAL_TESTS=0
 PASSED_TESTS=0
 FAILED_TESTS=0
@@ -21,6 +34,9 @@ FAILED_TESTS=0
 function cleanup_test_artifacts {
   rm -f "${LOG_FILE}" "${JETSKI_TEST_NOTIFY_LOG}" "${JETSKI_TEST_TMUX_LOG}" /tmp/mock_target_tty_$$* /tmp/jetski_test_*
   rm -rf /tmp/jetski_${UID}_900* /tmp/jetski_${UID}_99999* /tmp/mock_brain_$$ /tmp/jetski_${UID}_active_*
+  # Detached hook dispatchers resolve PATH lazily and may still be running when
+  # the suite exits, so remove the notification mocks only after a short delay.
+  ( sleep 10; rm -rf "${JETSKI_NOTIFY_MOCK_BIN}" ) </dev/null >/dev/null 2>&1 &
 }
 trap cleanup_test_artifacts EXIT
 

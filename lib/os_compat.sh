@@ -207,8 +207,9 @@ os::clipboard_paste() {
 }
 
 #######################################
-# Dispatches a native desktop notification on macOS (terminal-notifier or
-# osascript) or Linux (notify-send).
+# Dispatches a native desktop notification on macOS (terminal-notifier, falling
+# back to osascript when terminal-notifier is absent or fails) or Linux
+# (notify-send).
 #
 # Arguments:
 #   [--urgency|-u LEVEL]     Optional urgency (low, normal, critical).
@@ -290,9 +291,14 @@ os::notify() {
       local tn_args=(-title "${title}" -message "${body:- }")
       [[ -n "${app_name}" ]] && tn_args+=(-subtitle "${app_name}")
       [[ -n "${group_id}" ]] && tn_args+=(-group "${group_id}")
-      terminal-notifier "${tn_args[@]}" &>/dev/null
-      return $?
-    elif command -v osascript &>/dev/null; then
+      if terminal-notifier "${tn_args[@]}" &>/dev/null; then
+        return 0
+      fi
+      # terminal-notifier is installed but failed (e.g. Google Santa blocks the
+      # ad-hoc signed binary with exit 126 until it is approved): fall through
+      # to the built-in osascript notification instead of dropping the alert.
+    fi
+    if command -v osascript &>/dev/null; then
       osascript -e 'on run argv' \
         -e 'display notification (item 2 of argv) with title (item 1 of argv)' \
         -e 'end run' -- "${title}" "${body}" &>/dev/null
@@ -796,7 +802,8 @@ os::emacs_daemon_running() {
 # the socket accepts connections.
 #
 # Arguments:
-#   [--wait|-w]     Block until the daemon socket is ready to accept clients.
+#   [--wait|-w]     Block until the daemon socket is ready to accept clients
+#                   (up to EMACS_DAEMON_WAIT_SECS seconds, default 300).
 #   [socket_name]   Optional server socket name (default: EMACS_TTY_SERVER or
 #                   'tty-server').
 # Returns:
@@ -834,14 +841,26 @@ os::ensure_emacs_daemon() {
   fi
 
   if (( wait_for_socket == 1 )); then
+    # The first daemon start on a fresh machine downloads and byte-compiles
+    # packages (MELPA) and can take a few minutes, so wait up to
+    # EMACS_DAEMON_WAIT_SECS (default 300s) of wall-clock time. The loop still
+    # bails out early if the daemon process exits before creating its socket.
+    local max_wait_secs="${EMACS_DAEMON_WAIT_SECS:-300}"
+    [[ "${max_wait_secs}" =~ ^[0-9]+$ ]] || max_wait_secs=300
+    local start_secs="${SECONDS}"
+    local next_progress_secs=30
+    local elapsed_secs=0
     local attempts=0
-    local max_attempts=300
     while ! os::emacs_socket_ready "${socket_name}"; do
+      elapsed_secs=$(( SECONDS - start_secs ))
       if (( attempts == 5 )); then
-        echo "Waiting for Emacs daemon (${socket_name}) to finish initializing (log: ${log_file})..." >&2
+        echo "Waiting for Emacs daemon (${socket_name}) to finish initializing (up to ${max_wait_secs}s; log: ${log_file})..." >&2
+      elif (( elapsed_secs >= next_progress_secs )); then
+        echo "Still waiting for Emacs daemon (${socket_name}) after ${elapsed_secs}s (log: ${log_file})..." >&2
+        next_progress_secs=$(( next_progress_secs + 30 ))
       fi
-      if (( attempts >= max_attempts )); then
-        echo "ERROR: Timed out waiting for Emacs daemon (${socket_name}). Check ${log_file}." >&2
+      if (( elapsed_secs >= max_wait_secs )); then
+        echo "ERROR: Timed out waiting for Emacs daemon (${socket_name}) after ${max_wait_secs}s. Check ${log_file}." >&2
         return 1
       fi
       if (( attempts > 3 )) && ! pgrep -if "emacs.*--(bg-|fg-)?daemon=${socket_name}" &>/dev/null; then
@@ -852,7 +871,10 @@ os::ensure_emacs_daemon() {
         fi
       fi
       sleep 0.1
-      ((attempts++))
+      # Not ((attempts++)): it returns status 1 when attempts is 0, which aborts
+      # callers running under `set -e` on Bash >= 4.1 (e.g. Linux; macOS
+      # /bin/bash 3.2 ignores failing (( )) under errexit).
+      attempts=$(( attempts + 1 ))
     done
   fi
   return 0

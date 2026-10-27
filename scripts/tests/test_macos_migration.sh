@@ -214,6 +214,13 @@ echo "$*" >> "${TEST_SHORTCUTS_LOG}"
 exit 0
 EOF
   chmod +x "${mock_bin}/shortcuts"
+  # Hermetic notifications: do-not-disturb announces state changes via os::notify,
+  # which would otherwise invoke the real terminal-notifier/osascript.
+  for _cmd in terminal-notifier osascript; do
+    printf '#!/usr/bin/env bash\nexit 0\n' > "${mock_bin}/${_cmd}"
+    chmod +x "${mock_bin}/${_cmd}"
+  done
+  unset _cmd
 
   sc_log="${TEST_TMP}/t5_shortcuts.log"
   export TEST_SHORTCUTS_LOG="${sc_log}"
@@ -490,6 +497,8 @@ echo "[Test 12] bootstrap_macos.sh --dry-run (Mule-first), launchd plists, and J
     "airgradient-monitor is disabled by default on gMac" "${dry_out}"
   assert_contains "bootstrap_macos.sh --dry-run marks airgradient.10s.sh non-executable by default" \
     "chmod -x ${HOME}/.config/swiftbar/airgradient.10s.sh" "${dry_out}"
+  assert_contains "bootstrap_macos.sh --dry-run runs go mod init/tidy before building whatsapp-notification" \
+    "{ [[ -f go.mod ]] || go mod init whatsapp-notification; } && go mod tidy && CGO_ENABLED=1" "${dry_out}"
   assert_true "~/scripts/bootstrap_macos.sh and ~/.googlerc.d/scripts/bootstrap_macos.sh are identical" \
     cmp -s "${HOME}/scripts/bootstrap_macos.sh" "${HOME}/.googlerc.d/scripts/bootstrap_macos.sh"
 

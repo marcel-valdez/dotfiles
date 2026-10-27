@@ -199,6 +199,38 @@ PY
   rm -rf "${tmp_dir}"
 }
 
+# Returns 0 if Google Santa permits executing $1: santactl is absent, Santa is
+# not in Lockdown mode, or an explicit allow rule (binary, certificate, TeamID,
+# transitive, ...) exists. Checking up front avoids triggering Santa block
+# dialogs for unapproved binaries (Upvote approval needs votes from peers).
+santa_allows_binary() {
+  local bin_path="$1"
+  command -v santactl >/dev/null 2>&1 || return 0
+  local santa_status
+  santa_status="$(santactl status 2>/dev/null || true)"
+  grep -Eq '^[[:space:]]*Mode[[:space:]]*[|][[:space:]]*Lockdown' <<< "${santa_status}" || return 0
+  local santa_info
+  santa_info="$(santactl fileinfo "${bin_path}" 2>/dev/null || true)"
+  grep -Eq '^Rule[[:space:]]*:[[:space:]]*Allowed' <<< "${santa_info}"
+}
+
+# Returns 0 when the whatsapp-notification LaunchAgent can run without
+# crash-looping under KeepAlive: TARGET_JIDS configured in config.env, binary
+# built and allowed by Santa, and a linked WhatsApp session database present.
+whatsapp_agent_ready() {
+  local cfg="${HOME}/.config/whatsapp-notification/config.env"
+  [[ -f "${cfg}" ]] || return 1
+  (
+    # shellcheck disable=SC1090
+    source "${cfg}" >/dev/null 2>&1 || exit 1
+    bin_dir="${WHATSAPP_BIN_DIR:-${HOME}/projects/whatsapp-notification/bin}"
+    [[ -n "${TARGET_JIDS:-${WHATSAPP_TARGET_JIDS:-}}" ]] || exit 1
+    [[ -x "${bin_dir}/whatsapp-notification" ]] || exit 1
+    [[ -s "${bin_dir}/whatsapp-notification.db" ]] || exit 1
+    santa_allows_binary "${bin_dir}/whatsapp-notification"
+  )
+}
+
 echo "=============================================================================="
 echo "gMac M5 Pro Dual-OS Dotfiles & Daemon Bootstrap (DRY_RUN=${DRY_RUN})"
 echo "=============================================================================="
@@ -319,11 +351,34 @@ install_github_macos_app "LinearMouse.app" "linearmouse/linearmouse" "LinearMous
 install_github_macos_app "AutoRaise.app" "sbmpost/AutoRaise" "AutoRaise.dmg"
 install_github_macos_app "terminal-notifier.app" "julienXX/terminal-notifier" "terminal-notifier-"
 
-if [[ -x "/Applications/terminal-notifier.app/Contents/MacOS/terminal-notifier" ]] || (( DRY_RUN == 1 )); then
+# Only expose terminal-notifier on PATH once Google Santa allows it: the release
+# binary is ad-hoc signed, so in Santa Lockdown mode every notification would be
+# blocked (with a Santa dialog) until peers upvote it. Until then os::notify
+# (~/lib/os_compat.sh) and ~/bin/notify use the built-in osascript fallback.
+TN_BIN=""
+for _tn in "/Applications/terminal-notifier.app/Contents/MacOS/terminal-notifier" \
+           "${HOME}/Applications/terminal-notifier.app/Contents/MacOS/terminal-notifier"; do
+  if [[ -x "${_tn}" ]]; then
+    TN_BIN="${_tn}"
+    break
+  fi
+done
+unset _tn
+if (( DRY_RUN == 1 )); then
   run_cmd ln -sfn "/Applications/terminal-notifier.app/Contents/MacOS/terminal-notifier" "${HOME}/bin/terminal-notifier"
-elif [[ -x "${HOME}/Applications/terminal-notifier.app/Contents/MacOS/terminal-notifier" ]]; then
-  run_cmd ln -sfn "${HOME}/Applications/terminal-notifier.app/Contents/MacOS/terminal-notifier" "${HOME}/bin/terminal-notifier"
+elif [[ -n "${TN_BIN}" ]]; then
+  if santa_allows_binary "${TN_BIN}"; then
+    run_cmd ln -sfn "${TN_BIN}" "${HOME}/bin/terminal-notifier"
+  else
+    echo "[INFO] Google Santa has no allow rule for ${TN_BIN} yet; not linking ~/bin/terminal-notifier."
+    echo "       Request approval via Upvote (blockable SHA-256: $(shasum -a 256 "${TN_BIN}" | cut -d' ' -f1));"
+    echo "       notifications use the osascript fallback until then. Re-run this script once approved."
+    if [[ -L "${HOME}/bin/terminal-notifier" ]]; then
+      run_cmd rm -f "${HOME}/bin/terminal-notifier"
+    fi
+  fi
 fi
+unset TN_BIN
 
 if command -v brew >/dev/null 2>&1; then
   echo "[INFO] Optional Homebrew detected; installing supplementary packages not in Mule..."
@@ -434,8 +489,21 @@ fi
 
 if command -v go >/dev/null 2>&1 || (( DRY_RUN == 1 )); then
   if [[ -d "${HOME}/projects/whatsapp-notification" ]] || (( DRY_RUN == 1 )); then
-    # whatsapp-notification uses github.com/mattn/go-sqlite3 (cgo) and requires CGO_ENABLED=1 + Xcode CLT
-    run_cmd bash -c "cd '${HOME}/projects/whatsapp-notification' && CGO_ENABLED=1 GOOS=darwin GOARCH=arm64 go build -o bin/whatsapp-notification ."
+    # whatsapp-notification uses github.com/mattn/go-sqlite3 (cgo) and requires CGO_ENABLED=1 + Xcode CLT.
+    # The repo intentionally .gitignores go.mod/go.sum (its README runs `go mod init whatsapp-notification`
+    # and its build.sh runs `go mod tidy`), so create/tidy the module before building.
+    # An existing binary is kept unless REBUILD_WHATSAPP=1: every rebuild changes the binary hash, which
+    # invalidates any Google Santa (Lockdown) approval obtained for it.
+    if ! xcode-select -p >/dev/null 2>&1 && (( DRY_RUN == 0 )); then
+      echo "[WARN] Xcode Command Line Tools not installed (xcode-select -p failed); cgo builds need clang."
+      echo "       Ask the user to run: xcode-select --install"
+    fi
+    if [[ -x "${HOME}/projects/whatsapp-notification/bin/whatsapp-notification" && "${REBUILD_WHATSAPP:-0}" != "1" ]] && (( DRY_RUN == 0 )); then
+      echo "[INFO] Keeping existing ~/projects/whatsapp-notification/bin/whatsapp-notification (set REBUILD_WHATSAPP=1 to rebuild)."
+    else
+      run_cmd bash -c "cd '${HOME}/projects/whatsapp-notification' && { [[ -f go.mod ]] || go mod init whatsapp-notification; } && go mod tidy && CGO_ENABLED=1 GOOS=darwin GOARCH=arm64 go build -o bin/whatsapp-notification ." || \
+        echo "[WARN] whatsapp-notification build failed (see output above); continuing."
+    fi
   fi
   if [[ "${ENABLE_AIRGRADIENT:-0}" == "1" ]] && { [[ -d "${HOME}/projects/air_gradient_alarm_daemon" ]] || (( DRY_RUN == 1 )); }; then
     run_cmd bash -c "cd '${HOME}/projects/air_gradient_alarm_daemon' && CGO_ENABLED=0 GOOS=darwin GOARCH=arm64 go build -trimpath -o airgradient-monitor ./cmd/airgradient-monitor && cp -f airgradient-monitor '${HOME}/.local/bin/airgradient-monitor'"
@@ -452,10 +520,13 @@ else
 fi
 
 cat << 'EOF'
-[INFO] Note on Google macOS Santa Binary Authorization:
-       If Google Santa blocks execution of a locally compiled Go/C++ binary:
-         1. Run: santactl fileinfo <path-to-binary>
-         2. Open the printed Rule/Upvote URL to self-approve your binary hash.
+[INFO] Note on Google macOS Santa Binary Authorization (Lockdown mode):
+       If Google Santa blocks execution of a downloaded or locally compiled binary:
+         1. Run: santactl fileinfo <path-to-binary>   (check the "Rule" line first
+            to avoid triggering a block dialog)
+         2. Open the Upvote link from the Santa block dialog to request approval;
+            binaries Upvote does not know need votes from other users (you
+            cannot approve your own request).
 EOF
 
 # ------------------------------------------------------------------------------
@@ -545,8 +616,32 @@ run_cmd mkdir -p "${HOME}/Library/LaunchAgents"
 PLISTS=(
   "${HOME}/.googlerc.d/launchd/com.marcelvaldez.knock-daemon.plist"
   "${HOME}/.config/launchd/com.marcelvaldez.clipboard-daemon.plist"
-  "${HOME}/.config/launchd/com.marcelvaldez.whatsapp-notification.plist"
 )
+
+# whatsapp-notification is only loaded once it can actually run: without a
+# TARGET_JIDS config, a linked session, and a Santa allow rule, the binary exits
+# non-zero (or is blocked) and KeepAlive (SuccessfulExit=false) restarts it
+# every ThrottleInterval (10s) indefinitely.
+WHATSAPP_PLIST_DST="${HOME}/Library/LaunchAgents/com.marcelvaldez.whatsapp-notification.plist"
+if whatsapp_agent_ready; then
+  PLISTS+=("${HOME}/.config/launchd/com.marcelvaldez.whatsapp-notification.plist")
+else
+  cat << 'EOF'
+[INFO] Skipping the com.marcelvaldez.whatsapp-notification LaunchAgent until it is set up:
+       1. Santa: santactl fileinfo ~/projects/whatsapp-notification/bin/whatsapp-notification
+          must show "Rule : Allowed" (request approval via the Santa dialog's Upvote link).
+       2. mkdir -p ~/.config/whatsapp-notification && \
+            echo 'TARGET_JIDS="<number>@s.whatsapp.net"' > ~/.config/whatsapp-notification/config.env
+       3. cd ~/projects/whatsapp-notification/bin && ./whatsapp-notification -target "<number>@s.whatsapp.net"
+          (scan the QR code via WhatsApp > Linked Devices; Ctrl-C after "Login event: success").
+       4. Re-run this script to register the LaunchAgent.
+EOF
+  if [[ -L "${WHATSAPP_PLIST_DST}" || -f "${WHATSAPP_PLIST_DST}" ]]; then
+    run_cmd launchctl bootout "gui/$(id -u)" "${WHATSAPP_PLIST_DST}" || true
+    run_cmd rm -f "${WHATSAPP_PLIST_DST}"
+  fi
+fi
+unset WHATSAPP_PLIST_DST
 
 if [[ "${ENABLE_AIRGRADIENT:-0}" == "1" ]]; then
   PLISTS+=("${HOME}/.config/launchd/com.marcelvaldez.airgradient-monitor.plist")

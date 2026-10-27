@@ -226,6 +226,78 @@ EOF
   fi
 }
 
+test_notify_darwin_osascript_fallback_when_terminal_notifier_fails() {
+  local mock_bin
+  mock_bin="$(mktemp -d)"
+  local osa_log
+  osa_log="$(mktemp)"
+  # Simulate Google Santa blocking the ad-hoc signed terminal-notifier (exit 126)
+  cat << 'EOF' > "${mock_bin}/terminal-notifier"
+#!/usr/bin/env bash
+exit 126
+EOF
+  cat << 'EOF' > "${mock_bin}/osascript"
+#!/usr/bin/env bash
+printf '%s\n' "$*" > "${OSA_LOG_FILE}"
+EOF
+  chmod +x "${mock_bin}/terminal-notifier" "${mock_bin}/osascript"
+  local rc=0
+  OSA_LOG_FILE="${osa_log}" PATH="${mock_bin}:/usr/bin:/bin" OS_COMPAT_UNAME_S="Darwin" \
+    os::notify -g "santa-blocked" "Blocked Title" "Blocked Body" || rc=$?
+  local osa_recorded
+  osa_recorded="$(cat "${osa_log}")"
+  rm -rf "${osa_log}" "${mock_bin}"
+  assert_eq "0" "${rc}" "os::notify (Darwin) succeeds via osascript when terminal-notifier fails"
+  if [[ "${osa_recorded}" == *"display notification"* && "${osa_recorded}" == *"Blocked Title"* ]]; then
+    PASS_COUNT=$((PASS_COUNT + 1))
+  else
+    echo "FAIL: os::notify (Darwin) did not fall back to osascript after terminal-notifier failed: ${osa_recorded}" >&2
+    FAIL_COUNT=$((FAIL_COUNT + 1))
+  fi
+}
+
+test_ensure_emacs_daemon_wait_timeout_and_set_e_safety() {
+  # Runs in separate bash processes so `set -e` is genuinely in effect: on
+  # Bash >= 4.1 (e.g. Linux) a regression to `((attempts++))` (status 1 when
+  # attempts is 0) aborts the wait loop, and an errexit-ignored context such as
+  # `( ... ) || rc=$?` would mask that. macOS /bin/bash 3.2 does not abort on a
+  # failing (( )), so there this mainly verifies EMACS_DAEMON_WAIT_SECS.
+  local sock="os-compat-test-$$"
+  local err_file
+  err_file="$(mktemp)"
+  local rc=0
+  bash -c '
+    set -e
+    source "$1"
+    os::emacs_socket_ready() { return 1; }
+    os::emacs_bin() { echo /usr/bin/true; }
+    pgrep() { return 0; }
+    EMACS_DAEMON_WAIT_SECS=1 os::ensure_emacs_daemon --wait "$2"
+  ' _ "${HOME}/lib/os_compat.sh" "${sock}" 2> "${err_file}" || rc=$?
+  local err_out
+  err_out="$(cat "${err_file}")"
+  rm -f "${err_file}"
+  assert_eq "1" "${rc}" "os::ensure_emacs_daemon --wait returns 1 once EMACS_DAEMON_WAIT_SECS elapses"
+  if [[ "${err_out}" == *"Timed out waiting for Emacs daemon (${sock}) after 1s"* ]]; then
+    PASS_COUNT=$((PASS_COUNT + 1))
+  else
+    echo "FAIL: os::ensure_emacs_daemon did not reach its timeout path under set -e: ${err_out}" >&2
+    FAIL_COUNT=$((FAIL_COUNT + 1))
+  fi
+
+  local ready_rc=0
+  bash -c '
+    set -e
+    source "$1"
+    _ready_calls=0
+    os::emacs_socket_ready() { _ready_calls=$((_ready_calls + 1)); [[ ${_ready_calls} -ge 3 ]]; }
+    os::emacs_bin() { echo /usr/bin/true; }
+    pgrep() { return 0; }
+    os::ensure_emacs_daemon --wait "$2"
+  ' _ "${HOME}/lib/os_compat.sh" "${sock}" 2>/dev/null || ready_rc=$?
+  assert_eq "0" "${ready_rc}" "os::ensure_emacs_daemon --wait returns 0 once the socket is ready (set -e safe)"
+}
+
 test_ping_once_ms_darwin_vs_linux_flags() {
   local ping_log
   ping_log="$(mktemp)"
@@ -352,6 +424,8 @@ test_file_mtime_returns_epoch_seconds
 test_file_mtime_darwin_stat_mock
 test_clipboard_copy_and_paste_darwin_mock
 test_notify_darwin_terminal_notifier_and_osascript_fallback
+test_notify_darwin_osascript_fallback_when_terminal_notifier_fails
+test_ensure_emacs_daemon_wait_timeout_and_set_e_safety
 test_ping_once_ms_darwin_vs_linux_flags
 test_pid_is_uninterruptible_darwin_mock
 test_is_mounted_and_unmount_lazy_darwin_mock

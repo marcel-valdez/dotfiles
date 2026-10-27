@@ -505,7 +505,12 @@ echo "Started clipboard-daemon on ${HOST}:${PORT} (Tunnel to ${REMOTE_CLIPBOARD_
 
 while true; do
   displays=$(ls /tmp/.X11-unix/ 2>/dev/null | sed 's/X//g')
-  readarray -t displays_array <<< "${displays}"
+  # Bash 3.2-compatible array fill (macOS /bin/bash 3.2 has no Bash 4 builtins
+  # for reading lines into arrays).
+  displays_array=()
+  while IFS= read -r _display_entry; do
+    displays_array+=("${_display_entry}")
+  done <<< "${displays}"
 
   # Wait for next payload from remote tmux via netcat
   paste_buffer=$(nc -l "${HOST}" "${PORT}" 200>&-)
