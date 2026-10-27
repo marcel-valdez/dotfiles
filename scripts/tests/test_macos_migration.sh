@@ -163,13 +163,20 @@ EOF
 # ------------------------------------------------------------------------------
 echo "[Test 4] kitten-cmd live-PID socket selection and stale socket cleanup"
 {
-  dead_sock="/tmp/kitty_tmux-999997"
-  live_sock="/tmp/kitty_tmux-$$"
+  # Hermetic sandbox: globbing the real /tmp would pick up a running kitty's own
+  # live socket (e.g. /tmp/kitty_tmux-<kitty pid>) and the cleanup branch could
+  # delete real stale sockets.
+  sock_dir="${TEST_TMP}/t4_sockets"
+  mkdir -p "${sock_dir}"
+  # The dead socket (PID 999997 > macOS pid_max) sorts *before* the live one, so
+  # the loop must really visit and clean it up before selecting the live socket.
+  dead_sock="${sock_dir}/kitty_tmux-0999997"
+  live_sock="${sock_dir}/kitty_tmux-$$"
   touch "${dead_sock}" "${live_sock}"
 
-  selected="$(bash -c '
+  selected="$(SOCK_DIR="${sock_dir}" bash -c '
     chosen=""
-    for candidate in /tmp/kitty_tmux-*; do
+    for candidate in "${SOCK_DIR}"/kitty_tmux-*; do
       [[ -e "${candidate}" ]] || continue
       cand_pid="${candidate##*-}"
       if [[ "${cand_pid}" =~ ^[0-9]+$ ]] && kill -0 "${cand_pid}" 2>/dev/null; then
@@ -181,7 +188,6 @@ echo "[Test 4] kitten-cmd live-PID socket selection and stale socket cleanup"
     done
     printf "%s" "${chosen}"
   ')"
-  rm -f "${dead_sock}" "${live_sock}"
   assert_eq "Live PID socket selected over dead PID socket" "${live_sock}" "${selected}"
   assert_true "Dead PID socket was cleaned up" test ! -e "${dead_sock}"
   assert_true "kitty-ssh-launch uses Bash 3.2-compatible read -n 1 (not read -N 1)" \
