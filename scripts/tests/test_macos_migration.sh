@@ -100,6 +100,16 @@ EOF
   ')"
   assert_eq "Darwin .googlerc sets PS1_HOST=macbook and CLIPBOARD_PORT=3335" \
     "macbook|3335" "${out}"
+
+  mkdir -p "${fake_home}/.config/clipboard-daemon"
+  echo "3336" > "${fake_home}/.config/clipboard-daemon/port"
+  out_override="$(HOME="${fake_home}" REAL_GOOGLERC="${real_googlerc}" PATH="${mock_bin}:${PATH}" OS_COMPAT_UNAME_S="Darwin" bash -c '
+    unset PS1_HOST CLIPBOARD_PORT
+    source "${REAL_GOOGLERC}" >/dev/null 2>&1 || true
+    printf "%s|%s\n" "${PS1_HOST:-}" "${CLIPBOARD_PORT:-}"
+  ')"
+  assert_eq "Per-machine ~/.config/clipboard-daemon/port overrides the Darwin default (3336)" \
+    "macbook|3336" "${out_override}"
 }
 
 # ------------------------------------------------------------------------------

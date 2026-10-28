@@ -6,7 +6,7 @@
 
 HOST="127.0.0.1"
 REMOTE_CLIPBOARD_HOST="${REMOTE_CLIPBOARD_HOST:-${USER}@marcelvaldez.c.googlers.com}"
-LOG_FILE="/tmp/clipboard-daemon.log"
+LOG_FILE="${CLIPBOARD_DAEMON_LOG_FILE:-/tmp/clipboard-daemon.log}"
 
 if [[ -f "${HOME}/lib/os_compat.sh" ]]; then
   source "${HOME}/lib/os_compat.sh"
@@ -35,6 +35,19 @@ while [[ $# -gt 0 ]]; do
       ;;
   esac
 done
+
+# Per-machine port override (untracked file, e.g. 3336 on a second Mac whose
+# reverse tunnel would otherwise collide with another Mac's 3335 on the
+# Cloudtop). Precedence: CLI port > CLIPBOARD_PORT > this file > defaults.
+CLIPBOARD_PORT_FILE="${CLIPBOARD_PORT_FILE:-${HOME}/.config/clipboard-daemon/port}"
+if [[ -z "${PORT}" && -z "${CLIPBOARD_PORT:-}" && -r "${CLIPBOARD_PORT_FILE}" ]]; then
+  _port_override=""
+  read -r _port_override < "${CLIPBOARD_PORT_FILE}" || true
+  if [[ "${_port_override}" =~ ^[0-9]+$ ]]; then
+    export CLIPBOARD_PORT="${_port_override}"
+  fi
+  unset _port_override
+fi
 
 # Source .googlerc to inherit configurations like CLIPBOARD_PORT
 if [[ -z "${CLIPBOARD_PORT:-}" ]]; then
@@ -301,6 +314,16 @@ start_ssh_tunnel() {
     local persistent_conflict=0
     local reconnect_backoff=5
     local ssh_child_pid=""
+    # Mux-only mode (gMac): the reverse forward rides on the shared SSH
+    # ControlMaster connection instead of a separate (touch-requiring) login.
+    local mux_waiting=0
+    local mux_forward_active=0
+    local mux_poll_sec="${CLIPBOARD_MUX_POLL_SEC:-10}"
+    # Host named in the single "open a shared SSH connection" notification; the
+    # default Cloudtop matches the knock daemon's gcloud alias so both daemons
+    # share one notification.
+    local mux_notice_host="${REMOTE_CLIPBOARD_HOST#*@}"
+    [[ "${mux_notice_host}" == "marcelvaldez.c.googlers.com" ]] && mux_notice_host="gcloud"
 
     subshell_cleanup() {
       if [[ -n "${ssh_child_pid}" ]] && kill -0 "${ssh_child_pid}" 2>/dev/null; then
@@ -309,6 +332,10 @@ start_ssh_tunnel() {
         if kill -0 "${ssh_child_pid}" 2>/dev/null; then
           kill -KILL "${ssh_child_pid}" 2>/dev/null || true
         fi
+      fi
+      if [[ ${mux_forward_active} -eq 1 ]]; then
+        # Drop our reverse forward from the shared master (local mux request).
+        ssh -O cancel -R "${PORT}:127.0.0.1:${PORT}" "${REMOTE_CLIPBOARD_HOST}" &>/dev/null || true
       fi
       rm -f "${PID_FILE}" 2>/dev/null || true
       exit 0
@@ -319,6 +346,59 @@ start_ssh_tunnel() {
       # Subshell parent liveness check
       if ! kill -0 "${parent_pid}" 2>/dev/null; then
         exit 0
+      fi
+
+      # 0. gMac: never open (and authenticate) a fresh SSH connection from the
+      # background; every new login asks for a security key touch. Reuse the
+      # shared ControlMaster connection, and ask the user once to open it.
+      if declare -F os::ssh_mux_only >/dev/null 2>&1 && os::ssh_mux_only; then
+        if ! os::ssh_master_alive "${REMOTE_CLIPBOARD_HOST}"; then
+          if [[ ${mux_waiting} -eq 0 ]]; then
+            echo "[$(get_timestamp)] [Tunnel] No shared SSH connection to ${REMOTE_CLIPBOARD_HOST}; waiting for 'ssh -fN ${mux_notice_host}' (not opening one from the background)." >> "${LOG_FILE}"
+            mux_waiting=1
+          fi
+          mux_forward_active=0
+          os::ssh_master_notify_missing "${mux_notice_host}" "Clipboard daemon (port ${PORT})"
+          for _ in $(seq 1 "${mux_poll_sec}"); do
+            kill -0 "${parent_pid}" 2>/dev/null || exit 0
+            sleep 1
+          done
+          continue
+        fi
+        os::ssh_master_notice_reset "${mux_notice_host}"
+        mux_waiting=0
+
+        # Idempotent: re-adding an existing forward is a no-op, and this
+        # re-adds it after the shared connection has been re-established.
+        if ssh -O forward -R "${PORT}:127.0.0.1:${PORT}" "${REMOTE_CLIPBOARD_HOST}" >/dev/null 2> "${ERR_LOG}"; then
+          if [[ ${mux_forward_active} -eq 0 ]]; then
+            echo "[$(get_timestamp)] [Tunnel] Reverse forward ${PORT} active on the shared SSH connection to ${REMOTE_CLIPBOARD_HOST}." >> "${LOG_FILE}"
+            mux_forward_active=1
+            persistent_conflict=0
+          fi
+          for _ in $(seq 1 "${mux_poll_sec}"); do
+            kill -0 "${parent_pid}" 2>/dev/null || exit 0
+            sleep 1
+          done
+          continue
+        fi
+
+        # Remote port unavailable (e.g. another machine's tunnel or a stale
+        # listener on the Cloudtop). Retrying costs no security key touch, so
+        # alert once per incident and retry quietly every 60s.
+        mux_forward_active=0
+        if [[ ${persistent_conflict} -eq 0 ]]; then
+          echo "[$(get_timestamp)] [Tunnel] Could not add reverse forward ${PORT} on ${REMOTE_CLIPBOARD_HOST}: $(tr '\n' ' ' < "${ERR_LOG}" 2>/dev/null) Retrying every 60s." >> "${LOG_FILE}"
+          send_desktop_notification "Clipboard Tunnel: Port ${PORT} Unavailable" "Port ${PORT} on ${REMOTE_CLIPBOARD_HOST} could not be forwarded (in use by another session?). Retrying every 60s.
+
+To fix: run ~/bin/clear-clipboard-port ${PORT} on ${REMOTE_CLIPBOARD_HOST}, or pick another port in ~/.config/clipboard-daemon/port."
+          persistent_conflict=1
+        fi
+        for _ in {1..60}; do
+          kill -0 "${parent_pid}" 2>/dev/null || exit 0
+          sleep 1
+        done
+        continue
       fi
 
       # 1. Check if an active local reverse SSH tunnel is already running

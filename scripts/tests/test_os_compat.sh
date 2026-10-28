@@ -298,6 +298,57 @@ test_ensure_emacs_daemon_wait_timeout_and_set_e_safety() {
   assert_eq "0" "${ready_rc}" "os::ensure_emacs_daemon --wait returns 0 once the socket is ready (set -e safe)"
 }
 
+test_ssh_mux_only_policy() {
+  _mux_only_with() {
+    local SSH_MUX_ONLY="$1" OS_COMPAT_UNAME_S="$2"
+    os::ssh_mux_only
+  }
+  assert_true "os::ssh_mux_only: SSH_MUX_ONLY=1 forces mux-only (even on Linux)" _mux_only_with 1 Linux
+  assert_false "os::ssh_mux_only: SSH_MUX_ONLY=0 disables mux-only (even on Darwin)" _mux_only_with 0 Darwin
+  assert_true "os::ssh_mux_only: defaults to mux-only on Darwin (gMac touch per login)" _mux_only_with "" Darwin
+  assert_false "os::ssh_mux_only: defaults to direct SSH on Linux" _mux_only_with "" Linux
+  unset -f _mux_only_with
+}
+
+test_ssh_master_alive_and_single_notification() {
+  local mock_bin notice_dir
+  mock_bin="$(mktemp -d)"
+  notice_dir="$(mktemp -d)"
+  local up_file="${notice_dir}/master_up"
+  local notify_log="${notice_dir}/notify.log"
+  # Mock ssh: only `ssh -O check` is expected; it succeeds while the master is "up".
+  cat << 'EOF' > "${mock_bin}/ssh"
+#!/usr/bin/env bash
+[[ "$1 $2" == "-O check" && -f "${MOCK_MASTER_UP_FILE}" ]]
+EOF
+  cat << 'EOF' > "${mock_bin}/terminal-notifier"
+#!/usr/bin/env bash
+printf '%s\n' "$*" >> "${MOCK_NOTIFY_LOG}"
+EOF
+  chmod +x "${mock_bin}/ssh" "${mock_bin}/terminal-notifier"
+  _with_ssh_mocks() {
+    PATH="${mock_bin}:/usr/bin:/bin" OS_COMPAT_UNAME_S="Darwin" \
+      SSH_MASTER_NOTICE_DIR="${notice_dir}" MOCK_MASTER_UP_FILE="${up_file}" \
+      MOCK_NOTIFY_LOG="${notify_log}" "$@"
+  }
+
+  assert_false "os::ssh_master_alive is false when no ControlMaster is up" \
+    _with_ssh_mocks os::ssh_master_alive "user@gcloud"
+  _with_ssh_mocks os::ssh_master_notify_missing "gcloud" "Knock daemon"
+  _with_ssh_mocks os::ssh_master_notify_missing "gcloud" "Clipboard daemon"
+  assert_eq "1" "$(grep -c "No shared SSH connection to gcloud" "${notify_log}" 2>/dev/null)" \
+    "os::ssh_master_notify_missing notifies once per outage across daemons"
+  touch "${up_file}"
+  assert_true "os::ssh_master_alive is true when the ControlMaster is up" \
+    _with_ssh_mocks os::ssh_master_alive "user@gcloud"
+  _with_ssh_mocks os::ssh_master_notice_reset "gcloud"
+  _with_ssh_mocks os::ssh_master_notify_missing "gcloud" "Knock daemon"
+  assert_eq "2" "$(grep -c "No shared SSH connection to gcloud" "${notify_log}" 2>/dev/null)" \
+    "os::ssh_master_notice_reset re-arms the notification for the next outage"
+  unset -f _with_ssh_mocks
+  rm -rf "${mock_bin}" "${notice_dir}"
+}
+
 test_ping_once_ms_darwin_vs_linux_flags() {
   local ping_log
   ping_log="$(mktemp)"
@@ -426,6 +477,8 @@ test_clipboard_copy_and_paste_darwin_mock
 test_notify_darwin_terminal_notifier_and_osascript_fallback
 test_notify_darwin_osascript_fallback_when_terminal_notifier_fails
 test_ensure_emacs_daemon_wait_timeout_and_set_e_safety
+test_ssh_mux_only_policy
+test_ssh_master_alive_and_single_notification
 test_ping_once_ms_darwin_vs_linux_flags
 test_pid_is_uninterruptible_darwin_mock
 test_is_mounted_and_unmount_lazy_darwin_mock

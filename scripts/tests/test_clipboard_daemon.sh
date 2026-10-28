@@ -282,7 +282,7 @@ test_flock_singleton_mutual_exclusion() {
   sleep 0.1
 
   local output="" exit_code=0
-  output=$(CLIPBOARD_PORT=3334 PATH="${bin_dir}:${PATH}" PS1_HOST="laptop" \
+  output=$(CLIPBOARD_DAEMON_LOG_FILE="${run_dir}/daemon.log" CLIPBOARD_PORT=3334 PATH="${bin_dir}:${PATH}" PS1_HOST="laptop" \
     XDG_RUNTIME_DIR="${run_dir}" bash ~/bin/clipboard-daemon.sh 3334 2>&1) \
     || exit_code=$?
 
@@ -720,7 +720,7 @@ EOF
   chmod +x "${bin_dir}/systemctl"
 
   local exit_code=0
-  OS_COMPAT_UNAME_S="Linux" CLIPBOARD_PORT=3334 PATH="${bin_dir}:${PATH}" PS1_HOST="laptop" \
+  CLIPBOARD_DAEMON_LOG_FILE="${run_dir}/daemon.log" OS_COMPAT_UNAME_S="Linux" CLIPBOARD_PORT=3334 PATH="${bin_dir}:${PATH}" PS1_HOST="laptop" \
     XDG_RUNTIME_DIR="${run_dir}" bash ~/bin/clipboard-daemon.sh -r 3334 \
     >/dev/null 2>&1 || exit_code=$?
 
@@ -796,8 +796,8 @@ EOF
   chmod +x "${bin_dir}/launchctl"
 
   local exit_code=0
-  HOME="${fake_home}" OS_COMPAT_UNAME_S="Darwin" PATH="${bin_dir}:${PATH}" PS1_HOST="macbook" \
-    XDG_RUNTIME_DIR="${run_dir}" bash "${HOME}/bin/clipboard-daemon.sh" -r \
+  CLIPBOARD_DAEMON_LOG_FILE="${run_dir}/daemon.log" HOME="${fake_home}" OS_COMPAT_UNAME_S="Darwin" PATH="${bin_dir}:${PATH}" PS1_HOST="macbook" \
+    CLIPBOARD_PORT="" XDG_RUNTIME_DIR="${run_dir}" bash "${HOME}/bin/clipboard-daemon.sh" -r \
     >/dev/null 2>&1 || exit_code=$?
 
   assert_equals "0" "${exit_code}" \
@@ -818,8 +818,8 @@ EOF
   sleep 0.1
 
   local darwin_out=""
-  darwin_out=$(HOME="${fake_home}" OS_COMPAT_UNAME_S="Darwin" PATH="${bin_dir}:${PATH}" PS1_HOST="macbook" \
-    XDG_RUNTIME_DIR="${run_dir}" bash "${HOME}/bin/clipboard-daemon.sh" 2>&1) || true
+  darwin_out=$(CLIPBOARD_DAEMON_LOG_FILE="${run_dir}/daemon.log" HOME="${fake_home}" OS_COMPAT_UNAME_S="Darwin" PATH="${bin_dir}:${PATH}" PS1_HOST="macbook" \
+    CLIPBOARD_PORT="" XDG_RUNTIME_DIR="${run_dir}" bash "${HOME}/bin/clipboard-daemon.sh" 2>&1) || true
 
   kill -9 "${holder_pid}" 2>/dev/null || true
   wait "${holder_pid}" 2>/dev/null || true
@@ -843,10 +843,129 @@ test_bash32_compat_no_bash4_builtins() {
 }
 
 # -----------------------------------------------------------------------------
+# Item 14: Per-machine port file (~/.config/clipboard-daemon/port)
+# -----------------------------------------------------------------------------
+test_per_machine_port_file_override() {
+  echo "Running test_per_machine_port_file_override..."
+  local bin_dir
+  bin_dir="$(setup_mock_bin)"
+  local run_dir="${TEST_DIR}/run_port_file"
+  local fake_home="${run_dir}/home"
+  mkdir -p "${fake_home}/lib" "${fake_home}/.config/clipboard-daemon"
+  ln -sf "${HOME}/lib/os_compat.sh" "${fake_home}/lib/os_compat.sh"
+  echo "3336" > "${fake_home}/.config/clipboard-daemon/port"
+
+  # Hold the 3336 lock so the daemon reports the port it resolved and exits.
+  local lock_3336="${run_dir}/clipboard-daemon-3336.lock"
+  touch "${lock_3336}"
+  (
+    exec 200>"${lock_3336}"
+    flock -n 200
+    exec sleep 5
+  ) </dev/null >/dev/null 2>&1 &
+  local holder_pid=$!
+  sleep 0.1
+
+  local out=""
+  out=$(CLIPBOARD_DAEMON_LOG_FILE="${run_dir}/daemon.log" HOME="${fake_home}" OS_COMPAT_UNAME_S="Darwin" PATH="${bin_dir}:${PATH}" PS1_HOST="macbook" \
+    CLIPBOARD_PORT="" XDG_RUNTIME_DIR="${run_dir}" bash "${HOME}/bin/clipboard-daemon.sh" 2>&1) || true
+
+  kill -9 "${holder_pid}" 2>/dev/null || true
+  wait "${holder_pid}" 2>/dev/null || true
+
+  assert_string_contains "${out}" "already running on port 3336" \
+    "Per-machine ~/.config/clipboard-daemon/port (3336) overrides the Darwin default 3335"
+}
+
+# -----------------------------------------------------------------------------
+# Item 15: gMac Mux-Only Tunnel (no fresh SSH login, single notification)
+# -----------------------------------------------------------------------------
+test_macos_mux_only_tunnel_never_opens_fresh_login() {
+  echo "Running test_macos_mux_only_tunnel_never_opens_fresh_login..."
+  local bin_dir
+  bin_dir="$(setup_mock_bin)"
+  local run_dir="${TEST_DIR}/run_mux"
+  local fake_home="${run_dir}/home"
+  mkdir -p "${fake_home}/lib"
+  ln -sf "${HOME}/lib/os_compat.sh" "${fake_home}/lib/os_compat.sh"
+  local ssh_log="${run_dir}/ssh.log"
+  local notify_log="${run_dir}/notify.log"
+  : > "${ssh_log}"
+
+  cat << EOF > "${bin_dir}/ssh"
+#!/bin/bash
+echo "\$*" >> "${ssh_log}"
+if [[ "\$*" == *"-O check"* ]]; then
+  [[ -f "${run_dir}/master_up" ]] && exit 0
+  exit 255
+fi
+exit 0
+EOF
+  # Payload listener returns quickly (empty payload) so SIGTERM is handled promptly.
+  cat << 'EOF' > "${bin_dir}/nc"
+#!/bin/bash
+sleep 0.5
+EOF
+  local notifier
+  for notifier in terminal-notifier osascript; do
+    cat << EOF > "${bin_dir}/${notifier}"
+#!/bin/bash
+echo "\$*" >> "${notify_log}"
+EOF
+  done
+  chmod +x "${bin_dir}/ssh" "${bin_dir}/nc" "${bin_dir}/terminal-notifier" "${bin_dir}/osascript"
+
+  CLIPBOARD_DAEMON_LOG_FILE="${run_dir}/daemon.log" HOME="${fake_home}" OS_COMPAT_UNAME_S="Darwin" SSH_MUX_ONLY=1 PATH="${bin_dir}:${PATH}" \
+    PS1_HOST="macbook" XDG_RUNTIME_DIR="${run_dir}" SSH_MASTER_NOTICE_DIR="${run_dir}" \
+    CLIPBOARD_MUX_POLL_SEC=1 CLIPBOARD_PORT=3336 \
+    bash "${HOME}/bin/clipboard-daemon.sh" 3336 </dev/null >/dev/null 2>&1 &
+  local daemon_pid=$!
+
+  # Phase 1: no shared master -> only `ssh -O check`, exactly one notification.
+  sleep 2.5
+  assert_equals "" "$(grep -v -- '-O check' "${ssh_log}")" \
+    "Mux-only tunnel only runs 'ssh -O check' (no fresh SSH login) while no shared master exists"
+  assert_equals "1" "$(grep -c 'No shared SSH connection to gcloud' "${notify_log}" 2>/dev/null || true)" \
+    "Mux-only tunnel sends exactly one 'ssh -fN gcloud' notification per outage"
+
+  # Phase 2: master up -> reverse forward is added to the shared master.
+  touch "${run_dir}/master_up"
+  local forwarded=0
+  for _ in {1..30}; do
+    if grep -q -- "-O forward -R 3336:127.0.0.1:3336" "${ssh_log}"; then
+      forwarded=1
+      break
+    fi
+    sleep 0.2
+  done
+  assert_equals "1" "${forwarded}" \
+    "Mux-only tunnel adds the reverse forward to the shared master (ssh -O forward -R 3336:127.0.0.1:3336)"
+
+  # Shutdown: the reverse forward is cancelled on the shared master.
+  kill -TERM "${daemon_pid}" 2>/dev/null || true
+  for _ in {1..30}; do
+    kill -0 "${daemon_pid}" 2>/dev/null || break
+    sleep 0.2
+  done
+  kill -9 "${daemon_pid}" 2>/dev/null || true
+  wait "${daemon_pid}" 2>/dev/null || true
+  local cancelled=0
+  for _ in {1..15}; do
+    if grep -q -- "-O cancel -R 3336:127.0.0.1:3336" "${ssh_log}"; then
+      cancelled=1
+      break
+    fi
+    sleep 0.2
+  done
+  assert_equals "1" "${cancelled}" \
+    "Mux-only tunnel cancels its reverse forward on the shared master at shutdown"
+}
+
+# -----------------------------------------------------------------------------
 # Test Runner
 # -----------------------------------------------------------------------------
 echo "================================================================="
-echo "Running Clipboard Daemon Unit Tests (13 Test Plan Items)"
+echo "Running Clipboard Daemon Unit Tests (15 Test Plan Items)"
 echo "================================================================="
 test_flock_singleton_mutual_exclusion
 test_restart_bounded_pid_polling_and_kill_escalation
@@ -868,6 +987,8 @@ test_network_drop_progressive_backoff
 test_log_isolation_no_false_conflict
 test_macos_darwin_port_launchctl_and_lsof_support
 test_bash32_compat_no_bash4_builtins
+test_per_machine_port_file_override
+test_macos_mux_only_tunnel_never_opens_fresh_login
 
 echo "================================================================="
 echo "Test Results: ${PASSED_TESTS} passed, ${FAILED_TESTS} failed."

@@ -321,6 +321,111 @@ os::notify() {
 }
 
 #######################################
+# Reports whether background SSH connections must reuse an existing SSH
+# ControlMaster connection instead of opening (and authenticating) a new one.
+# On gMac (macOS) every fresh SSH login to corp hosts asks for a security key
+# (gnubby) touch, so background daemons must never start one on their own.
+#
+# Environment:
+#   SSH_MUX_ONLY - 1/true/yes forces mux-only mode; 0/false/no disables it.
+# Returns:
+#   0 if background SSH must be mux-only (default on macOS), 1 otherwise.
+#
+# Usage Example:
+#   if os::ssh_mux_only; then ssh_opts+=(-o ControlMaster=no); fi
+#######################################
+os::ssh_mux_only() {
+  case "${SSH_MUX_ONLY:-}" in
+    1|true|yes) return 0 ;;
+    0|false|no) return 1 ;;
+  esac
+  os::is_macos
+}
+
+#######################################
+# Checks whether an SSH ControlMaster (multiplexed) connection to a host is up.
+# Only queries the local control socket (`ssh -O check`), so it never
+# authenticates and can never trigger a security key (gnubby) touch.
+#
+# Arguments:
+#   $1 - destination: SSH destination as passed to ssh (e.g. "user@gcloud").
+# Returns:
+#   0 if a master connection is up, 1 otherwise.
+#
+# Usage Example:
+#   os::ssh_master_alive "gcloud" || echo "Run: ssh -fN gcloud"
+#######################################
+os::ssh_master_alive() {
+  [[ -n "${1:-}" ]] || return 1
+  ssh -O check "$1" &>/dev/null
+}
+
+#######################################
+# Sends a single desktop notification asking the user to open the shared SSH
+# connection (`ssh -fN <host>`, one security key touch) that background daemons
+# reuse. Repeats from the same or other daemons are suppressed by a marker file
+# until os::ssh_master_notice_reset runs (i.e. once the connection is back), so
+# each outage produces exactly one notification.
+#
+# Arguments:
+#   $1 - host: SSH host alias to suggest (e.g. "gcloud").
+#   $2 - requester: Optional name of the daemon that needs the connection.
+# Environment:
+#   SSH_MASTER_NOTICE_DIR - Marker directory (default: os::runtime_dir).
+# Returns:
+#   0 always.
+#
+# Usage Example:
+#   os::ssh_master_notify_missing "gcloud" "Knock daemon"
+#######################################
+os::ssh_master_notify_missing() {
+  local host="${1:-gcloud}"
+  local requester="${2:-}"
+  local marker
+  marker="$(os::ssh_master_notice_marker "${host}")"
+  [[ -e "${marker}" ]] && return 0
+  : > "${marker}" 2>/dev/null || true
+  os::notify -u critical -a "SSH" -g "ssh-master-${host}" -- \
+    "No shared SSH connection to ${host}" \
+    "Run: ssh -fN ${host} (touch your security key once).${requester:+ Needed by: ${requester}.}" \
+    2>/dev/null || true
+  return 0
+}
+
+#######################################
+# Re-arms os::ssh_master_notify_missing for the next outage by removing its
+# single-notification marker.
+#
+# Arguments:
+#   $1 - host: SSH host alias (same value passed to the notify function).
+# Returns:
+#   0 always.
+#
+# Usage Example:
+#   os::ssh_master_alive "gcloud" && os::ssh_master_notice_reset "gcloud"
+#######################################
+os::ssh_master_notice_reset() {
+  rm -f "$(os::ssh_master_notice_marker "${1:-gcloud}")" 2>/dev/null || true
+  return 0
+}
+
+#######################################
+# Prints the marker file path used to de-duplicate "open a shared SSH
+# connection" notifications for a host.
+#
+# Arguments:
+#   $1 - host: SSH host alias.
+# Outputs:
+#   Writes the marker path to stdout.
+#######################################
+os::ssh_master_notice_marker() {
+  local dir="${SSH_MASTER_NOTICE_DIR:-$(os::runtime_dir)}"
+  local key="${1:-gcloud}"
+  key="${key//[^A-Za-z0-9_.@-]/_}"
+  printf '%s/ssh-master-missing-%s\n' "${dir%/}" "${key}"
+}
+
+#######################################
 # Returns the modification time of a file in epoch seconds.
 #
 # Arguments:

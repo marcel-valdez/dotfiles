@@ -5,10 +5,13 @@
   <key>Label</key>
   <string>com.marcelvaldez.clipboard-daemon</string>
   <key>ProgramArguments</key>
+  <!-- Port: per-machine override in ~/.config/clipboard-daemon/port (e.g. 3336
+       on a second Mac), else 3335. Exporting CLIPBOARD_PORT keeps the daemon
+       from sourcing ~/.googlerc under launchd. -->
   <array>
     <string>/bin/bash</string>
-    <string>/Users/marcelvaldez/bin/clipboard-daemon.sh</string>
-    <string>3335</string>
+    <string>-c</string>
+    <string>port="$(head -n 1 "${HOME}/.config/clipboard-daemon/port" 2>/dev/null)"; [[ "${port}" =~ ^[0-9]+$ ]] || port=3335; export CLIPBOARD_PORT="${port}"; exec /bin/bash "${HOME}/bin/clipboard-daemon.sh" "${port}"</string>
   </array>
   <key>EnvironmentVariables</key>
   <dict>
@@ -18,8 +21,6 @@
     <string>/Users/marcelvaldez</string>
     <key>USER</key>
     <string>marcelvaldez</string>
-    <key>CLIPBOARD_PORT</key>
-    <string>3335</string>
   </dict>
   <key>RunAtLoad</key>
   <true/>
