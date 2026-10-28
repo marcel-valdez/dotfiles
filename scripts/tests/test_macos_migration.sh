@@ -755,6 +755,12 @@ echo "[Test 15] ~/.hammerspoon/init.lua macOS 15+ space-moving & multi-workspace
     bash -c "grep -q 'math.floor(evNum)' '${hs_init}' && grep -q 'local function roundPt' '${hs_init}'"
   assert_true "init.lua matches Mission Control thumbnails by title/shape (not nearest distance)" \
     grep -q "local function findWindowThumbnail" "${hs_init}"
+  assert_true "init.lua also matches Mission Control titles without the ' - <App>' suffix (Chrome)" \
+    grep -q "local function stripAppNameSuffix" "${hs_init}"
+  assert_true "init.lua presses the target Space only after Mission Control settles, then falls back" \
+    bash -c "grep -q 'local MC_SETTLE_SEC' '${hs_init}' && grep -q 'local function followDroppedWindow' '${hs_init}' && grep -q 'local function switchToTargetSpaceDirectly' '${hs_init}'"
+  assert_true "init.lua never leaves Mission Control open when a move finishes" \
+    grep -q "if op.mcOpen then pcall(hs.spaces.closeMissionControl) end" "${hs_init}"
   assert_true "init.lua unpins explicitly moved windows from stickyWindows" \
     grep -Fq "stickyWindows[op.winId] = false" "${hs_init}"
   assert_true "init.lua declares stickyWindows exactly once (shared by Sections 3, 4 and 6)" \
@@ -796,6 +802,51 @@ echo "[Test 15] ~/.hammerspoon/init.lua macOS 15+ space-moving & multi-workspace
     assert_contains "init.lua compiles in Hammerspoon's Lua runtime (loadfile)" "SYNTAX_OK" "${hs_syntax}"
     hs_api="$("${hs_cli}" -t 3 -q -c "return type(workspaceMover) == 'table' and type(workspaceMover.moveFocusedWindowToAdjacentSpace) == 'function' and 'API_OK' or 'API_MISSING'" </dev/null 2>&1 || true)"
     assert_contains "running Hammerspoon exposes workspaceMover move functions over IPC" "API_OK" "${hs_api}"
+
+    # Pure helpers (resolution independent): a {enabled = 1} symbolichotkeys entry
+    # means the macOS default Ctrl+Arrow, custom bindings are kept, and Chrome
+    # thumbnails match without the " - Google Chrome - <profile>" title suffix.
+    cat << 'EOF' > "${TEST_TMP}/t15_helpers.lua"
+local wm = workspaceMover
+if type(wm) ~= "table" or type(wm.symbolicHotkeyFromEntry) ~= "function" or
+   type(wm.findWindowThumbnail) ~= "function" then
+  return "HELPERS_MISSING"
+end
+local out = {}
+local function hk(v) return v and string.format("%d/0x%X", v.keycode, v.flags) or "nil" end
+table.insert(out, "enabled-no-params=" .. hk(wm.symbolicHotkeyFromEntry(81, { enabled = true })))
+table.insert(out, "missing=" .. hk(wm.symbolicHotkeyFromEntry(79, nil)))
+table.insert(out, "disabled=" .. hk(wm.symbolicHotkeyFromEntry(81, { enabled = false })))
+table.insert(out, "custom=" .. hk(wm.symbolicHotkeyFromEntry(81,
+  { enabled = true, value = { parameters = { 65535, 124, 0x8C0000 } } })))
+table.insert(out, "desktop1-no-params=" .. hk(wm.symbolicHotkeyFromEntry(118, { enabled = true })))
+local same = { x = 0, y = 0, w = 181, h = 100 }
+local winFrame = { x = 0, y = 31, w = 2560, h = 1409 }
+local chromeThumbs = {
+  { AXTitle = "Other window", AXFrame = same },
+  { AXTitle = "asrf: (2/5) Partition RolloutLibr…ases. – cl/1004110320 – Critique", AXFrame = same },
+}
+local chromeTitle = "asrf: (2/5) Partition RolloutLibrary diffs into per-stage JUnit XML test cases." ..
+  " – cl/1004110320 – Critique - Google Chrome - Marcel (Work)"
+local el = wm.findWindowThumbnail(chromeThumbs, chromeTitle, winFrame, "Google Chrome")
+table.insert(out, "chrome-truncated=" .. tostring(el ~= nil and el.AXTitle == chromeThumbs[2].AXTitle))
+local newTab = { { AXTitle = "Other window", AXFrame = same }, { AXTitle = "New Tab", AXFrame = same } }
+el = wm.findWindowThumbnail(newTab, "New Tab - Google Chrome - Marcel (Work)", winFrame, "Google Chrome")
+table.insert(out, "chrome-newtab=" .. tostring(el ~= nil and el.AXTitle == "New Tab"))
+local kitty = { { AXTitle = "vim", AXFrame = same }, { AXTitle = "bash", AXFrame = same } }
+el = wm.findWindowThumbnail(kitty, "bash", winFrame, "kitty")
+table.insert(out, "exact=" .. tostring(el ~= nil and el.AXTitle == "bash"))
+el = wm.findWindowThumbnail(chromeThumbs, "Unrelated - Google Chrome", winFrame, "Google Chrome")
+table.insert(out, "ambiguous=" .. tostring(el == nil))
+return table.concat(out, " ")
+EOF
+    hs_helpers="$("${hs_cli}" -t 5 -q -c "return dofile('${TEST_TMP}/t15_helpers.lua')" </dev/null 2>&1 || true)"
+    assert_eq "symbolichotkeys entries: {enabled=1} -> default Ctrl+Arrow, disabled -> none, custom kept" \
+      "enabled-no-params=124/0x840000 missing=123/0x840000 disabled=nil custom=124/0x8C0000 desktop1-no-params=nil" \
+      "$(echo "${hs_helpers}" | sed -n 's/ chrome-truncated=.*//p')"
+    assert_eq "Mission Control thumbnails match Chrome titles without the app suffix; exact and ambiguous cases unchanged" \
+      "chrome-truncated=true chrome-newtab=true exact=true ambiguous=true" \
+      "$(echo "${hs_helpers}" | sed -n 's/.*\(chrome-truncated=\)/\1/p')"
   else
     echo "  [SKIP] live Hammerspoon IPC checks (Hammerspoon not running or hs.ipc unavailable)"
   fi

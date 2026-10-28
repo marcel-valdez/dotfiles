@@ -230,15 +230,18 @@ end)
 --      leftMouseDown + leftMouseDragged) and post the user's *own* macOS
 --      "Move left/right a space" (symbolic hotkeys 79/81) or "Switch to Desktop N"
 --      (118..133) shortcut, read live from com.apple.symbolichotkeys (e.g.
---      Ctrl+Alt+Arrow on the gMac rather than the stock Ctrl+Arrow; arrow-key
---      shortcuts must carry the fn flag). WindowServer carries the held window to
---      the new Space. hs.spaces.gotoSpace() switches via a Mission Control AXPress
---      and does NOT carry a held window, so it cannot be used for this.
+--      Ctrl+Alt+Arrow on the gMac rather than the stock Ctrl+Arrow; an entry
+--      without key parameters, such as {enabled = 1}, means the stock binding;
+--      arrow-key shortcuts must carry the fn flag). WindowServer carries the held
+--      window to the new Space. hs.spaces.gotoSpace() switches via a Mission
+--      Control AXPress and does NOT carry a held window, so it cannot be used for this.
 --   B. Borderless windows (kitty hide_window_decorations yes), titlebars with no
 --      draggable spot, or no enabled Spaces shortcut: open Mission Control, wait
 --      for the thumbnails to settle, press the window's thumbnail and lift it (the
 --      Spaces bar expands only once a drag is in progress), drop it onto the
---      *expanded* target Space thumbnail, then AXPress that Space to follow it.
+--      *expanded* target Space thumbnail, then, once Mission Control has settled,
+--      AXPress that Space to follow it (if Mission Control ignores the press, close
+--      it and switch Spaces directly).
 -- Both paths first wait for the physically held hotkey modifiers to be released
 -- (taps made meanwhile accumulate: hold Ctrl+Alt+Shift and tap Right twice to move
 -- two Spaces), keep strong references to every pending hs.timer (unreferenced
@@ -449,17 +452,27 @@ local function readSymbolicHotkeys()
   return symbolicHotkeysCache
 end
 
--- Returns { keycode = n, flags = n } for an enabled symbolic hotkey id, or nil.
-local function getSymbolicHotkey(id)
-  local entry = readSymbolicHotkeys()[tostring(id)]
+-- Returns { keycode = n, flags = n } for a com.apple.symbolichotkeys entry, or nil
+-- when it is disabled. An entry without key parameters (e.g. {enabled = 1}, as
+-- on a fresh gMac) uses the macOS default binding, just like a missing entry:
+-- WindowServer then reports Ctrl+Left/Right for 79/81.
+local function symbolicHotkeyFromEntry(id, entry)
   if entry == nil then
     return SYMBOLIC_HOTKEY_DEFAULTS[id]
   end
   if entry.enabled == false or entry.enabled == 0 then return nil end
   local params = type(entry.value) == "table" and entry.value.parameters or nil
-  local keycode = type(params) == "table" and tonumber(params[2]) or nil
+  if type(params) ~= "table" then
+    return SYMBOLIC_HOTKEY_DEFAULTS[id]
+  end
+  local keycode = tonumber(params[2])
   if not keycode or keycode == 65535 then return nil end
   return { keycode = math.floor(keycode), flags = math.floor(tonumber(params[3]) or 0) }
+end
+
+-- Returns { keycode = n, flags = n } for an enabled symbolic hotkey id, or nil.
+local function getSymbolicHotkey(id)
+  return symbolicHotkeyFromEntry(id, readSymbolicHotkeys()[tostring(id)])
 end
 
 -- Section 3 hotkeys are recorded so that a synthetic Spaces shortcut colliding with
@@ -487,7 +500,7 @@ local spaceMove = {
   lastModifierWait = nil,
   lastResult = nil,    -- outcome of the last move (see workspaceMover.lastResult())
 }
-local finishMove, startPendingMove  -- forward declarations
+local finishMove, startPendingMove, planSpaceSwitchKeys  -- forward declarations
 
 -- Runs fn after sec seconds as part of op, holding a strong reference to the timer
 -- (an unreferenced hs.timer.doAfter timer is garbage-collected and never fires,
@@ -598,7 +611,8 @@ finishMove = function(op, ok, reason)
   op.timers = {}
   pcall(releaseMouse, op)
   restoreSuspendedHotkeys(op)
-  if op.mcOpen and not ok then pcall(hs.spaces.closeMissionControl) end
+  -- Never leave the user in Mission Control (no-op when it is already closed)
+  if op.mcOpen then pcall(hs.spaces.closeMissionControl) end
   if op.savedCursor then hs.mouse.absolutePosition(op.savedCursor) end
   if op.dragTapWasEnabled and altDragTap then altDragTap:start() end
   if spaceMove.op == op then spaceMove.op = nil end
@@ -698,20 +712,37 @@ local function mcTitleMatches(candidate, title)
          (suffix == "" or title:sub(#title - #suffix + 1) == suffix)
 end
 
+-- Mission Control titles drop the " - <App>[ - <profile>]" suffix that Chrome-style
+-- browsers append to window titles ("Docs - Google Chrome - Marcel (Work)" shows
+-- as "Docs"), so thumbnails are also matched against the title without it.
+local function stripAppNameSuffix(title, appName)
+  if not title or title == "" or not appName or appName == "" then return nil end
+  local needle, cut, from = " - " .. appName, nil, 1
+  while true do
+    local s = title:find(needle, from, true)
+    if not s then break end
+    cut, from = s, s + 1
+  end
+  if cut and cut > 1 then return title:sub(1, cut - 1) end
+  return nil
+end
+
 -- Picks win's thumbnail by title, then aspect ratio (thumbnails are scaled-down
 -- copies), then Mission Control's front-to-back order (win was focused first).
 -- Refuses to guess when neither title nor shape identifies the window.
-local function findWindowThumbnail(thumbs, winTitle, winFrame)
+local function findWindowThumbnail(thumbs, winTitle, winFrame, appName)
   local aspect = winFrame.w / math.max(1, winFrame.h)
+  local shortTitle = stripAppNameSuffix(winTitle, appName)
   local scored = {}
   for idx, th in ipairs(thumbs) do
     local tf = th.AXFrame
     if tf and tf.w > 0 and tf.h > 0 then
       local title = th.AXTitle or ""
       local titleScore = 0
-      if winTitle ~= "" and title == winTitle then
+      if winTitle ~= "" and (title == winTitle or (shortTitle and title == shortTitle)) then
         titleScore = 2
-      elseif winTitle ~= "" and mcTitleMatches(title, winTitle) then
+      elseif winTitle ~= "" and (mcTitleMatches(title, winTitle) or
+                                 (shortTitle and mcTitleMatches(title, shortTitle))) then
         titleScore = 1
       end
       local aspectErr = math.abs(math.log((tf.w / tf.h) / aspect))
@@ -736,12 +767,82 @@ local function findWindowThumbnail(thumbs, winTitle, winFrame)
   return nil
 end
 
+local function isMissionControlOpen()
+  local dock = hs.application.applicationsForBundleID("com.apple.dock")[1]
+  return mcChild(dock and hs.axuielement.applicationElement(dock), "mc") ~= nil
+end
+
+-- Switches op.scr to op.targetSpace without Mission Control: the user's Spaces
+-- shortcut(s) when enabled, else hs.spaces.gotoSpace(). Calls onDone(arrived).
+local function switchToTargetSpaceDirectly(op, onDone)
+  if hs.spaces.focusedSpace() == op.targetSpace then return onDone(true) end
+  local function viaGotoSpace()
+    pcall(hs.spaces.gotoSpace, op.targetSpace)
+    opPoll(op, 0.05, 2.5, function() return hs.spaces.focusedSpace() == op.targetSpace end, onDone)
+  end
+  local plan = planSpaceSwitchKeys(op.scr, hs.spaces.focusedSpace(), op.targetSpace, op.targetIdx)
+  if not plan then return viaGotoSpace() end
+  local function runStep(i)
+    local step = plan[i]
+    if not step then return onDone(true) end
+    postSymbolicHotkey(op, step.hotkey)
+    opPoll(op, 0.03, 2.0, function() return hs.spaces.focusedSpace() == step.space end, function(switched)
+      if switched then return runStep(i + 1) end
+      viaGotoSpace()
+    end)
+  end
+  runStep(1)
+end
+
+-- After the drop, leave Mission Control on the target Space. Mission Control
+-- ignores a Space press while it is still animating (hs.spaces.gotoSpace() waits
+-- hs.spaces.MCwaitTime after opening it for the same reason), and a press ~20ms
+-- after the drop left it open on the 2560x1440 gMac. So let it settle first,
+-- press again if it is still showing, and finally close it and switch Spaces
+-- without it: the user must never be left in Mission Control.
+local MC_SETTLE_SEC = 0.4
+local MC_PRESS_ATTEMPTS = 2
+
+local function followDroppedWindow(op, spaceListIdx)
+  local attempt = 0
+  local function pressTargetSpace()
+    attempt = attempt + 1
+    local sp = getMissionControlSpaces(getMissionControlDisplay(op.scr))[spaceListIdx]
+    local okPress, pressed = pcall(function() return sp and sp:performAction("AXPress") end)
+    trace(op, string.format("AXPress target Space (attempt %d): %s", attempt,
+      (okPress and pressed) and "ok" or "failed"))
+    opPoll(op, 0.05, 1.0, function()
+      return hs.spaces.focusedSpace() == op.targetSpace
+    end, function(arrived)
+      if arrived then
+        op.mcOpen = false
+        return finishMove(op, true, "dragged in Mission Control")
+      end
+      if attempt < MC_PRESS_ATTEMPTS and isMissionControlOpen() then
+        return opAfter(op, MC_SETTLE_SEC, pressTargetSpace)
+      end
+      trace(op, "Space press ignored; closing Mission Control and switching Spaces directly")
+      pcall(hs.spaces.closeMissionControl)
+      opPoll(op, 0.05, 1.5, function() return not isMissionControlOpen() end, function()
+        op.mcOpen = isMissionControlOpen()
+        switchToTargetSpaceDirectly(op, function(switched)
+          finishMove(op, true, switched and "dragged in Mission Control, then switched Spaces directly"
+            or "dragged in Mission Control (Space switch still pending)")
+        end)
+      end)
+    end)
+  end
+  opAfter(op, MC_SETTLE_SEC, pressTargetSpace)
+end
+
 local function moveWindowViaMissionControl(op)
   local win, scr = op.win, op.scr
   op.method = (op.method and op.method ~= "mission-control") and (op.method .. "+mission-control") or "mission-control"
   local full = scr:fullFrame()
   local winTitle = win:title() or ""
   local winFrame = win:frame()
+  local okApp, appName = pcall(function() return win:application():name() end)
+  appName = okApp and appName or nil
   local spaceListIdx = indexOf(getRawSpacesForScreen(scr), op.targetSpace)
   if not spaceListIdx then
     return finishMove(op, false, "target Space is not on the window's display")
@@ -756,7 +857,7 @@ local function moveWindowViaMissionControl(op)
   -- 1. Wait for the opening animation to settle (presses mid-animation are ignored)
   opPoll(op, 0.05, 3.0, function()
     local display = getMissionControlDisplay(scr)
-    local _, tf = findWindowThumbnail(getMissionControlWindows(display), winTitle, winFrame)
+    local _, tf = findWindowThumbnail(getMissionControlWindows(display), winTitle, winFrame, appName)
     if not tf then return false end
     local key = string.format("%.0f,%.0f,%.0f,%.0f", tf.x, tf.y, tf.w, tf.h)
     stableTicks = (key == lastKey) and (stableTicks + 1) or 0
@@ -797,7 +898,7 @@ local function moveWindowViaMissionControl(op)
               dragMouseAlong(op, { { x = endPt.x + 1, y = endPt.y } }, 0.01, function()
                 opAfter(op, 0.06, function()
                   releaseMouse(op)
-                  -- 4. Verify, then follow the window by pressing the target Space
+                  -- 4. Verify, then follow the window to the target Space
                   opPoll(op, 0.05, 1.5, function()
                     return indexOf(hs.spaces.windowSpaces(win) or {}, op.targetSpace)
                   end, function(dropped)
@@ -805,20 +906,7 @@ local function moveWindowViaMissionControl(op)
                     if not dropped then
                       return finishMove(op, false, "Mission Control drop did not move the window")
                     end
-                    local sp = getMissionControlSpaces(getMissionControlDisplay(scr))[spaceListIdx]
-                    local okPress, pressed = pcall(function() return sp and sp:performAction("AXPress") end)
-                    trace(op, "AXPress target Space: " .. ((okPress and pressed) and "ok" or "failed"))
-                    if not (okPress and pressed) then
-                      pcall(hs.spaces.closeMissionControl)
-                      pcall(hs.spaces.gotoSpace, op.targetSpace)
-                    end
-                    op.mcOpen = false
-                    opPoll(op, 0.05, 2.5, function()
-                      return hs.spaces.focusedSpace() == op.targetSpace
-                    end, function(arrived)
-                      finishMove(op, true, arrived and "dragged in Mission Control"
-                        or "dragged in Mission Control (Space switch still pending)")
-                    end)
+                    followDroppedWindow(op, spaceListIdx)
                   end)
                 end)
               end)
@@ -888,7 +976,8 @@ end
 -- Space it lands on: one "Move left/right a space" hop for adjacent Spaces, else
 -- a direct "Switch to Desktop N" shortcut when enabled (single display only, where
 -- Desktop N is our workspace N), else one hop per Space.
-local function planSpaceSwitchKeys(scr, fromSpace, targetSpace, targetIdx)
+-- (Forward-declared above: the Mission Control path also uses it.)
+planSpaceSwitchKeys = function(scr, fromSpace, targetSpace, targetIdx)
   local onScreen = getRawSpacesForScreen(scr)
   local fromPos, toPos = indexOf(onScreen, fromSpace), indexOf(onScreen, targetSpace)
   if not fromPos or not toPos or fromPos == toPos then return nil end
@@ -1163,6 +1252,9 @@ workspaceMover = {
   moveFocusedWindowToAdjacentSpace = moveFocusedWindowToAdjacentSpace,
   ensureUserSpacesCount = ensureUserSpacesCount,
   getSymbolicHotkey = getSymbolicHotkey,
+  -- Pure helpers, exercised by ~/scripts/tests/test_macos_migration.sh over IPC
+  symbolicHotkeyFromEntry = symbolicHotkeyFromEntry,
+  findWindowThumbnail = findWindowThumbnail,
   showWorkspaceBanner = showWorkspaceBanner,
   isBannerVisible = function() return workspaceBanner ~= nil and workspaceBanner:isShowing() end,
   isBusy = function()
