@@ -796,11 +796,21 @@ echo "[Test 15] ~/.hammerspoon/init.lua macOS 15+ space-moving & multi-workspace
 
   # Live checks against the running Hammerspoon over hs.ipc (skipped when it isn't running)
   hs_cli="/Applications/Hammerspoon.app/Contents/Frameworks/hs/hs"
+  # hs_ipc <timeout_secs> <hs args...>: the hs CLI ignores -t while it shows its
+  # modal "Hammerspoon is not running, launch it?" alert, which happens whenever
+  # LaunchServices cannot see Hammerspoon from this session (e.g. a shell in a
+  # Background launchd session), so enforce a hard deadline with SIGALRM.
+  hs_ipc() {
+    local secs="$1"
+    shift
+    perl -e 'alarm shift; exec @ARGV or die "exec: $!"' "$(( secs + 2 ))" \
+      "${hs_cli}" -t "${secs}" -q "$@" </dev/null 2>&1
+  }
   if [[ -x "${hs_cli}" ]] && pgrep -x Hammerspoon >/dev/null 2>&1 &&
-     [[ "$("${hs_cli}" -t 3 -q -c 'return "pong"' </dev/null 2>/dev/null || true)" == *pong* ]]; then
-    hs_syntax="$("${hs_cli}" -t 5 -q -c "local f, e = loadfile('${hs_init}'); return f and 'SYNTAX_OK' or tostring(e)" </dev/null 2>&1 || true)"
+     [[ "$(hs_ipc 3 -c 'return "pong"' || true)" == *pong* ]]; then
+    hs_syntax="$(hs_ipc 5 -c "local f, e = loadfile('${hs_init}'); return f and 'SYNTAX_OK' or tostring(e)" || true)"
     assert_contains "init.lua compiles in Hammerspoon's Lua runtime (loadfile)" "SYNTAX_OK" "${hs_syntax}"
-    hs_api="$("${hs_cli}" -t 3 -q -c "return type(workspaceMover) == 'table' and type(workspaceMover.moveFocusedWindowToAdjacentSpace) == 'function' and 'API_OK' or 'API_MISSING'" </dev/null 2>&1 || true)"
+    hs_api="$(hs_ipc 3 -c "return type(workspaceMover) == 'table' and type(workspaceMover.moveFocusedWindowToAdjacentSpace) == 'function' and 'API_OK' or 'API_MISSING'" || true)"
     assert_contains "running Hammerspoon exposes workspaceMover move functions over IPC" "API_OK" "${hs_api}"
 
     # Pure helpers (resolution independent): a {enabled = 1} symbolichotkeys entry
@@ -840,7 +850,7 @@ el = wm.findWindowThumbnail(chromeThumbs, "Unrelated - Google Chrome", winFrame,
 table.insert(out, "ambiguous=" .. tostring(el == nil))
 return table.concat(out, " ")
 EOF
-    hs_helpers="$("${hs_cli}" -t 5 -q -c "return dofile('${TEST_TMP}/t15_helpers.lua')" </dev/null 2>&1 || true)"
+    hs_helpers="$(hs_ipc 5 -c "return dofile('${TEST_TMP}/t15_helpers.lua')" || true)"
     assert_eq "symbolichotkeys entries: {enabled=1} -> default Ctrl+Arrow, disabled -> none, custom kept" \
       "enabled-no-params=124/0x840000 missing=123/0x840000 disabled=nil custom=124/0x8C0000 desktop1-no-params=nil" \
       "$(echo "${hs_helpers}" | sed -n 's/ chrome-truncated=.*//p')"
@@ -848,7 +858,7 @@ EOF
       "chrome-truncated=true chrome-newtab=true exact=true ambiguous=true" \
       "$(echo "${hs_helpers}" | sed -n 's/.*\(chrome-truncated=\)/\1/p')"
   else
-    echo "  [SKIP] live Hammerspoon IPC checks (Hammerspoon not running or hs.ipc unavailable)"
+    echo "  [SKIP] live Hammerspoon IPC checks (Hammerspoon not running, hs.ipc unavailable, or not visible to LaunchServices from this session)"
   fi
 }
 
