@@ -52,3 +52,8 @@ else
 fi
 
 [ -s "${HOME}/.cargo/env" ] && . "${HOME}/.cargo/env"
+
+# Finish with a successful command: the prompt's [Exit: ...] shows PIPESTATUS,
+# which at the first prompt still holds the last startup test above (1 when
+# ~/.cargo/env is absent).
+true

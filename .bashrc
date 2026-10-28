@@ -12,7 +12,24 @@ if [[ -n "${TMUX:-}" ]] && command -v tmux &>/dev/null; then
   tmux set-environment -gu POSIX_PEDANTIC 2>/dev/null || true
   tmux set-environment -gu ENV 2>/dev/null || true
   tmux set-environment -gu KITTY_BASH_INJECT 2>/dev/null || true
+  tmux set-environment -gu PROMPT_COMMAND 2>/dev/null || true
 fi
+# PROMPT_COMMAND names shell functions, which child processes never inherit, so
+# it must never be exported. An exported copy (e.g. captured in the tmux server's
+# global environment when a Terminal.app login shell started tmux) makes every
+# new pane run /etc/bashrc_Apple_Terminal's update_terminal_cwd and
+# shell_session_history_check hooks without their definitions:
+#   -bash: update_terminal_cwd: command not found
+# Un-export it and drop inherited Apple Terminal hooks not defined in this shell.
+export -n PROMPT_COMMAND 2>/dev/null || true
+for _pc_hook in update_terminal_cwd shell_session_history_check; do
+  if ! declare -F "${_pc_hook}" &>/dev/null; then
+    PROMPT_COMMAND="${PROMPT_COMMAND//${_pc_hook}; /}"
+    PROMPT_COMMAND="${PROMPT_COMMAND//${_pc_hook};/}"
+    PROMPT_COMMAND="${PROMPT_COMMAND//${_pc_hook}/}"
+  fi
+done
+unset _pc_hook
 # If /etc/profile -> /etc/bashrc ran under --posix before ~/.bashrc turned off
 # POSIX mode, /etc/bash.bashrc.d/skippy.sh failed to define skippy::init; reload
 # it cleanly now that POSIX mode is disabled.
@@ -52,6 +69,7 @@ function tmux_attach_or_create_initial_session() {
   "${_tmux}" set-environment -gu POSIX_PEDANTIC 2>/dev/null || true
   "${_tmux}" set-environment -gu ENV 2>/dev/null || true
   "${_tmux}" set-environment -gu KITTY_BASH_INJECT 2>/dev/null || true
+  "${_tmux}" set-environment -gu PROMPT_COMMAND 2>/dev/null || true
 
   if [ -z "${TMUX_INIT_SESSION:-}" ]; then
     log_debug "tmux init: attaching to default session"
@@ -81,7 +99,8 @@ export HISTFILESIZE=200000
 # history -a: append this session's new history elements to the history file
 # history -c: clear this session's history list
 # history -r: read the history file's entries and make them the current history list
-export PROMPT_COMMAND="${PROMPT_COMMAND:+$PROMPT_COMMAND$'\n'}"
+# (Not exported: PROMPT_COMMAND must stay local to this shell; see top of file.)
+PROMPT_COMMAND="${PROMPT_COMMAND:+$PROMPT_COMMAND$'\n'}"
 
 # If set, the pattern "**" used in a pathname expansion context will
 # match all files and zero or more directories and subdirectories.
