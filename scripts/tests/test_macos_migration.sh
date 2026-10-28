@@ -485,6 +485,92 @@ echo "[Test 11] ~/scripts/setup_work_environment.sh Darwin port 3335 & sed gcert
   hours="$(echo "SSH Certificate status: VALID (expires in 17h 42m)" | \
     sed -n 's/.*expires in \([0-9][0-9]*\)h.*/\1/p')"
   assert_eq "Portable sed extracts remaining gcert hours without grep -P" "17" "${hours}"
+
+  # macOS (macFUSE FSKit): sshfs cannot fork after mounting and stays in the
+  # foreground for the life of the mount, so it must be backgrounded instead of
+  # blocking. FSKit volumes also stop listing their root directory ~30 s after
+  # mounting, so the remote home is mounted once on ~/.gcloud_home and ~/notes,
+  # ~/gtd and ~/gcloud_tmp become symlinks into it.
+  fake_home="${TEST_TMP}/t11_home"
+  mock_bin="${TEST_TMP}/t11_bin"
+  # ~/notes: empty leftover mount point directory from the per-folder layout
+  mkdir -p "${fake_home}/lib" "${mock_bin}" "${fake_home}/notes"
+  ln -sf "${HOME}/lib/os_compat.sh" "${fake_home}/lib/os_compat.sh"
+  cat << 'EOF' > "${fake_home}/lib/log_lib.sh"
+log::info() { :; }
+log::warn() { echo "[WARN] $*" >&2; }
+log::error() { echo "[ERROR] $*" >&2; }
+log::fatal() { echo "[FATAL] $*" >&2; exit 1; }
+log::debug() { :; }
+EOF
+  export T11_MOUNTED="${TEST_TMP}/t11_mounted"
+  : > "${T11_MOUNTED}"
+  : > "${T11_MOUNTED}.calls"
+  : > "${T11_MOUNTED}.pids"
+  cat << 'EOF' > "${mock_bin}/sshfs"
+#!/usr/bin/env bash
+echo "$*" >> "${T11_MOUNTED}.calls"
+echo "$$" >> "${T11_MOUNTED}.pids"
+echo "${!#}" >> "${T11_MOUNTED}"
+sleep 60 &
+trap 'kill $! 2>/dev/null; exit 0' TERM
+wait
+EOF
+  cat << 'EOF' > "${mock_bin}/mount"
+#!/usr/bin/env bash
+while read -r mp; do
+  [[ -n "${mp}" ]] && echo "macfuse://mock on ${mp} (macfuse, fskit)"
+done < "${T11_MOUNTED}"
+EOF
+  chmod +x "${mock_bin}/sshfs" "${mock_bin}/mount"
+
+  t11_run_mount() {
+    HOME="${fake_home}" PATH="${mock_bin}:${PATH}" OS_COMPAT_UNAME_S="Darwin" \
+      SSHFS_LOG_DIR="${TEST_TMP}" SWE_SCRIPT="${HOME}/scripts/setup_work_environment.sh" \
+      perl -e 'alarm 30; exec @ARGV' bash -c '
+        source "${SWE_SCRIPT}"
+        mount_remote_gcloud_folders
+      ' </dev/null >/dev/null 2>&1
+  }
+  t11_links() {
+    local name
+    for name in notes gtd gcloud_tmp; do
+      printf '%s=%s ' "${name}" "$(readlink "${fake_home}/${name}" 2>/dev/null || echo "not-a-symlink")"
+    done
+  }
+  t11_expected_links="notes=${fake_home}/.gcloud_home/notes gtd=${fake_home}/.gcloud_home/gtd gcloud_tmp=${fake_home}/.gcloud_home/tmp "
+
+  t11_rc=0
+  t11_start="${SECONDS}"
+  t11_run_mount || t11_rc=$?
+  t11_elapsed=$(( SECONDS - t11_start ))
+  assert_eq "mount_remote_gcloud_folders returns without blocking on FSKit sshfs (rc, fast)" \
+    "0|fast" "${t11_rc}|$( (( t11_elapsed < 15 )) && echo fast || echo "slow:${t11_elapsed}s")"
+  assert_eq "macOS mounts the remote home once, on ~/.gcloud_home" \
+    "${fake_home}/.gcloud_home" "$(tr '\n' ' ' < "${T11_MOUNTED}" | sed 's/ $//')"
+  assert_contains "macOS sshfs mounts the remote home directory" \
+    ":/usr/local/google/home/${USER} ${fake_home}/.gcloud_home" "$(cat "${T11_MOUNTED}.calls")"
+  assert_contains "macOS sshfs mounts use the macFUSE FSKit backend" \
+    "-o backend=fskit" "$(cat "${T11_MOUNTED}.calls")"
+  assert_eq "~/notes (empty mount point dir), ~/gtd and ~/gcloud_tmp become symlinks into ~/.gcloud_home" \
+    "${t11_expected_links}" "$(t11_links)"
+
+  t11_rc=0
+  t11_run_mount || t11_rc=$?
+  assert_eq "Re-running keeps the existing mount and symlinks (rc, sshfs calls, links)" \
+    "0|1|${t11_expected_links}" "${t11_rc}|$(wc -l < "${T11_MOUNTED}.calls" | tr -d ' ')|$(t11_links)"
+
+  rm -f "${fake_home}/gtd"
+  mkdir -p "${fake_home}/gtd"
+  echo "local data" > "${fake_home}/gtd/keep.txt"
+  t11_rc=0
+  t11_run_mount || t11_rc=$?
+  assert_eq "A non-empty ~/gtd directory is left alone (rc=1, contents kept)" \
+    "1|local data" "${t11_rc}|$(cat "${fake_home}/gtd/keep.txt" 2>/dev/null)"
+
+  while read -r t11_pid; do
+    kill -TERM "${t11_pid}" 2>/dev/null || true
+  done < "${T11_MOUNTED}.pids"
 }
 
 # ------------------------------------------------------------------------------

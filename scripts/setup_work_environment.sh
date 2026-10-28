@@ -21,6 +21,14 @@ function get_local_mount_folder_name {
   esac
 }
 
+# macOS (macFUSE 5, FSKit backend): about 30 s after mounting, the ROOT
+# directory of an sshfs volume stops listing (ls shows nothing and new entries
+# are not found), while every subdirectory keeps listing and updating normally
+# (seen with macFUSE 5.4.0 + SSHFS 3.7.5 on macOS 26.7). So on macOS the remote
+# home directory is mounted once on GCLOUD_HOME_MOUNT, and ~/notes, ~/gtd and
+# ~/gcloud_tmp are symlinks into it (see mount_gcloud_home_and_link_folders).
+GCLOUD_HOME_MOUNT="${HOME}/.gcloud_home"
+
 
 GCLOUD_HOST="${USER}.c.googlers.com"
 OFFICE_HOST="${USER}.mtv.corp.google.com"
@@ -81,8 +89,123 @@ function is_folder_mounted {
   fi
 }
 
+# Mounts one remote gcloud folder with sshfs. On macOS, macFUSE's FSKit backend
+# (-o backend=fskit) cannot fork after mounting ("fuse: forking after mount is
+# not supported"), so sshfs stays in the foreground for the life of the mount
+# and would block the folder loop on its first mount. Start it in the
+# background and wait for the mount point instead. Never SIGKILL it: a killed
+# FSKit sshfs leaves a stale mount that hangs every access until force-unmounted.
+function sshfs_mount_gcloud_folder {
+  local remote_folder="$1"
+  local mount_point="$2"
+  local sshfs_opts=(-o compression=yes -o auto_cache -o reconnect)
+  if ! os::is_macos; then
+    sshpass -p "$(get_secret)" sshfs "${sshfs_opts[@]}" \
+      "${USER}@${GCLOUD_HOST}:${remote_folder}" "${mount_point}"
+    return $?
+  fi
+
+  local log_file
+  log_file="${SSHFS_LOG_DIR:-/tmp}/sshfs-$(basename "${mount_point}").log"
+  if ! command -v sshfs > /dev/null 2>&1; then
+    log::warn "sshfs not found: install macFUSE and SSHFS from https://macfuse.github.io/"
+    return 1
+  fi
+  # setsid: detach sshfs (and the ssh child it spawns for sftp) from the
+  # caller's terminal session, so a SIGHUP from closing the terminal or tmux
+  # pane cannot kill the ssh child and leave an empty, disconnected mount.
+  ( sshpass -p "$(get_secret)" perl -MPOSIX -e 'POSIX::setsid(); exec @ARGV or die "exec: $!"' \
+      sshfs -o backend=fskit "${sshfs_opts[@]}" \
+      "${USER}@${GCLOUD_HOST}:${remote_folder}" "${mount_point}" ) \
+    >> "${log_file}" 2>&1 < /dev/null &
+  local sshfs_job=$!
+  local _
+  for _ in {1..60}; do
+    if os::is_mounted "${mount_point}"; then
+      return 0
+    fi
+    # sshfs exited without mounting (e.g. auth or remote path failure)
+    kill -0 "${sshfs_job}" 2>/dev/null || break
+    sleep 1
+  done
+  log::warn "sshfs did not mount ${mount_point} (see ${log_file})."
+  # Stop a still-pending attempt gracefully (SIGTERM lets FUSE unmount cleanly).
+  pkill -TERM -u "$(id -u)" -f "sshfs.*[[:space:]]${mount_point}\$" 2>/dev/null || true
+  return 1
+}
+
+# Makes ~/<local folder name> a symlink to GCLOUD_HOME_MOUNT/<folder> (macOS).
+# A per-folder sshfs mount left on it by older versions of this script is
+# unmounted and its empty mount point directory replaced. Anything else (a
+# non-empty directory, a file, or a symlink pointing elsewhere) is left alone.
+function link_gcloud_folder {
+  local folder="$1"
+  local link
+  link="${HOME}/$(get_local_mount_folder_name "${folder}")"
+  local target="${GCLOUD_HOME_MOUNT}/${folder}"
+  if [[ -L "${link}" ]]; then
+    if [[ "$(readlink "${link}")" == "${target}" ]]; then
+      return 0
+    fi
+    log::warn "${link} is a symlink to $(readlink "${link}"), not ${target}; leaving it alone."
+    return 1
+  fi
+  if [[ -d "${link}" ]]; then
+    if os::is_mounted "${link}"; then
+      log::info "Unmounting the per-folder sshfs mount on ${link}"
+      if ! umount "${link}"; then
+        log::warn "Unable to unmount ${link}; not replacing it with a symlink to ${target}."
+        return 1
+      fi
+    fi
+    if ! rmdir "${link}" 2>/dev/null; then
+      log::warn "${link} is a non-empty directory; not replacing it with a symlink to ${target}."
+      return 1
+    fi
+  elif [[ -e "${link}" ]]; then
+    log::warn "${link} exists and is not a directory; not replacing it with a symlink to ${target}."
+    return 1
+  fi
+  log::info "Linking ${link} -> ${target}"
+  ln -s "${target}" "${link}"
+}
+
+# macOS: mounts the remote home directory once on GCLOUD_HOME_MOUNT and links
+# ~/notes, ~/gtd and ~/gcloud_tmp into it, because macFUSE FSKit volumes stop
+# listing their root directory shortly after mounting (see GCLOUD_HOME_MOUNT).
+function mount_gcloud_home_and_link_folders {
+  local remote_home="/usr/local/google/home/${USER}"
+  if ! os::is_mounted "${GCLOUD_HOME_MOUNT}"; then
+    mkdir -p "${GCLOUD_HOME_MOUNT}"
+    log::info "Mounting ${GCLOUD_HOST}:${remote_home} on ${GCLOUD_HOME_MOUNT}"
+    if ! sshfs_mount_gcloud_folder "${remote_home}" "${GCLOUD_HOME_MOUNT}"; then
+      log::warn "Unable to mount ${GCLOUD_HOME_MOUNT}. Unmounting and remounting once."
+      if declare -F os::unmount_lazy >/dev/null 2>&1; then
+        os::unmount_lazy "${GCLOUD_HOME_MOUNT}"
+      else
+        umount "${GCLOUD_HOME_MOUNT}"
+      fi
+      if ! sshfs_mount_gcloud_folder "${remote_home}" "${GCLOUD_HOME_MOUNT}"; then
+        return 1
+      fi
+    fi
+  fi
+  local folder
+  local rc=0
+  for folder in "${GCLOUD_FOLDERS[@]}"; do
+    link_gcloud_folder "${folder}" || rc=1
+    # attempt to list directory contents in order to force reconnect of the SSHFS mount
+    ls "${HOME}/$(get_local_mount_folder_name "${folder}")/" &>/dev/null
+  done
+  return "${rc}"
+}
+
 function mount_remote_gcloud_folders {
   log::info "Re-mounting (if necessary) folders from host ${USER}.c.googlers.com"
+  if declare -F os::is_macos >/dev/null 2>&1 && os::is_macos; then
+    mount_gcloud_home_and_link_folders
+    return $?
+  fi
   for folder in "${GCLOUD_FOLDERS[@]}"; do
     local local_folder_name
     local_folder_name="$(get_local_mount_folder_name "${folder}")"
@@ -92,15 +215,14 @@ function mount_remote_gcloud_folders {
       fi
       local remote_folder="/usr/local/google/home/${USER}/${folder}"
       log::info "Mounting ${GCLOUD_HOST}:${remote_folder} on ${HOME}/${local_folder_name}"
-      sshpass -p "$(get_secret)" sshfs -o compression=yes -o auto_cache -o reconnect "${USER}@${GCLOUD_HOST}:${remote_folder}" "${HOME}/${local_folder_name}"
-      if [[ $? -ne 0 ]]; then
+      if ! sshfs_mount_gcloud_folder "${remote_folder}" "${HOME}/${local_folder_name}"; then
         log::warn "Unable to mount folder ${HOME}/${folder}. Unmounting and remounting once."
         if declare -F os::unmount_lazy >/dev/null 2>&1; then
           os::unmount_lazy "${HOME}/${local_folder_name}"
         else
           umount "${HOME}/${local_folder_name}"
         fi
-        sshpass -p "$(get_secret)" sshfs -o compression=yes -o auto_cache -o reconnect "${USER}@${GCLOUD_HOST}:${remote_folder}" "${HOME}/${local_folder_name}"
+        sshfs_mount_gcloud_folder "${remote_folder}" "${HOME}/${local_folder_name}"
       fi
     fi
     # attempt to list directory contents in order to force reconnect of the SSHFS mount
