@@ -24,7 +24,7 @@
                         ]
                     },
                     {
-                        "description": "Glove80 in Google Chrome: Ctrl+T/N/W/L/F/1-9 and Ctrl+Shift+T/A -> Cmd (Linux browser shortcuts)",
+                        "description": "Glove80 in Google Chrome: Ctrl+T/N/W/L/F/R/1-9 and Ctrl+Shift+T/A -> Cmd (Linux browser shortcuts)",
                         "manipulators": [
                             {
                                 "conditions": [
@@ -114,6 +114,24 @@
                                     "modifiers": { "mandatory": ["control"], "optional": ["caps_lock"] }
                                 },
                                 "to": [{ "key_code": "f", "modifiers": ["left_command"] }],
+                                "type": "basic"
+                            },
+                            {
+                                "conditions": [
+                                    {
+                                        "bundle_identifiers": ["^com\\.google\\.Chrome$"],
+                                        "type": "frontmost_application_if"
+                                    },
+                                    {
+                                        "identifiers": [{ "product_id": 10203, "vendor_id": 5824 }],
+                                        "type": "device_if"
+                                    }
+                                ],
+                                "from": {
+                                    "key_code": "r",
+                                    "modifiers": { "mandatory": ["control"], "optional": ["caps_lock"] }
+                                },
+                                "to": [{ "key_code": "r", "modifiers": ["left_command"] }],
                                 "type": "basic"
                             },
                             {
