@@ -7,7 +7,8 @@
 --      {1.0, 0.75, 0.666, 0.5, 0.334, 0.25} on WM_MOD (Ctrl+Cmd) + Arrows/K.
 --   2. Cross-monitor window movement & dual-screen spanning (both-screens) on
 --      both WFH (<Ctrl><Cmd>Page_Up) and MTV (<Alt><Cmd>Left/Right/Page_Up).
---   3. 6-Space workspace navigation (<Ctrl><Alt>1..6) and window migration that
+--   3. 6-Space workspace navigation (<Ctrl><Alt>1..6, <Ctrl><Alt>Left/Right; left to
+--      macOS when its own shortcut uses the same keys) and window migration that
 --      follows the window (<Ctrl><Shift><Alt>Left/Right and <Ctrl><Shift><Alt>1..6).
 --   4. Sticky Window toggle (<Alt>F6) + automatic Sticky Kitty watcher via
 --      hs.spaces.watcher (bypassing macOS SIP restrictions on third-party apps).
@@ -220,8 +221,8 @@ keepHotkey(WM_MOD,       "pagedown", function()
 end)
 
 -- -----------------------------------------------------------------------------
--- 3. 6-Space Workspace Switching (<Ctrl><Alt>1..6) & Window-to-Space Moves that
---    follow the window (<Ctrl><Shift><Alt>Left/Right & <Ctrl><Shift><Alt>1..6)
+-- 3. 6-Space Workspace Switching (<Ctrl><Alt>1..6 & Left/Right) & Window-to-Space
+--    Moves that follow the window (<Ctrl><Shift><Alt>Left/Right & <Ctrl><Shift><Alt>1..6)
 -- -----------------------------------------------------------------------------
 -- macOS 14.5+ (15 Sequoia, 26 Tahoe) NOPs CGSMoveWindowsToManagedSpace, so
 -- hs.spaces.moveWindowToSpace() returns true while the window stays put. Windows
@@ -254,6 +255,9 @@ local spaceMoveLog = hs.logger.new("spacemove", "info")
 
 local evTypes = hs.eventtap.event.types
 local evProps = hs.eventtap.event.properties
+-- Stamped (eventSourceUserData) on keystrokes Hammerspoon posts itself, so the
+-- workspace-shortcut key tap ignores them instead of treating them as user presses.
+local SYNTHETIC_EVENT_TAG = 0x48534D56  -- "HSMV"
 local nextMouseEventNumber = 32000
 
 local function allocMouseEventNumber()
@@ -416,6 +420,31 @@ local function showBannerForSpace(scr, spaceId, detail)
   if idx then showWorkspaceBanner(scr, idx, #spaces, detail) end
 end
 
+-- Desktop switches complete asynchronously (macOS's own shortcuts in ~0.3s,
+-- gotoSpace() via Mission Control in ~1s), so the banner waits for the focused
+-- Space to actually change: every change within the armed window gets a banner
+-- (holding or repeating a shortcut moves several Desktops).
+local switchBannerArm = { timer = nil, deadline = 0, lastSpace = nil, scr = nil }
+
+local function armSwitchBanner(scr, windowSec)
+  local arm = switchBannerArm
+  arm.scr = scr or hs.screen.mainScreen()
+  arm.deadline = math.max(arm.deadline, hs.timer.secondsSinceEpoch() + (windowSec or 1.6))
+  if arm.timer then return end
+  arm.lastSpace = hs.spaces.focusedSpace()
+  arm.timer = hs.timer.doEvery(0.03, function()
+    local fs = hs.spaces.focusedSpace()
+    if fs and fs ~= arm.lastSpace then
+      arm.lastSpace = fs
+      showBannerForSpace(arm.scr, fs)
+    end
+    if hs.timer.secondsSinceEpoch() >= arm.deadline then
+      arm.timer:stop()
+      arm.timer = nil
+    end
+  end)
+end
+
 -- macOS Spaces shortcuts (System Settings > Keyboard > Keyboard Shortcuts >
 -- Mission Control) live in com.apple.symbolichotkeys as {ascii, keycode, flags},
 -- where flags use the CGEventFlags bits (0x20000 shift, 0x40000 ctrl, 0x80000 alt,
@@ -429,12 +458,16 @@ local SYMBOLIC_HOTKEY_DEFAULTS = {        -- macOS defaults when the plist has n
 }
 local HOTKEY_MOD_FLAGS = { shift = 0x20000, ctrl = 0x40000, alt = 0x80000, cmd = 0x100000 }
 local MODIFIER_FLAGS_MASK = 0x1E0000      -- shift | ctrl | alt | cmd
-local symbolicHotkeysCache, symbolicHotkeysReadAt = nil, 0
+local SYMBOLIC_HOTKEYS_PLIST = os.getenv("HOME") .. "/Library/Preferences/com.apple.symbolichotkeys.plist"
+local symbolicHotkeysCache, symbolicHotkeysReadAt, symbolicHotkeysMtime = nil, 0, nil
 
 local function readSymbolicHotkeys()
   local now = hs.timer.secondsSinceEpoch()
-  -- Cached for 5 minutes; also invalidated whenever a posted shortcut has no effect
-  if symbolicHotkeysCache and (now - symbolicHotkeysReadAt) < 300 then
+  local mtime = hs.fs.attributes(SYMBOLIC_HOTKEYS_PLIST, "modification")
+  -- Cached until the plist changes on disk (System Settings edits are flushed there
+  -- within seconds), for at most 5 minutes, and invalidated whenever a posted
+  -- shortcut has no effect
+  if symbolicHotkeysCache and mtime == symbolicHotkeysMtime and (now - symbolicHotkeysReadAt) < 300 then
     return symbolicHotkeysCache
   end
   local data = nil
@@ -445,10 +478,11 @@ local function readSymbolicHotkeys()
     if ok and type(parsed) == "table" then data = parsed end
   end
   if not data then
-    data = hs.plist.read(os.getenv("HOME") .. "/Library/Preferences/com.apple.symbolichotkeys.plist")
+    data = hs.plist.read(SYMBOLIC_HOTKEYS_PLIST)
   end
   symbolicHotkeysCache = (type(data) == "table" and data.AppleSymbolicHotKeys) or {}
   symbolicHotkeysReadAt = now
+  symbolicHotkeysMtime = mtime
   return symbolicHotkeysCache
 end
 
@@ -588,9 +622,11 @@ local function postSymbolicHotkey(op, hotkey)
   end
   local down = hs.eventtap.event.newKeyEvent(hotkey.keycode, true)
   down:rawFlags(hotkey.flags)
+  down:setProperty(evProps.eventSourceUserData, SYNTHETIC_EVENT_TAG)
   down:post()
   local up = hs.eventtap.event.newKeyEvent(hotkey.keycode, false)
   up:rawFlags(hotkey.flags)
+  up:setProperty(evProps.eventSourceUserData, SYNTHETIC_EVENT_TAG)
   up:post()
   local remaining = mods
   for _, mod in ipairs({ "shift", "cmd", "alt", "ctrl" }) do
@@ -1204,15 +1240,32 @@ local function switchToWorkspaceIndex(idx)
   end
   local targetSpace = spaces[idx]
   if targetSpace then
-    showWorkspaceBanner(scr, idx, #spaces)
-    if targetSpace == hs.spaces.activeSpaceOnScreen(scr) then return end
-    -- Let the banner paint before gotoSpace() busy-waits on Mission Control
+    if targetSpace == hs.spaces.activeSpaceOnScreen(scr) then
+      showWorkspaceBanner(scr, idx, #spaces)
+      return
+    end
+    armSwitchBanner(scr, 3.0)
+    -- Deferred so the hotkey callback returns before gotoSpace() busy-waits on Mission Control
     if workspaceSwitchTimer then workspaceSwitchTimer:stop() end
     workspaceSwitchTimer = hs.timer.doAfter(0.01, function()
       workspaceSwitchTimer = nil
       hs.spaces.gotoSpace(targetSpace)
     end)
   end
+end
+
+-- Hammerspoon's own <Ctrl><Alt>Left/Right: switch to the neighbouring Desktop.
+local function switchToAdjacentWorkspace(delta)
+  local scr = hs.screen.mainScreen()
+  local spaces = getOrderedUserSpacesForCurrentScreen(scr)
+  local cur = indexOf(spaces, hs.spaces.activeSpaceOnScreen(scr) or hs.spaces.focusedSpace())
+  if not cur then return end
+  local target = cur + delta
+  if target < 1 or target > #spaces then
+    showWorkspaceBanner(scr, cur, #spaces, string.format("Already at Space %d of %d", cur, #spaces))
+    return
+  end
+  switchToWorkspaceIndex(target)
 end
 
 local function moveFocusedWindowToWorkspaceIndex(idx)
@@ -1223,10 +1276,154 @@ local function moveFocusedWindowToAdjacentSpace(delta)
   requestSpaceMove("delta", delta)
 end
 
+-- -- Desktop-switch shortcuts shared with macOS -----------------------------------
+-- <Ctrl><Alt>1..6 and <Ctrl><Alt>Left/Right switch Desktops. When macOS's own
+-- "Switch to Desktop N" (118..123) or "Move left/right a space" (79/81) shortcut
+-- is enabled with the *same* keys for the same action, macOS does the switch
+-- natively (~0.3s, no Mission Control flash) and Hammerspoon only shows the
+-- banner once the Space has changed:
+--   * its own hotkey for that binding stays disabled (macOS fires "Switch to
+--     Desktop N" alongside a Hammerspoon hotkey, which used to add a slow
+--     Mission Control gotoSpace(); and it holds Ctrl+Alt+Arrow exclusively, so a
+--     Hammerspoon hotkey there cannot even be registered), and
+--   * a passive key tap that never consumes events notices the keypress.
+-- Bindings macOS does not share keep the Hammerspoon hotkey (gotoSpace + banner).
+-- Ownership is re-checked when com.apple.symbolichotkeys.plist changes on disk.
+local switchBindings = {}
+
+-- Pure: does the com.apple.symbolichotkeys entry for symbolicId (nil = absent)
+-- bind exactly this keycode + modifiers (fn and other non-modifier bits ignored)?
+local function symbolicEntryMatches(symbolicId, entry, keycode, modFlags)
+  local hk = symbolicHotkeyFromEntry(symbolicId, entry)
+  return hk ~= nil and hk.keycode == keycode and (hk.flags & MODIFIER_FLAGS_MASK) == modFlags
+end
+
+local function macOSOwnsBinding(b)
+  return symbolicEntryMatches(b.symbolicId, readSymbolicHotkeys()[tostring(b.symbolicId)], b.keycode, b.flags)
+end
+
+local function addSwitchBinding(mods, key, symbolicId, action, fn)
+  local flags = 0
+  for _, m in ipairs(mods) do
+    flags = flags | (HOTKEY_MOD_FLAGS[m] or 0)
+  end
+  local hk = hs.hotkey.new(mods, key, fn)
+  table.insert(_G.HS_KEEPALIVE.hotkeys, hk)
+  table.insert(switchBindings, {
+    key = key, keycode = hs.keycodes.map[key:lower()], flags = flags,
+    symbolicId = symbolicId, action = action, hk = hk, enabled = false, ownedByMacOS = nil,
+  })
+end
+
+-- Enables each Hammerspoon hotkey only where macOS does not bind the same keys.
+local function syncSwitchBindings()
+  for _, b in ipairs(switchBindings) do
+    local owned = macOSOwnsBinding(b)
+    if owned and b.enabled then
+      b.hk:disable()
+      b.enabled = false
+    elseif not owned and not b.enabled then
+      b.enabled = b.hk:enable() ~= nil
+    end
+    if owned ~= b.ownedByMacOS then
+      spaceMoveLog.i(string.format("Ctrl+Alt+%s: %s", b.key, owned
+        and "macOS shortcut has the same keys; macOS switches, Hammerspoon shows the banner"
+        or "handled by Hammerspoon"))
+    end
+    b.ownedByMacOS = owned
+  end
+end
+
+-- macOS performs the switch itself: show the banner once it lands, or right away
+-- when nothing will move (already on Desktop N). At the first/last Desktop, macOS
+-- 26 wraps around ("Move left" on Desktop 1 goes to the last one) while older
+-- versions stay put, so wait to see which happened before saying "Already at".
+local switchEdgeTimer = nil
+
+local function onMacOSSwitchShortcut(action)
+  local scr = hs.screen.mainScreen()
+  local spaces = getOrderedUserSpacesForCurrentScreen(scr)
+  local current = hs.spaces.activeSpaceOnScreen(scr) or hs.spaces.focusedSpace()
+  local cur = indexOf(spaces, current)
+  if action.kind == "index" then
+    if spaces[action.idx] == current then
+      return showWorkspaceBanner(scr, action.idx, #spaces)
+    end
+    if not spaces[action.idx] then
+      -- macOS ignores Desktops that do not exist; create it and switch ourselves
+      return switchToWorkspaceIndex(action.idx)
+    end
+  elseif cur and (cur + action.delta < 1 or cur + action.delta > #spaces) then
+    if switchEdgeTimer then switchEdgeTimer:stop() end
+    switchEdgeTimer = hs.timer.doAfter(0.9, function()
+      switchEdgeTimer = nil
+      if (hs.spaces.activeSpaceOnScreen(scr) or hs.spaces.focusedSpace()) == current then
+        showWorkspaceBanner(scr, cur, #spaces, string.format("Already at Space %d of %d", cur, #spaces))
+      end
+    end)
+  end
+  armSwitchBanner(scr, 1.6)
+end
+
 for i = 1, 6 do
-  bindWorkspaceHotkey({"ctrl", "alt"}, tostring(i), function()
-    switchToWorkspaceIndex(i)
-  end)
+  addSwitchBinding({"ctrl", "alt"}, tostring(i), SYMBOLIC_SWITCH_TO_DESKTOP_1 + i - 1,
+    { kind = "index", idx = i }, function() switchToWorkspaceIndex(i) end)
+end
+addSwitchBinding({"ctrl", "alt"}, "Left", SYMBOLIC_MOVE_LEFT_SPACE,
+  { kind = "delta", delta = -1 }, function() switchToAdjacentWorkspace(-1) end)
+addSwitchBinding({"ctrl", "alt"}, "Right", SYMBOLIC_MOVE_RIGHT_SPACE,
+  { kind = "delta", delta = 1 }, function() switchToAdjacentWorkspace(1) end)
+syncSwitchBindings()
+
+local switchShortcutTimer = nil
+local switchShortcutTap = hs.eventtap.new({ evTypes.keyDown }, function(e)
+  local flags = e:getFlags()
+  if not (flags.ctrl and flags.alt) or flags.cmd or flags.shift then return false end
+  if e:getProperty(evProps.eventSourceUserData) == SYNTHETIC_EVENT_TAG or spaceMove.op then
+    return false
+  end
+  local keycode = e:getKeyCode()
+  for _, b in ipairs(switchBindings) do
+    if b.keycode == keycode then
+      if macOSOwnsBinding(b) ~= b.ownedByMacOS then syncSwitchBindings() end
+      local action = b.action
+      if b.ownedByMacOS then
+        -- Let the keystroke through to macOS; banner logic runs after the tap returns
+        switchShortcutTimer = hs.timer.doAfter(0, function()
+          switchShortcutTimer = nil
+          onMacOSSwitchShortcut(action)
+        end)
+      elseif not b.enabled then
+        -- Neither macOS nor a Hammerspoon hotkey handles it (registration failed)
+        switchShortcutTimer = hs.timer.doAfter(0, function()
+          switchShortcutTimer = nil
+          if action.kind == "index" then switchToWorkspaceIndex(action.idx)
+          else switchToAdjacentWorkspace(action.delta) end
+        end)
+        return true
+      end
+      return false
+    end
+  end
+  return false
+end)
+switchShortcutTap:start()
+_G.HS_KEEPALIVE.taps.switchShortcutTap = switchShortcutTap
+
+-- Re-check which shortcuts macOS owns whenever System Settings rewrites the plist
+local switchShortcutsWatcher = hs.pathwatcher.new(os.getenv("HOME") .. "/Library/Preferences", function(paths)
+  for _, p in ipairs(paths) do
+    if p:find("com.apple.symbolichotkeys.plist", 1, true) then
+      symbolicHotkeysCache = nil
+      syncSwitchBindings()
+      return
+    end
+  end
+end)
+switchShortcutsWatcher:start()
+_G.HS_KEEPALIVE.watchers.switchShortcutsWatcher = switchShortcutsWatcher
+
+for i = 1, 6 do
   bindWorkspaceHotkey({"ctrl", "shift", "alt"}, tostring(i), function()
     moveFocusedWindowToWorkspaceIndex(i)
   end)
@@ -1254,7 +1451,18 @@ workspaceMover = {
   getSymbolicHotkey = getSymbolicHotkey,
   -- Pure helpers, exercised by ~/scripts/tests/test_macos_migration.sh over IPC
   symbolicHotkeyFromEntry = symbolicHotkeyFromEntry,
+  symbolicEntryMatches = symbolicEntryMatches,
   findWindowThumbnail = findWindowThumbnail,
+  -- e.g. hs -c 'return hs.inspect(workspaceMover.switchShortcutStatus())'
+  switchShortcutStatus = function()
+    local out = {}
+    for _, b in ipairs(switchBindings) do
+      out["Ctrl+Alt+" .. b.key] = b.ownedByMacOS and "macOS (banner only)"
+        or (b.enabled and "Hammerspoon hotkey" or "Hammerspoon via key tap")
+    end
+    out.keyTap = switchShortcutTap:isEnabled() and "enabled" or "DISABLED"
+    return out
+  end,
   showWorkspaceBanner = showWorkspaceBanner,
   isBannerVisible = function() return workspaceBanner ~= nil and workspaceBanner:isShowing() end,
   isBusy = function()
@@ -2125,6 +2333,9 @@ tapWatchdog = hs.timer.doEvery(2.0, function()
   end
   if altDragTap and not altDragTap:isEnabled() and not (spaceMove and spaceMove.op) then
     altDragTap:start()
+  end
+  if switchShortcutTap and not switchShortcutTap:isEnabled() then
+    switchShortcutTap:start()
   end
 end)
 _G.HS_KEEPALIVE.timers.tapWatchdog = tapWatchdog

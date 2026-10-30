@@ -771,6 +771,14 @@ echo "[Test 15] ~/.hammerspoon/init.lua macOS 15+ space-moving & multi-workspace
     bash -c "grep -q 'local function showWorkspaceBanner' '${hs_init}' && grep -q 'canJoinAllSpaces' '${hs_init}'"
   assert_true "init.lua never shows the Desktop banner from OS-level hs.spaces.watcher callbacks" \
     bash -c "! grep -A3 'hs.spaces.watcher.new' '${hs_init}' | grep -q 'Banner'"
+  assert_true "init.lua leaves Ctrl+Alt Desktop switches to macOS when its shortcut uses the same keys" \
+    bash -c "grep -q 'local function symbolicEntryMatches' '${hs_init}' && grep -q 'local function syncSwitchBindings' '${hs_init}'"
+  assert_true "init.lua shows the switch banner only once the Space has changed (armSwitchBanner)" \
+    grep -q "local function armSwitchBanner" "${hs_init}"
+  assert_true "init.lua tags keystrokes it posts so the switch-shortcut tap ignores them" \
+    bash -c "grep -q 'SYNTHETIC_EVENT_TAG = ' '${hs_init}' && grep -q 'eventSourceUserData) == SYNTHETIC_EVENT_TAG' '${hs_init}'"
+  assert_true "init.lua roots the switch-shortcut tap and re-checks shortcut ownership on plist changes" \
+    bash -c "grep -q '_G.HS_KEEPALIVE.taps.switchShortcutTap = switchShortcutTap' '${hs_init}' && grep -q 'switchShortcutsWatcher = hs.pathwatcher.new' '${hs_init}'"
   assert_true "init.lua exposes workspaceMover for live IPC testing" \
     grep -q "^workspaceMover = {" "${hs_init}"
   assert_true "init.lua defines buildAllWorkspacesChooserChoices for cross-workspace Alt-Tab" \
@@ -857,6 +865,11 @@ EOF
     assert_eq "Mission Control thumbnails match Chrome titles without the app suffix; exact and ambiguous cases unchanged" \
       "chrome-truncated=true chrome-newtab=true exact=true ambiguous=true" \
       "$(echo "${hs_helpers}" | sed -n 's/.*\(chrome-truncated=\)/\1/p')"
+    # Desktop-switch ownership: macOS owns a Hammerspoon binding only when its own
+    # shortcut for the same action is enabled with the same keys (fn bit ignored).
+    hs_owned="$(hs_ipc 5 -c "local m = workspaceMover.symbolicEntryMatches; if type(m) ~= 'function' then return 'MISSING' end; local function e(on, kc, fl) return { enabled = on, value = { parameters = { 65535, kc, fl } } } end; return table.concat({ 'same=' .. tostring(m(119, e(true, 19, 0xC0000), 19, 0xC0000)), 'disabled=' .. tostring(m(123, e(false, 22, 0xC0000), 22, 0xC0000)), 'stock-ctrl2=' .. tostring(m(119, e(true, 19, 0x40000), 19, 0xC0000)), 'arrow-fn=' .. tostring(m(81, e(true, 124, 0x8C0000), 124, 0xC0000)), 'absent79=' .. tostring(m(79, nil, 123, 0xC0000)), 'absent118=' .. tostring(m(118, nil, 18, 0xC0000)) }, ' ')" || true)"
+    assert_eq "macOS owns a Desktop shortcut only when enabled with the same keys (fn ignored, defaults honoured)" \
+      "same=true disabled=false stock-ctrl2=false arrow-fn=true absent79=false absent118=false" "${hs_owned}"
   else
     echo "  [SKIP] live Hammerspoon IPC checks (Hammerspoon not running, hs.ipc unavailable, or not visible to LaunchServices from this session)"
   fi
