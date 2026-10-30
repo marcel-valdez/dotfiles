@@ -335,7 +335,7 @@
                         ]
                     },
                     {
-                        "description": "Ctrl+C/V/X -> Cmd+C/V/X (copy/paste/cut) except in terminals, Emacs/Vim/IDEs, remote desktops and VMs",
+                        "description": "Ctrl+C/V/X -> Cmd+C/V/X (copy/paste/cut) except in terminals, Emacs/Vim/IDEs (incl. the Cider Chrome App), remote desktops and VMs",
                         "manipulators": [
                             {
                                 "conditions": [
@@ -360,6 +360,7 @@
                                             "^com\\.vscodium$",
                                             "^com\\.todesktop\\.230313mzl4w4u92$",
                                             "^com\\.exafunction\\.windsurf$",
+                                            "^com\\.google\\.Chrome\\.app\\.cbbofggldkejjggfnenmiomkjblnhmdn$",
                                             "^dev\\.zed\\.Zed",
                                             "^com\\.jetbrains\\.",
                                             "^com\\.google\\.android\\.studio",
@@ -406,6 +407,7 @@
                                             "^com\\.vscodium$",
                                             "^com\\.todesktop\\.230313mzl4w4u92$",
                                             "^com\\.exafunction\\.windsurf$",
+                                            "^com\\.google\\.Chrome\\.app\\.cbbofggldkejjggfnenmiomkjblnhmdn$",
                                             "^dev\\.zed\\.Zed",
                                             "^com\\.jetbrains\\.",
                                             "^com\\.google\\.android\\.studio",
@@ -452,6 +454,7 @@
                                             "^com\\.vscodium$",
                                             "^com\\.todesktop\\.230313mzl4w4u92$",
                                             "^com\\.exafunction\\.windsurf$",
+                                            "^com\\.google\\.Chrome\\.app\\.cbbofggldkejjggfnenmiomkjblnhmdn$",
                                             "^dev\\.zed\\.Zed",
                                             "^com\\.jetbrains\\.",
                                             "^com\\.google\\.android\\.studio",
