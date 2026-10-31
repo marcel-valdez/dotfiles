@@ -5,10 +5,12 @@
 # Provides unified shell primitives across Linux (gLinux X11/Wayland) and macOS
 # (Darwin arm64/x86_64) for clipboard access, desktop notifications, process
 # inspection, runtime directories, file metadata, advisory locking, FUSE/SSHFS
-# mount management, and audio playback.
+# mount management, audio playback, and CPU/memory/load metrics.
 #
 # Environment Variables:
-#   OS_COMPAT_UNAME_S - Optional override for $(uname -s) used by unit tests.
+#   OS_COMPAT_UNAME_S    - Optional override for $(uname -s) used by unit tests.
+#   OS_COMPAT_PROC_ROOT  - Optional override for the Linux /proc root used by
+#                          the CPU/memory/load readers (unit test fixtures).
 #
 # Usage Example:
 #   source "${HOME}/lib/os_compat.sh"
@@ -576,6 +578,195 @@ os::ping_once_ms() {
     return 0
   fi
   return 1
+}
+
+#######################################
+# Outputs the number of online logical CPUs (sysconf _SC_NPROCESSORS_ONLN).
+#
+# Arguments:
+#   None
+# Outputs:
+#   CPU count to stdout ('1' if it cannot be determined).
+# Returns:
+#   0 if the count was determined, 1 if it fell back to 1.
+#
+# Usage Example:
+#   ncpu="$(os::cpu_count)"
+#######################################
+os::cpu_count() {
+  local count=""
+  if os::is_macos; then
+    count="$(sysctl -n hw.activecpu 2>/dev/null || true)"
+  else
+    count="$(getconf _NPROCESSORS_ONLN 2>/dev/null || true)"
+  fi
+  if [[ "${count}" =~ ^[0-9]+$ ]] && (( count > 0 )); then
+    printf '%s\n' "${count}"
+    return 0
+  fi
+  printf '1\n'
+  return 1
+}
+
+#######################################
+# Outputs the 1, 5 and 15 minute load averages (`sysctl vm.loadavg` on Darwin,
+# /proc/loadavg on Linux).
+#
+# Arguments:
+#   None
+# Outputs:
+#   Space-separated load averages to stdout, e.g. "2.31 2.14 2.04".
+# Returns:
+#   0 on success, 1 if the load averages could not be read.
+#
+# Usage Example:
+#   read -r load1 load5 load15 <<< "$(os::load_averages)"
+#######################################
+os::load_averages() {
+  local raw=""
+  if os::is_macos; then
+    # Prints "{ 2.31 2.14 2.04 }".
+    raw="$(sysctl -n vm.loadavg 2>/dev/null | tr -d '{}' || true)"
+  else
+    raw="$(cat "${OS_COMPAT_PROC_ROOT:-/proc}/loadavg" 2>/dev/null || true)"
+  fi
+  local one="" five="" fifteen="" number_re='^[0-9]+([.][0-9]+)?$'
+  read -r one five fifteen _ <<< "${raw}"
+  if [[ "${one}" =~ ${number_re} && "${five}" =~ ${number_re} && "${fifteen}" =~ ${number_re} ]]; then
+    printf '%s %s %s\n' "${one}" "${five}" "${fifteen}"
+    return 0
+  fi
+  return 1
+}
+
+#######################################
+# Outputs used and total physical memory in MiB, using the same definitions as
+# the tmux-mem-cpu-load plugin: on Darwin, memory that is neither free nor
+# file-backed cache counts as used (`vm_stat` "Pages free" already excludes
+# speculative pages); on Linux, MemTotal + Shmem - MemFree - Buffers - Cached -
+# SReclaimable from /proc/meminfo.
+#
+# Arguments:
+#   None
+# Outputs:
+#   "<used_mib> <total_mib>" to stdout, e.g. "43391 49152".
+# Returns:
+#   0 on success, 1 if memory statistics could not be read.
+#
+# Usage Example:
+#   read -r used_mb total_mb <<< "$(os::memory_used_total_mb)"
+#######################################
+os::memory_used_total_mb() {
+  local used_kib="" total_kib=""
+  if os::is_macos; then
+    local total_bytes vm page_size free_pages file_pages
+    total_bytes="$(sysctl -n hw.memsize 2>/dev/null || true)"
+    vm="$(vm_stat 2>/dev/null || true)"
+    page_size="$(printf '%s\n' "${vm}" | sed -n 's/.*page size of \([0-9][0-9]*\) bytes.*/\1/p' | head -n 1)"
+    free_pages="$(printf '%s\n' "${vm}" | awk -F: '$1 == "Pages free" { gsub(/[^0-9]/, "", $2); print $2; exit }')"
+    file_pages="$(printf '%s\n' "${vm}" | awk -F: '$1 == "File-backed pages" { gsub(/[^0-9]/, "", $2); print $2; exit }')"
+    if [[ "${total_bytes}" =~ ^[0-9]+$ && "${page_size}" =~ ^[0-9]+$ && \
+          "${free_pages}" =~ ^[0-9]+$ && "${file_pages}" =~ ^[0-9]+$ ]]; then
+      total_kib=$(( total_bytes / 1024 ))
+      used_kib=$(( (total_bytes - (free_pages + file_pages) * page_size) / 1024 ))
+    fi
+  else
+    local meminfo="${OS_COMPAT_PROC_ROOT:-/proc}/meminfo"
+    if [[ -r "${meminfo}" ]]; then
+      local mem_line
+      mem_line="$(awk '
+        { key = $1; sub(/:$/, "", key); kib[key] = $2 }
+        END {
+          if (kib["MemTotal"] == "") exit
+          used = kib["MemTotal"] - kib["MemFree"] + kib["Shmem"] \
+                 - kib["Buffers"] - kib["Cached"] - kib["SReclaimable"]
+          printf "%d %d\n", used, kib["MemTotal"]
+        }' "${meminfo}" 2>/dev/null || true)"
+      read -r used_kib total_kib <<< "${mem_line}"
+    fi
+  fi
+  if [[ "${used_kib}" =~ ^[0-9]+$ && "${total_kib}" =~ ^[0-9]+$ ]] && (( total_kib > 0 )); then
+    printf '%s %s\n' "$(( used_kib / 1024 ))" "$(( total_kib / 1024 ))"
+    return 0
+  fi
+  return 1
+}
+
+#######################################
+# Samples overall CPU utilization over an interval, the way tmux-mem-cpu-load
+# does: busy (user + nice + system) time as a share of all CPU time. Uses
+# `iostat` on Darwin (whole percentages, no locally compiled helper needed) and
+# two /proc/stat samples on Linux. Blocks for the sampling interval.
+#
+# Arguments:
+#   $1 - interval_secs: Sampling interval in whole seconds (default: 1).
+# Outputs:
+#   Busy percentage as an integer from 0 to 100 to stdout.
+# Returns:
+#   0 on success, 1 if CPU statistics could not be sampled.
+#
+# Usage Example:
+#   cpu_pct="$(os::cpu_busy_percent 1)"
+#######################################
+os::cpu_busy_percent() {
+  local interval="${1:-1}"
+  [[ "${interval}" =~ ^[0-9]+$ ]] && (( interval > 0 )) || interval=1
+  local busy=""
+  if os::is_macos; then
+    # With no disks (-n 0) iostat prints "us sy id 1m 5m 15m" rows: the first
+    # covers the time since boot, the last one the sampling interval.
+    local idle
+    idle="$(iostat -n 0 -c 2 -w "${interval}" 2>/dev/null |
+      awk '$1 ~ /^[0-9]+$/ && $3 ~ /^[0-9]+$/ { idle = $3 } END { print idle }')"
+    if [[ "${idle}" =~ ^[0-9]+$ ]]; then
+      busy=$(( 100 - idle ))
+    fi
+  else
+    local stat_file="${OS_COMPAT_PROC_ROOT:-/proc}/stat"
+    local label u1 n1 s1 i1 u2 n2 s2 i2
+    if read -r label u1 n1 s1 i1 _ 2>/dev/null < "${stat_file}"; then
+      sleep "${interval}"
+      if read -r label u2 n2 s2 i2 _ 2>/dev/null < "${stat_file}"; then
+        busy="$(os::_cpu_busy_from_ticks "${u1}" "${n1}" "${s1}" "${i1}" "${u2}" "${n2}" "${s2}" "${i2}")"
+      fi
+    fi
+  fi
+  if [[ "${busy}" =~ ^-?[0-9]+$ ]]; then
+    (( busy < 0 )) && busy=0
+    (( busy > 100 )) && busy=100
+    printf '%s\n' "${busy}"
+    return 0
+  fi
+  return 1
+}
+
+#######################################
+# Computes the busy CPU percentage between two /proc/stat style tick samples.
+#
+# Arguments:
+#   $1..$4 - user, nice, system and idle ticks of the first sample.
+#   $5..$8 - user, nice, system and idle ticks of the second sample.
+# Outputs:
+#   Busy percentage (truncated integer) to stdout; 0 if no ticks elapsed.
+# Returns:
+#   0 on success, 1 if any argument is not a non-negative integer.
+#
+# Usage Example:
+#   os::_cpu_busy_from_ticks 100 0 50 850 160 0 70 940   # prints 47
+#######################################
+os::_cpu_busy_from_ticks() {
+  local arg
+  for arg in "$@"; do
+    [[ "${arg}" =~ ^[0-9]+$ ]] || return 1
+  done
+  (( $# == 8 )) || return 1
+  local busy_delta=$(( ($5 + $6 + $7) - ($1 + $2 + $3) ))
+  local total_delta=$(( busy_delta + ($8 - $4) ))
+  if (( total_delta <= 0 )); then
+    printf '0\n'
+  else
+    printf '%s\n' "$(( busy_delta * 100 / total_delta ))"
+  fi
 }
 
 #######################################

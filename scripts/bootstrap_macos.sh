@@ -469,14 +469,11 @@ EOF
   fi
 fi
 
-TMUX_MEM_CPU_DIR="${HOME}/.tmux/plugins/tmux-mem-cpu-load"
-if [[ -d "${TMUX_MEM_CPU_DIR}" ]] || (( DRY_RUN == 1 )); then
-  if command -v cmake >/dev/null 2>&1 || (( DRY_RUN == 1 )); then
-    run_cmd bash -c "cd '${TMUX_MEM_CPU_DIR}' && cmake . && make -j4"
-  else
-    echo "[INFO] cmake not installed; skipping optional tmux-mem-cpu-load compilation."
-  fi
-fi
+# The tmux status bar's CPU/memory/load segment comes from the shell-native
+# ~/scripts/tmux_mem_cpu_load.sh on macOS. The compiled tmux-mem-cpu-load TPM
+# plugin needs cmake (not on gMac), and Santa Lockdown would block a locally
+# built binary anyway, so ~/.tmux.conf only loads that plugin on Linux.
+echo "[INFO] tmux CPU/memory segment: using ~/scripts/tmux_mem_cpu_load.sh (tmux-mem-cpu-load is not built on macOS)."
 
 # ------------------------------------------------------------------------------
 # Stage 4: Go Daemons (whatsapp-notification & airgradient-monitor) + Santa Hint

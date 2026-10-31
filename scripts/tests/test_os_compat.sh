@@ -463,6 +463,132 @@ test_flock_mkdir_fallback_when_flock_absent() {
   rm -rf "${lock_dir}"
 }
 
+test_cpu_count_darwin_mock_and_linux() {
+  sysctl() {
+    [[ "$*" == "-n hw.activecpu" ]] && echo "15"
+  }
+  assert_eq "15" "$(OS_COMPAT_UNAME_S="Darwin" os::cpu_count)" \
+    "os::cpu_count (Darwin) reads sysctl hw.activecpu"
+  unset -f sysctl
+
+  getconf() {
+    [[ "$*" == "_NPROCESSORS_ONLN" ]] && echo "8"
+  }
+  assert_eq "8" "$(OS_COMPAT_UNAME_S="Linux" os::cpu_count)" \
+    "os::cpu_count (Linux) reads getconf _NPROCESSORS_ONLN"
+  getconf() { echo "garbage"; }
+  assert_eq "1" "$(OS_COMPAT_UNAME_S="Linux" os::cpu_count || true)" \
+    "os::cpu_count falls back to 1 on unparsable output"
+  unset -f getconf
+}
+
+test_load_averages_darwin_mock_and_linux_proc() {
+  sysctl() {
+    [[ "$*" == "-n vm.loadavg" ]] && echo "{ 2.31 2.14 2.04 }"
+  }
+  assert_eq "2.31 2.14 2.04" "$(OS_COMPAT_UNAME_S="Darwin" os::load_averages)" \
+    "os::load_averages (Darwin) parses sysctl vm.loadavg"
+  sysctl() { echo "{ n/a }"; }
+  assert_false "os::load_averages (Darwin) fails on unparsable sysctl output" \
+    eval 'OS_COMPAT_UNAME_S="Darwin" os::load_averages >/dev/null'
+  unset -f sysctl
+
+  local proc_root
+  proc_root="$(mktemp -d)"
+  echo "0.52 0.58 0.59 1/1234 5678" > "${proc_root}/loadavg"
+  assert_eq "0.52 0.58 0.59" \
+    "$(OS_COMPAT_UNAME_S="Linux" OS_COMPAT_PROC_ROOT="${proc_root}" os::load_averages)" \
+    "os::load_averages (Linux) reads the first three /proc/loadavg fields"
+  rm -f "${proc_root}/loadavg"
+  assert_false "os::load_averages (Linux) fails when /proc/loadavg is missing" \
+    eval 'OS_COMPAT_UNAME_S="Linux" OS_COMPAT_PROC_ROOT="${proc_root}" os::load_averages >/dev/null'
+  rm -rf "${proc_root}"
+}
+
+test_memory_used_total_mb_darwin_vm_stat_mock() {
+  sysctl() {
+    [[ "$*" == "-n hw.memsize" ]] && echo "51539607552"
+  }
+  vm_stat() {
+    cat << 'EOF'
+Mach Virtual Memory Statistics: (page size of 16384 bytes)
+Pages free:                                     8335.
+Pages active:                                 721231.
+Pages inactive:                               716516.
+Pages speculative:                              3211.
+Pages wired down:                             552875.
+File-backed pages:                            363966.
+Anonymous pages:                             1080000.
+EOF
+  }
+  # used = 48 GiB - (8335 free + 363966 file-backed) * 16 KiB pages
+  assert_eq "43334 49152" "$(OS_COMPAT_UNAME_S="Darwin" os::memory_used_total_mb)" \
+    "os::memory_used_total_mb (Darwin) counts free + file-backed pages as available"
+  vm_stat() { echo "Mach Virtual Memory Statistics: (page size of 16384 bytes)"; }
+  assert_false "os::memory_used_total_mb (Darwin) fails without vm_stat page counts" \
+    eval 'OS_COMPAT_UNAME_S="Darwin" os::memory_used_total_mb >/dev/null'
+  unset -f sysctl vm_stat
+}
+
+test_memory_used_total_mb_linux_proc_meminfo() {
+  local proc_root
+  proc_root="$(mktemp -d)"
+  cat << 'EOF' > "${proc_root}/meminfo"
+MemTotal:       16384000 kB
+MemFree:         2048000 kB
+MemAvailable:    9000000 kB
+Buffers:          512000 kB
+Cached:          4096000 kB
+SwapCached:       999999 kB
+Shmem:            256000 kB
+SReclaimable:     128000 kB
+EOF
+  # used = 16384000 - 2048000 + 256000 - 512000 - 4096000 - 128000 kB (SwapCached ignored)
+  assert_eq "9625 16000" \
+    "$(OS_COMPAT_UNAME_S="Linux" OS_COMPAT_PROC_ROOT="${proc_root}" os::memory_used_total_mb)" \
+    "os::memory_used_total_mb (Linux) applies the tmux-mem-cpu-load /proc/meminfo formula"
+  rm -rf "${proc_root}"
+}
+
+test_cpu_busy_percent_darwin_iostat_mock() {
+  local iostat_log
+  iostat_log="$(mktemp)"
+  iostat() {
+    printf '%s\n' "$*" > "${iostat_log}"
+    cat << 'EOF'
+      cpu    load average
+ us sy id   1m   5m   15m
+  7  5 88  4.65 3.71 3.83
+  8  6 87  4.65 3.71 3.83
+EOF
+  }
+  assert_eq "13" "$(OS_COMPAT_UNAME_S="Darwin" os::cpu_busy_percent 2)" \
+    "os::cpu_busy_percent (Darwin) is 100 - idle of the last iostat sample"
+  assert_eq "-n 0 -c 2 -w 2" "$(cat "${iostat_log}")" \
+    "os::cpu_busy_percent (Darwin) samples iostat over the requested interval"
+  iostat() { echo "iostat: unavailable"; }
+  assert_false "os::cpu_busy_percent (Darwin) fails without iostat samples" \
+    eval 'OS_COMPAT_UNAME_S="Darwin" os::cpu_busy_percent 1 >/dev/null'
+  unset -f iostat
+  rm -f "${iostat_log}"
+}
+
+test_cpu_busy_percent_linux_proc_stat() {
+  assert_eq "47" "$(os::_cpu_busy_from_ticks 100 0 50 850 160 0 70 940)" \
+    "os::_cpu_busy_from_ticks computes busy share of elapsed ticks"
+  assert_eq "0" "$(os::_cpu_busy_from_ticks 5 5 5 5 5 5 5 5)" \
+    "os::_cpu_busy_from_ticks reports 0 when no ticks elapsed"
+  assert_false "os::_cpu_busy_from_ticks rejects non-numeric ticks" \
+    os::_cpu_busy_from_ticks 1 2 3 x 5 6 7 8
+
+  local proc_root
+  proc_root="$(mktemp -d)"
+  echo "cpu  100 0 50 850 0 0 0 0 0 0" > "${proc_root}/stat"
+  assert_eq "0" "$(OS_COMPAT_UNAME_S="Linux" OS_COMPAT_PROC_ROOT="${proc_root}" os::cpu_busy_percent 1)" \
+    "os::cpu_busy_percent (Linux) samples /proc/stat twice"
+  rm -rf "${proc_root}"
+}
+
 test_os_detection_linux_mode
 test_os_detection_darwin_mode
 test_runtime_dir_darwin_mode
@@ -484,6 +610,12 @@ test_pid_is_uninterruptible_darwin_mock
 test_is_mounted_and_unmount_lazy_darwin_mock
 test_play_audio_darwin_afplay_mock
 test_flock_mkdir_fallback_when_flock_absent
+test_cpu_count_darwin_mock_and_linux
+test_load_averages_darwin_mock_and_linux_proc
+test_memory_used_total_mb_darwin_vm_stat_mock
+test_memory_used_total_mb_linux_proc_meminfo
+test_cpu_busy_percent_darwin_iostat_mock
+test_cpu_busy_percent_linux_proc_stat
 
 echo "test_os_compat.sh: ${PASS_COUNT} passed, ${FAIL_COUNT} failed."
 [[ ${FAIL_COUNT} -eq 0 ]]
