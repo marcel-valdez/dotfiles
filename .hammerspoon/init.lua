@@ -2375,8 +2375,10 @@ end)
 -- the Elgato dock's DisplayPort output reconnects and then, about 20s later,
 -- can flicker and stay blank while macOS still has it connected. Switching its
 -- refresh rate to another rate and back (a fresh mode set) brings the picture
--- back, so do that automatically: once the displays have settled after a wake,
--- and again after any later reconnect within the post-wake window.
+-- back, so do that automatically, but only when needed: each time that monitor
+-- comes back after dropping out since the displays slept (it does once the
+-- monitors reached "no signal" standby, not after a short lock), shortly after
+-- the wake.
 --
 -- Only acts on a CR240DM that reaches the Mac through the Elgato dock's own
 -- DisplayPort output, wherever it sits in the arrangement: never on one that
@@ -2388,15 +2390,18 @@ end)
 local DISPLAY_RESYNC = {
   monitorName = "CR240DM",        -- monitor model (EDID name); nil for any model
   dockVendor = "Elgato Systems",  -- Thunderbolt dock vendor reported by macOS
-  settleSec = 5,    -- quiet period after the last display change before acting
-  windowSec = 120,  -- keep watching for reconnects this long after a wake
-  holdSec = 1.5,    -- time on the alternate refresh rate before switching back
+  settleSec = 2,    -- quiet period after the monitor reconnects before acting
+  windowSec = 45,   -- only act on reconnects this long after a wake
+  holdSec = 0.3,    -- time on the alternate refresh rate before switching back
   maxPerWake = 3,   -- re-sync at most this many times per wake
 }
 local resyncLog = hs.logger.new("dispResync", "info")
 local resyncState = {
   awake = true, wakeAt = 0, count = 0, busyUntil = 0, checking = false,
   timer = nil, restoreTimers = {}, tasks = {},
+  tracked = {},      -- screen UUIDs present (or dropped out) at the last check
+  missing = {},      -- screen UUIDs that dropped out since the displays slept
+  reconnected = {},  -- screen UUIDs that came back after dropping out
 }
 
 -- Returns the current mode and another refresh rate at the same resolution:
@@ -2504,6 +2509,38 @@ local function findScreenByUUID(uuid)
   return nil
 end
 
+local function currentScreenUUIDs()
+  local present = {}
+  for _, scr in ipairs(hs.screen.allScreens()) do present[scr:getUUID()] = true end
+  return present
+end
+
+-- Updates the drop-out tracking in `state` with the current screen UUIDs and
+-- returns true when a screen that dropped out since the displays slept is back
+-- (its UUID is then added to state.reconnected). While `busy` (our own mode
+-- switches) drop-outs are not recorded, so they can never trigger a re-sync.
+local function trackScreens(state, current, busy)
+  local back = false
+  if not busy then
+    for uuid in pairs(state.tracked) do
+      if not current[uuid] then state.missing[uuid] = true end
+    end
+    for uuid in pairs(current) do
+      if state.missing[uuid] then
+        state.missing[uuid] = nil
+        state.reconnected[uuid] = true
+        back = true
+      end
+    end
+  end
+  state.tracked = {}
+  for uuid in pairs(current) do state.tracked[uuid] = true end
+  if not busy then
+    for uuid in pairs(state.missing) do state.tracked[uuid] = true end
+  end
+  return back
+end
+
 -- Switches the screen to an alternate refresh rate and back.
 local function resyncScreen(scr, reason, basis)
   local cur, alt = alternateMode(scr)
@@ -2527,8 +2564,9 @@ local function resyncScreen(scr, reason, basis)
 end
 
 -- Collects display serials and the dock's DisplayPort sinks in the background
--- (system_profiler and ioreg), then re-syncs the qualifying monitors.
-local function resyncIfEligible(reason, onDone)
+-- (system_profiler and ioreg), then re-syncs the qualifying monitors; with
+-- requireReconnect, only those that came back after dropping out.
+local function resyncIfEligible(reason, onDone, requireReconnect)
   if resyncState.checking then return end
   resyncState.checking = true
   local facts, pending = {}, 2
@@ -2539,7 +2577,13 @@ local function resyncIfEligible(reason, onDone)
     local targets, why = eligibleScreens(hs.screen.allScreens(), facts.serials, facts.dock)
     local count = 0
     for _, scr in ipairs(targets) do
-      if resyncScreen(scr, reason, why) then count = count + 1 end
+      local uuid = scr:getUUID()
+      if not requireReconnect or resyncState.reconnected[uuid] then
+        resyncState.reconnected[uuid] = nil
+        if resyncScreen(scr, reason, why) then count = count + 1 end
+      else
+        resyncLog.i(reason .. ": skipped " .. tostring(scr:name()) .. " (it did not drop out after the displays slept)")
+      end
     end
     if #targets == 0 then resyncLog.i(reason .. ": skipped (" .. why .. ")") end
     if onDone then onDone(count) end
@@ -2568,7 +2612,7 @@ local function scheduleResync(reason)
     if not resyncState.awake then return end
     resyncIfEligible(reason, function(count)
       if count > 0 then resyncState.count = resyncState.count + 1 end
-    end)
+    end, true)
   end)
 end
 
@@ -2577,25 +2621,34 @@ local resyncPowerWatcher = hs.caffeinate.watcher.new(function(event)
   if event == w.screensDidSleep or event == w.systemWillSleep then
     resyncState.awake = false
     if resyncState.timer then resyncState.timer:stop(); resyncState.timer = nil end
+    -- Start drop-out tracking from the screens present when the displays slept.
+    resyncState.tracked, resyncState.missing, resyncState.reconnected = currentScreenUUIDs(), {}, {}
   elseif event == w.screensDidWake or event == w.systemDidWake then
     resyncState.awake = true
     resyncState.wakeAt = hs.timer.secondsSinceEpoch()
     resyncState.count = 0
-    scheduleResync("display wake")
+    -- Record a monitor that macOS already dropped at wake; act once it is back
+    -- (or now, if it somehow came back while the displays were asleep).
+    if trackScreens(resyncState, currentScreenUUIDs(), false) or next(resyncState.reconnected) then
+      scheduleResync("monitor reconnected after wake")
+    end
   end
 end)
+resyncState.tracked = currentScreenUUIDs()
 resyncPowerWatcher:start()
 
 local resyncScreenWatcher = hs.screen.watcher.new(function()
-  if hs.timer.secondsSinceEpoch() < resyncState.busyUntil then return end
-  scheduleResync("display reconnect after wake")
+  local busy = hs.timer.secondsSinceEpoch() < resyncState.busyUntil
+  if trackScreens(resyncState, currentScreenUUIDs(), busy) then
+    scheduleResync("monitor reconnected after wake")
+  end
 end)
 resyncScreenWatcher:start()
 _G.HS_KEEPALIVE.watchers.resyncPowerWatcher = resyncPowerWatcher
 _G.HS_KEEPALIVE.watchers.resyncScreenWatcher = resyncScreenWatcher
 
 -- Global for live IPC testing and manual use: `displayResync.resyncNow()`
--- runs the same checks as after a wake and logs the outcome.
+-- re-syncs the qualifying monitor right away (no drop-out needed) and logs it.
 displayResync = {
   config = DISPLAY_RESYNC,
   state = resyncState,
@@ -2603,5 +2656,6 @@ displayResync = {
   displaySerials = displaySerials,
   dockDisplayPortSinks = dockDisplayPortSinks,
   eligibleScreens = eligibleScreens,
-  resyncNow = function() resyncIfEligible("manual") end,
+  trackScreens = trackScreens,
+  resyncNow = function() resyncIfEligible("manual", nil, false) end,
 }

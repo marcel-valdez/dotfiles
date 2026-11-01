@@ -787,6 +787,8 @@ echo "[Test 15] ~/.hammerspoon/init.lua macOS 15+ space-moving & multi-workspace
     bash -c "grep -q '_G.HS_KEEPALIVE.watchers.resyncPowerWatcher = resyncPowerWatcher' '${hs_init}' && grep -q '^displayResync = {' '${hs_init}'"
   assert_true "init.lua re-syncs only a CR240DM on the Elgato dock's DisplayPort (no hardcoded display UUIDs)" \
     bash -c "grep -q 'monitorName = \"CR240DM\"' '${hs_init}' && grep -q 'dockVendor = \"Elgato Systems\"' '${hs_init}' && ! grep -q 'uuids = {' '${hs_init}'"
+  assert_true "init.lua re-syncs a monitor only after it dropped out and came back since the displays slept" \
+    bash -c "grep -q 'local function trackScreens(state, current, busy)' '${hs_init}' && grep -q 'if not requireReconnect or resyncState.reconnected\[uuid\] then' '${hs_init}'"
   assert_true "init.lua defines buildAllWorkspacesChooserChoices for cross-workspace Alt-Tab" \
     grep -q "local function buildAllWorkspacesChooserChoices" "${hs_init}"
   assert_true "init.lua pre-populates default workspace prefix filter ^<N> " \
@@ -938,6 +940,12 @@ EOF
     assert_eq "display re-sync only targets a CR240DM on the Elgato dock's DisplayPort, in any position" \
       "direct-left=CR240DM (2):on the dock's DisplayPort | direct-right=CR240DM (1):on the dock's DisplayPort | stale=CR240DM (2):the only CR240DM not behind the KVM | ambiguous=none:can't tell which CR240DM is on the dock's DisplayPort | kvm-only=none:CR240DM reaches the dock through a KVM or adapter | other=none:no CR240DM connected | nodock=none:Elgato Systems dock not attached | serials=4251086178,0,1 | dock=true:0b,1d other-vendor=false" \
       "${hs_eligible}"
+    # Drop-out tracking: a re-sync is due only when a screen that dropped out
+    # since the displays slept comes back; drop-outs during our own mode
+    # switches (busy) and newly attached screens never count.
+    hs_track="$(hs_ipc 5 -c "local t = displayResync and displayResync.trackScreens; if type(t) ~= 'function' then return 'MISSING' end; local function st(...) local s = { tracked = {}, missing = {}, reconnected = {} } for _, u in ipairs({ ... }) do s.tracked[u] = true end return s end; local a = st('A', 'B'); local r1 = t(a, { B = true }, false); local r2 = t(a, { A = true, B = true }, false); local b = st('A', 'B'); local r3 = t(b, { B = true }, true); local r4 = t(b, { A = true, B = true }, false); local c = st('A'); local r5 = t(c, { A = true, C = true }, false); local e = st('A', 'B'); t(e, { B = true }, false); t(e, { B = true }, false); local r6 = t(e, { A = true, B = true }, false); return string.format('drop=%s back=%s flagged=%s busy-drop=%s after-busy=%s new-screen=%s two-events-then-back=%s', tostring(r1), tostring(r2), tostring(a.reconnected.A), tostring(r3), tostring(r4), tostring(r5), tostring(r6))" || true)"
+    assert_eq "display re-sync triggers only when a dropped-out monitor comes back" \
+      "drop=false back=true flagged=true busy-drop=false after-busy=false new-screen=false two-events-then-back=true" "${hs_track}"
   else
     echo "  [SKIP] live Hammerspoon IPC checks (Hammerspoon not running, hs.ipc unavailable, or not visible to LaunchServices from this session)"
   fi
