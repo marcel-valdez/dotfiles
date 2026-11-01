@@ -17,9 +17,9 @@
 --   6. <Alt>Tab MRU fuzzy window switcher (hs.chooser) with live 10px 85%-opaque
 --      blue highlight border (hs.canvas, replicating draw_border_around_window.py).
 --   7. <WM_MOD>z Zen Mode toggle & <WM_MOD>n terminal-scoped Notes launcher.
---   8. Re-sync of the left CR240DM monitor after the displays wake, when it is on
---      the Elgato dock's DisplayPort (it can come back blank until its refresh
---      rate is switched and switched back).
+--   8. Re-sync of the CR240DM on the Elgato dock's DisplayPort after the displays
+--      wake (it can come back blank until its refresh rate is switched and
+--      switched back).
 -- =============================================================================
 
 -- Live Hammerspoon CLI (`/Applications/Hammerspoon.app/Contents/Frameworks/hs/hs -c '<lua>'`)
@@ -2369,22 +2369,24 @@ keepHotkey({"ctrl", "alt"}, "l", function()
 end)
 
 -- -----------------------------------------------------------------------------
--- 8. Left Monitor Re-sync After Display Wake
+-- 8. Monitor Re-sync After Display Wake (Elgato Dock DisplayPort)
 -- -----------------------------------------------------------------------------
--- After the displays wake (already on the lock screen), a CR240DM plugged into
+-- After the displays wake (already on the lock screen), the CR240DM plugged into
 -- the Elgato dock's DisplayPort output reconnects and then, about 20s later,
 -- can flicker and stay blank while macOS still has it connected. Switching its
 -- refresh rate to another rate and back (a fresh mode set) brings the picture
 -- back, so do that automatically: once the displays have settled after a wake,
 -- and again after any later reconnect within the post-wake window.
 --
--- Only acts when the left (leftmost external) monitor is a CR240DM and the
--- Elgato dock is attached, and not when macOS reports that monitor behind a
--- DisplayPort branch device (the KVM or an adapter) instead of on the dock's own
--- DisplayPort output. macOS refreshes those tunnel details only on some link
--- events, so when they don't mention the monitor at all it is assumed direct.
+-- Only acts on a CR240DM that reaches the Mac through the Elgato dock's own
+-- DisplayPort output, wherever it sits in the arrangement: never on one that
+-- macOS reports behind a DisplayPort branch device (the KVM's hub or an
+-- adapter). Monitors are matched to the dock's DisplayPort tunnels by EDID
+-- serial number. macOS refreshes those tunnel details only on some link events,
+-- so when they don't mention a monitor, the one CR240DM that is not behind a
+-- branch device is taken to be on the dock's DisplayPort (none if ambiguous).
 local DISPLAY_RESYNC = {
-  monitorName = "CR240DM",        -- left monitor model (hs.screen name prefix)
+  monitorName = "CR240DM",        -- monitor model (EDID name); nil for any model
   dockVendor = "Elgato Systems",  -- Thunderbolt dock vendor reported by macOS
   settleSec = 5,    -- quiet period after the last display change before acting
   windowSec = 120,  -- keep watching for reconnects this long after a wake
@@ -2394,7 +2396,7 @@ local DISPLAY_RESYNC = {
 local resyncLog = hs.logger.new("dispResync", "info")
 local resyncState = {
   awake = true, wakeAt = 0, count = 0, busyUntil = 0, checking = false,
-  timer = nil, restoreTimer = nil, tasks = {},
+  timer = nil, restoreTimers = {}, tasks = {},
 }
 
 -- Returns the current mode and another refresh rate at the same resolution:
@@ -2456,34 +2458,43 @@ local function dockDisplayPortSinks(xml, vendor)
   return dock
 end
 
--- Returns the left monitor if it qualifies for a re-sync, else nil, plus the
--- reason either way.
-local function eligibleLeftMonitor(screens, serials, dock)
-  local left = nil
-  for _, scr in ipairs(screens or {}) do
-    if not (scr:name() or ""):find("^Built%-in") and (left == nil or scr:fullFrame().x < left:fullFrame().x) then
-      left = scr
-    end
-  end
-  if not left then return nil, "no external monitor" end
-  local name = left:name() or ""
-  if name:sub(1, #DISPLAY_RESYNC.monitorName) ~= DISPLAY_RESYNC.monitorName then
-    return nil, "left monitor is " .. name
-  end
+-- Screen name without the " (2)" suffix macOS adds to identical monitors.
+local function modelName(scr)
+  return ((scr:name() or ""):gsub(" %(%d+%)$", ""))
+end
+
+-- Returns the screens on the dock's DisplayPort output that qualify for a
+-- re-sync (possibly none) and the reason.
+local function eligibleScreens(screens, serials, dock)
+  local model = DISPLAY_RESYNC.monitorName
   if not (dock and dock.present) then
-    return nil, DISPLAY_RESYNC.dockVendor .. " dock not attached"
+    return {}, DISPLAY_RESYNC.dockVendor .. " dock not attached"
   end
-  local serial = (serials or {})[tostring(left:id())] or 0
-  local direct, behindBranch = false, false
-  for _, sink in ipairs(dock.sinks or {}) do
-    if sink.product == DISPLAY_RESYNC.monitorName and sink.serial == serial then
-      if sink.direct then direct = true else behindBranch = true end
+  local direct, unknown, candidates = {}, {}, 0
+  for _, scr in ipairs(screens or {}) do
+    local name = modelName(scr)
+    if not name:find("^Built%-in") and (model == nil or name == model) then
+      candidates = candidates + 1
+      local serial = (serials or {})[tostring(scr:id())] or 0
+      local onDirect, onBranch = false, false
+      for _, sink in ipairs(dock.sinks or {}) do
+        if sink.product == name and sink.serial == serial then
+          if sink.direct then onDirect = true else onBranch = true end
+        end
+      end
+      if onDirect then
+        direct[#direct + 1] = scr
+      elseif not onBranch then
+        unknown[#unknown + 1] = scr
+      end
     end
   end
-  if behindBranch and not direct then
-    return nil, "left monitor reaches the dock through a KVM or adapter"
-  end
-  return left, direct and "on the dock's DisplayPort" or "dock tunnel details unavailable"
+  local what = model or "external monitor"
+  if #direct > 0 then return direct, "on the dock's DisplayPort" end
+  if #unknown == 1 then return unknown, "the only " .. what .. " not behind the KVM" end
+  if #unknown > 1 then return {}, "can't tell which " .. what .. " is on the dock's DisplayPort" end
+  if candidates > 0 then return {}, what .. " reaches the dock through a KVM or adapter" end
+  return {}, "no " .. what .. " connected"
 end
 
 local function findScreenByUUID(uuid)
@@ -2503,11 +2514,11 @@ local function resyncScreen(scr, reason, basis)
   local uuid = scr:getUUID()
   -- Ignore the display changes caused by our own mode switches.
   resyncState.busyUntil = hs.timer.secondsSinceEpoch() + DISPLAY_RESYNC.holdSec + 4
-  resyncLog.i(string.format("%s: left %s (%s) %dx%d@%gHz -> %gHz and back",
+  resyncLog.i(string.format("%s: %s (%s) %dx%d@%gHz -> %gHz and back",
     reason, tostring(scr:name()), basis, cur.w, cur.h, cur.freq, alt.freq))
   scr:setMode(alt.w, alt.h, alt.scale, alt.freq, alt.depth)
-  resyncState.restoreTimer = hs.timer.doAfter(DISPLAY_RESYNC.holdSec, function()
-    resyncState.restoreTimer = nil
+  resyncState.restoreTimers[uuid] = hs.timer.doAfter(DISPLAY_RESYNC.holdSec, function()
+    resyncState.restoreTimers[uuid] = nil
     local s = findScreenByUUID(uuid)
     if s then s:setMode(cur.w, cur.h, cur.scale, cur.freq, cur.depth) end
     resyncState.busyUntil = hs.timer.secondsSinceEpoch() + 3
@@ -2516,7 +2527,7 @@ local function resyncScreen(scr, reason, basis)
 end
 
 -- Collects display serials and the dock's DisplayPort sinks in the background
--- (system_profiler and ioreg), then re-syncs the left monitor if it qualifies.
+-- (system_profiler and ioreg), then re-syncs the qualifying monitors.
 local function resyncIfEligible(reason, onDone)
   if resyncState.checking then return end
   resyncState.checking = true
@@ -2525,14 +2536,13 @@ local function resyncIfEligible(reason, onDone)
     pending = pending - 1
     if pending > 0 then return end
     resyncState.checking, resyncState.tasks = false, {}
-    local scr, why = eligibleLeftMonitor(hs.screen.allScreens(), facts.serials, facts.dock)
-    local did = false
-    if scr then
-      did = resyncScreen(scr, reason, why)
-    else
-      resyncLog.i(reason .. ": skipped (" .. why .. ")")
+    local targets, why = eligibleScreens(hs.screen.allScreens(), facts.serials, facts.dock)
+    local count = 0
+    for _, scr in ipairs(targets) do
+      if resyncScreen(scr, reason, why) then count = count + 1 end
     end
-    if onDone then onDone(did) end
+    if #targets == 0 then resyncLog.i(reason .. ": skipped (" .. why .. ")") end
+    if onDone then onDone(count) end
   end
   local profiler = hs.task.new("/usr/sbin/system_profiler", function(_, out)
     facts.serials = displaySerials(out)
@@ -2556,8 +2566,8 @@ local function scheduleResync(reason)
   resyncState.timer = hs.timer.doAfter(DISPLAY_RESYNC.settleSec, function()
     resyncState.timer = nil
     if not resyncState.awake then return end
-    resyncIfEligible(reason, function(did)
-      if did then resyncState.count = resyncState.count + 1 end
+    resyncIfEligible(reason, function(count)
+      if count > 0 then resyncState.count = resyncState.count + 1 end
     end)
   end)
 end
@@ -2592,6 +2602,6 @@ displayResync = {
   alternateMode = alternateMode,
   displaySerials = displaySerials,
   dockDisplayPortSinks = dockDisplayPortSinks,
-  eligibleLeftMonitor = eligibleLeftMonitor,
+  eligibleScreens = eligibleScreens,
   resyncNow = function() resyncIfEligible("manual") end,
 }

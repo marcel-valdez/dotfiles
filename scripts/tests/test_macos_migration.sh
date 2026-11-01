@@ -781,11 +781,11 @@ echo "[Test 15] ~/.hammerspoon/init.lua macOS 15+ space-moving & multi-workspace
     bash -c "grep -q '_G.HS_KEEPALIVE.taps.switchShortcutTap = switchShortcutTap' '${hs_init}' && grep -q 'switchShortcutsWatcher = hs.pathwatcher.new' '${hs_init}'"
   assert_true "init.lua exposes workspaceMover for live IPC testing" \
     grep -q "^workspaceMover = {" "${hs_init}"
-  assert_true "init.lua re-syncs the left monitor on display wake (screensDidWake), not on unlock" \
+  assert_true "init.lua re-syncs the Elgato DisplayPort monitor on display wake (screensDidWake), not on unlock" \
     bash -c "grep -q 'event == w.screensDidWake' '${hs_init}' && grep -q 'scr:setMode(alt.w, alt.h, alt.scale, alt.freq, alt.depth)' '${hs_init}'"
   assert_true "init.lua roots the display re-sync watchers and exposes displayResync for IPC testing" \
     bash -c "grep -q '_G.HS_KEEPALIVE.watchers.resyncPowerWatcher = resyncPowerWatcher' '${hs_init}' && grep -q '^displayResync = {' '${hs_init}'"
-  assert_true "init.lua re-syncs only a left CR240DM on the Elgato dock (no hardcoded display UUIDs)" \
+  assert_true "init.lua re-syncs only a CR240DM on the Elgato dock's DisplayPort (no hardcoded display UUIDs)" \
     bash -c "grep -q 'monitorName = \"CR240DM\"' '${hs_init}' && grep -q 'dockVendor = \"Elgato Systems\"' '${hs_init}' && ! grep -q 'uuids = {' '${hs_init}'"
   assert_true "init.lua defines buildAllWorkspacesChooserChoices for cross-workspace Alt-Tab" \
     grep -q "local function buildAllWorkspacesChooserChoices" "${hs_init}"
@@ -881,35 +881,35 @@ EOF
     hs_resync="$(hs_ipc 5 -c "local a = displayResync and displayResync.alternateMode; if type(a) ~= 'function' then return 'MISSING' end; local function fake(cur, freqs) local modes = {} for i, f in ipairs(freqs) do modes[i] = { w = 1920, h = 1080, scale = 1, freq = f, depth = 8 } end return { currentMode = function() return { w = 1920, h = 1080, scale = 1, freq = cur, depth = 8 } end, availableModes = function() return modes end } end; local function alt(cur, freqs) local _, m = a(fake(cur, freqs)); return m and string.format('%g', m.freq) or 'nil' end; return table.concat({ '165=' .. alt(165, { 50, 60, 120, 144, 165 }), '60=' .. alt(60, { 50, 60, 120, 144, 165 }), '120=' .. alt(120, { 100, 120, 144 }), 'only60=' .. alt(60, { 60 }) }, ' ')" || true)"
     assert_eq "display re-sync alternates to 60 Hz, else the closest other refresh rate" \
       "165=60 60=50 120=100 only60=nil" "${hs_resync}"
-    # Display re-sync eligibility: only a left CR240DM attached to the Elgato dock,
-    # never one that macOS reports behind a branch device (KVM or adapter); plus
-    # the system_profiler serial and ioreg dock-tunnel parsers.
+    # Display re-sync eligibility: only a CR240DM on the Elgato dock's own
+    # DisplayPort output, wherever it is in the arrangement, never one that macOS
+    # reports behind a branch device (KVM or adapter); plus the system_profiler
+    # serial and ioreg dock-tunnel parsers.
     cat << 'EOF' > "${TEST_TMP}/t15_resync.lua"
 local d = displayResync
-if type(d) ~= "table" or type(d.eligibleLeftMonitor) ~= "function" then return "MISSING" end
-local function screen(name, id, x)
-  return {
-    name = function() return name end,
-    id = function() return id end,
-    fullFrame = function() return { x = x, y = 0, w = 1920, h = 1080 } end,
-  }
+if type(d) ~= "table" or type(d.eligibleScreens) ~= "function" then return "MISSING" end
+local function screen(name, id)
+  return { name = function() return name end, id = function() return id end }
 end
-local builtin = screen("Built-in Retina Display", 1, -3432)
-local left = screen("CR240DM (2)", 4, -1920)
-local right = screen("CR240DM (1)", 3, 0)
-local serials = { ["1"] = 4251086178, ["3"] = 0, ["4"] = 1 }
+local builtin = screen("Built-in Retina Display", 1)
+local left = screen("CR240DM (2)", 4)
+local right = screen("CR240DM (1)", 3)
+local serials = { ["1"] = 4251086178, ["3"] = 0, ["4"] = 1, ["5"] = 7 }
 local function sink(serial, direct) return { product = "CR240DM", serial = serial, direct = direct } end
 local function verdict(screens, dock)
-  local scr, why = d.eligibleLeftMonitor(screens, serials, dock)
-  return (scr and "yes" or "no") .. ":" .. why
+  local targets, why = d.eligibleScreens(screens, serials, dock)
+  local names = {}
+  for _, t in ipairs(targets) do names[#names + 1] = t:name() end
+  return (#names > 0 and table.concat(names, ",") or "none") .. ":" .. why
 end
 local results = {
-  "direct=" .. verdict({ builtin, left, right }, { present = true, sinks = { sink(1, true), sink(0, false) } }),
-  "kvm=" .. verdict({ builtin, left, right }, { present = true, sinks = { sink(1, false) } }),
-  "unknown=" .. verdict({ left, right }, { present = true, sinks = { sink(0, false) } }),
-  "other=" .. verdict({ screen("DELL U2720Q", 5, -2560), right }, { present = true, sinks = {} }),
+  "direct-left=" .. verdict({ builtin, left, right }, { present = true, sinks = { sink(1, true), sink(0, false) } }),
+  "direct-right=" .. verdict({ builtin, left, right }, { present = true, sinks = { sink(0, true), sink(1, false) } }),
+  "stale=" .. verdict({ left, right }, { present = true, sinks = { sink(0, false) } }),
+  "ambiguous=" .. verdict({ left, right }, { present = true, sinks = {} }),
+  "kvm-only=" .. verdict({ right }, { present = true, sinks = { sink(0, false) } }),
+  "other=" .. verdict({ screen("DELL U2720Q", 5) }, { present = true, sinks = {} }),
   "nodock=" .. verdict({ left, right }, { present = false, sinks = {} }),
-  "builtin-only=" .. verdict({ builtin }, { present = true, sinks = {} }),
 }
 local json = '{"SPDisplaysDataType":[{"spdisplays_ndrvs":[{"_name":"CR240DM","_spdisplays_displayID":"3"},'
   .. '{"_name":"Color LCD","_spdisplays_displayID":"1","_spdisplays_display-serial-number":"fd626d62"},'
@@ -935,8 +935,8 @@ results[#results + 1] = string.format("dock=%s:%s other-vendor=%s", tostring(doc
 return table.concat(results, " | ")
 EOF
     hs_eligible="$(hs_ipc 5 -c "return dofile('${TEST_TMP}/t15_resync.lua')" || true)"
-    assert_eq "display re-sync only targets a left CR240DM on the Elgato dock's DisplayPort" \
-      "direct=yes:on the dock's DisplayPort | kvm=no:left monitor reaches the dock through a KVM or adapter | unknown=yes:dock tunnel details unavailable | other=no:left monitor is DELL U2720Q | nodock=no:Elgato Systems dock not attached | builtin-only=no:no external monitor | serials=4251086178,0,1 | dock=true:0b,1d other-vendor=false" \
+    assert_eq "display re-sync only targets a CR240DM on the Elgato dock's DisplayPort, in any position" \
+      "direct-left=CR240DM (2):on the dock's DisplayPort | direct-right=CR240DM (1):on the dock's DisplayPort | stale=CR240DM (2):the only CR240DM not behind the KVM | ambiguous=none:can't tell which CR240DM is on the dock's DisplayPort | kvm-only=none:CR240DM reaches the dock through a KVM or adapter | other=none:no CR240DM connected | nodock=none:Elgato Systems dock not attached | serials=4251086178,0,1 | dock=true:0b,1d other-vendor=false" \
       "${hs_eligible}"
   else
     echo "  [SKIP] live Hammerspoon IPC checks (Hammerspoon not running, hs.ipc unavailable, or not visible to LaunchServices from this session)"
