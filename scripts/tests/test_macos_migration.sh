@@ -781,6 +781,10 @@ echo "[Test 15] ~/.hammerspoon/init.lua macOS 15+ space-moving & multi-workspace
     bash -c "grep -q '_G.HS_KEEPALIVE.taps.switchShortcutTap = switchShortcutTap' '${hs_init}' && grep -q 'switchShortcutsWatcher = hs.pathwatcher.new' '${hs_init}'"
   assert_true "init.lua exposes workspaceMover for live IPC testing" \
     grep -q "^workspaceMover = {" "${hs_init}"
+  assert_true "init.lua re-syncs the left monitor on display wake (screensDidWake), not on unlock" \
+    bash -c "grep -q 'event == w.screensDidWake' '${hs_init}' && grep -q 'scr:setMode(alt.w, alt.h, alt.scale, alt.freq, alt.depth)' '${hs_init}'"
+  assert_true "init.lua roots the display re-sync watchers and exposes displayResync for IPC testing" \
+    bash -c "grep -q '_G.HS_KEEPALIVE.watchers.resyncPowerWatcher = resyncPowerWatcher' '${hs_init}' && grep -q '^displayResync = {' '${hs_init}'"
   assert_true "init.lua defines buildAllWorkspacesChooserChoices for cross-workspace Alt-Tab" \
     grep -q "local function buildAllWorkspacesChooserChoices" "${hs_init}"
   assert_true "init.lua pre-populates default workspace prefix filter ^<N> " \
@@ -870,6 +874,11 @@ EOF
     hs_owned="$(hs_ipc 5 -c "local m = workspaceMover.symbolicEntryMatches; if type(m) ~= 'function' then return 'MISSING' end; local function e(on, kc, fl) return { enabled = on, value = { parameters = { 65535, kc, fl } } } end; return table.concat({ 'same=' .. tostring(m(119, e(true, 19, 0xC0000), 19, 0xC0000)), 'disabled=' .. tostring(m(123, e(false, 22, 0xC0000), 22, 0xC0000)), 'stock-ctrl2=' .. tostring(m(119, e(true, 19, 0x40000), 19, 0xC0000)), 'arrow-fn=' .. tostring(m(81, e(true, 124, 0x8C0000), 124, 0xC0000)), 'absent79=' .. tostring(m(79, nil, 123, 0xC0000)), 'absent118=' .. tostring(m(118, nil, 18, 0xC0000)) }, ' ')" || true)"
     assert_eq "macOS owns a Desktop shortcut only when enabled with the same keys (fn ignored, defaults honoured)" \
       "same=true disabled=false stock-ctrl2=false arrow-fn=true absent79=false absent118=false" "${hs_owned}"
+    # Display re-sync picks another refresh rate at the same resolution: 60 Hz
+    # unless already at 60 Hz, else the closest other rate; nil when none exists.
+    hs_resync="$(hs_ipc 5 -c "local a = displayResync and displayResync.alternateMode; if type(a) ~= 'function' then return 'MISSING' end; local function fake(cur, freqs) local modes = {} for i, f in ipairs(freqs) do modes[i] = { w = 1920, h = 1080, scale = 1, freq = f, depth = 8 } end return { currentMode = function() return { w = 1920, h = 1080, scale = 1, freq = cur, depth = 8 } end, availableModes = function() return modes end } end; local function alt(cur, freqs) local _, m = a(fake(cur, freqs)); return m and string.format('%g', m.freq) or 'nil' end; return table.concat({ '165=' .. alt(165, { 50, 60, 120, 144, 165 }), '60=' .. alt(60, { 50, 60, 120, 144, 165 }), '120=' .. alt(120, { 100, 120, 144 }), 'only60=' .. alt(60, { 60 }) }, ' ')" || true)"
+    assert_eq "display re-sync alternates to 60 Hz, else the closest other refresh rate" \
+      "165=60 60=50 120=100 only60=nil" "${hs_resync}"
   else
     echo "  [SKIP] live Hammerspoon IPC checks (Hammerspoon not running, hs.ipc unavailable, or not visible to LaunchServices from this session)"
   fi

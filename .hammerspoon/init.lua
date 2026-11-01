@@ -17,6 +17,8 @@
 --   6. <Alt>Tab MRU fuzzy window switcher (hs.chooser) with live 10px 85%-opaque
 --      blue highlight border (hs.canvas, replicating draw_border_around_window.py).
 --   7. <WM_MOD>z Zen Mode toggle & <WM_MOD>n terminal-scoped Notes launcher.
+--   8. Re-sync of the left CR240DM monitor after the displays wake (it can come
+--      back blank until its refresh rate is switched and switched back).
 -- =============================================================================
 
 -- Live Hammerspoon CLI (`/Applications/Hammerspoon.app/Contents/Frameworks/hs/hs -c '<lua>'`)
@@ -2364,3 +2366,127 @@ end)
 keepHotkey({"ctrl", "alt"}, "l", function()
   hs.caffeinate.lockScreen()
 end)
+
+-- -----------------------------------------------------------------------------
+-- 8. Left Monitor Re-sync After Display Wake
+-- -----------------------------------------------------------------------------
+-- After the displays wake (already on the lock screen), the left CR240DM on the
+-- Elgato dock's DisplayPort output reconnects and then, about 20s later, can
+-- flicker and stay blank while macOS still has it connected. Switching its
+-- refresh rate to another rate and back (a fresh mode set) brings the picture
+-- back, so do that automatically: once the displays have settled after a wake,
+-- and again after any later reconnect within the post-wake window.
+local DISPLAY_RESYNC = {
+  -- hs.screen UUIDs of the monitors to re-sync (see `hs.screen.allScreens()`
+  -- and `screen:getUUID()`), mapped to a label for the log.
+  uuids = {
+    ["D97C93A8-F48E-4510-B3DC-14D61F4DE32C"] = "left CR240DM (Elgato DisplayPort)",
+  },
+  settleSec = 5,    -- quiet period after the last display change before acting
+  windowSec = 120,  -- keep watching for reconnects this long after a wake
+  holdSec = 1.5,    -- time on the alternate refresh rate before switching back
+  maxPerWake = 3,   -- re-sync at most this many times per wake
+}
+local resyncLog = hs.logger.new("dispResync", "info")
+local resyncState = { awake = true, wakeAt = 0, count = 0, busyUntil = 0, timer = nil, restoreTimer = nil }
+
+-- Returns the current mode and another refresh rate at the same resolution:
+-- 60 Hz when the display is not already at 60 Hz, otherwise the closest other
+-- rate (the higher one on ties). The second value is nil if there is none.
+local function alternateMode(scr)
+  local cur = scr:currentMode()
+  if not cur then return nil, nil end
+  local best = nil
+  for _, m in pairs(scr:availableModes() or {}) do
+    if m.w == cur.w and m.h == cur.h and m.scale == cur.scale and math.abs(m.freq - cur.freq) >= 0.5 then
+      if math.abs(cur.freq - 60) >= 0.5 and math.abs(m.freq - 60) < 0.5 then
+        return cur, m
+      end
+      local dm = math.abs(m.freq - cur.freq)
+      local db = best and math.abs(best.freq - cur.freq) or math.huge
+      if dm < db or (dm == db and m.freq > best.freq) then best = m end
+    end
+  end
+  return cur, best
+end
+
+local function findScreenByUUID(uuid)
+  for _, scr in ipairs(hs.screen.allScreens()) do
+    if scr:getUUID() == uuid then return scr end
+  end
+  return nil
+end
+
+-- Switches each configured monitor to an alternate refresh rate and back.
+-- Returns the number of monitors it re-synced.
+local function resyncDisplays(reason)
+  local now = hs.timer.secondsSinceEpoch()
+  local restore = {}
+  for uuid, label in pairs(DISPLAY_RESYNC.uuids) do
+    local scr = findScreenByUUID(uuid)
+    local cur, alt = nil, nil
+    if scr then cur, alt = alternateMode(scr) end
+    if cur and alt then
+      -- Ignore the display changes caused by our own mode switches.
+      resyncState.busyUntil = now + DISPLAY_RESYNC.holdSec + 4
+      resyncLog.i(string.format("%s: %s %dx%d@%gHz -> %gHz and back", reason, label, cur.w, cur.h, cur.freq, alt.freq))
+      scr:setMode(alt.w, alt.h, alt.scale, alt.freq, alt.depth)
+      restore[#restore + 1] = { uuid = uuid, mode = cur }
+    end
+  end
+  if #restore > 0 then
+    resyncState.restoreTimer = hs.timer.doAfter(DISPLAY_RESYNC.holdSec, function()
+      resyncState.restoreTimer = nil
+      for _, r in ipairs(restore) do
+        local scr = findScreenByUUID(r.uuid)
+        if scr then scr:setMode(r.mode.w, r.mode.h, r.mode.scale, r.mode.freq, r.mode.depth) end
+      end
+      resyncState.busyUntil = hs.timer.secondsSinceEpoch() + 3
+    end)
+  end
+  return #restore
+end
+
+-- (Re)starts the settle timer while inside the post-wake window.
+local function scheduleResync(reason)
+  local now = hs.timer.secondsSinceEpoch()
+  if not resyncState.awake or now > resyncState.wakeAt + DISPLAY_RESYNC.windowSec then return end
+  if resyncState.count >= DISPLAY_RESYNC.maxPerWake then return end
+  if resyncState.timer then resyncState.timer:stop() end
+  resyncState.timer = hs.timer.doAfter(DISPLAY_RESYNC.settleSec, function()
+    resyncState.timer = nil
+    if resyncState.awake and resyncDisplays(reason) > 0 then
+      resyncState.count = resyncState.count + 1
+    end
+  end)
+end
+
+local resyncPowerWatcher = hs.caffeinate.watcher.new(function(event)
+  local w = hs.caffeinate.watcher
+  if event == w.screensDidSleep or event == w.systemWillSleep then
+    resyncState.awake = false
+    if resyncState.timer then resyncState.timer:stop(); resyncState.timer = nil end
+  elseif event == w.screensDidWake or event == w.systemDidWake then
+    resyncState.awake = true
+    resyncState.wakeAt = hs.timer.secondsSinceEpoch()
+    resyncState.count = 0
+    scheduleResync("display wake")
+  end
+end)
+resyncPowerWatcher:start()
+
+local resyncScreenWatcher = hs.screen.watcher.new(function()
+  if hs.timer.secondsSinceEpoch() < resyncState.busyUntil then return end
+  scheduleResync("display reconnect after wake")
+end)
+resyncScreenWatcher:start()
+_G.HS_KEEPALIVE.watchers.resyncPowerWatcher = resyncPowerWatcher
+_G.HS_KEEPALIVE.watchers.resyncScreenWatcher = resyncScreenWatcher
+
+-- Global for live IPC testing and manual use: `displayResync.resyncNow()`.
+displayResync = {
+  config = DISPLAY_RESYNC,
+  state = resyncState,
+  alternateMode = alternateMode,
+  resyncNow = function() return resyncDisplays("manual") end,
+}
