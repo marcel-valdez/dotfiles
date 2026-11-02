@@ -57,10 +57,30 @@ eval "$(echo "$DATA" | jq -r '
   "
 ' 2>/dev/null)"
 
+# CitC and Fig clients live under /google/src/cloud/<user>/<workspace>: show the
+# workspace (with its owner when it isn't yours) instead of a branch, tagged fig
+# when the client has an hg repo, else citc. Path-only, so no FUSE-heavy calls.
+VCS_WORKSPACE=''
+CITC_PATH_RE='^/google/src/cloud/([^/]+)/([^/]+)'
+if [[ "${CWD}" =~ ${CITC_PATH_RE} ]]; then
+  citc_owner="${BASH_REMATCH[1]}"
+  citc_root="/google/src/cloud/${citc_owner}/${BASH_REMATCH[2]}"
+  VCS_WORKSPACE="${BASH_REMATCH[2]}"
+  if [[ "${citc_owner}" != "${USER:-$(id -un 2>/dev/null)}" ]]; then
+    VCS_WORKSPACE="${citc_owner}/${VCS_WORKSPACE}"
+  fi
+  if [[ "${VCS_TYPE}" == "hg" || "${VCS_TYPE}" == "fig" || -d "${citc_root}/.hg" || -d "${citc_root}/google3/.hg" ]]; then
+    VCS_WORKSPACE="fig:${VCS_WORKSPACE}"
+  else
+    VCS_WORKSPACE="citc:${VCS_WORKSPACE}"
+  fi
+fi
+
 # Newer CLIs send only vcs.type, so ask git for the branch (the short commit
 # when detached) and whether tracked files have uncommitted changes. Skipping
 # untracked files and optional locks keeps it fast (~20ms) and out of the way.
-if [[ -z "${VCS_BRANCH}" ]] && [[ -z "${VCS_TYPE}" || "${VCS_TYPE}" == "git" ]] && [[ -d "${CWD}" ]]; then
+if [[ -z "${VCS_WORKSPACE}" ]] && [[ -z "${VCS_BRANCH}" ]] && [[ -z "${VCS_TYPE}" || "${VCS_TYPE}" == "git" ]] &&
+   [[ -d "${CWD}" ]]; then
   VCS_BRANCH=$(git -C "${CWD}" symbolic-ref --quiet --short HEAD 2>/dev/null ||
     git -C "${CWD}" rev-parse --short HEAD 2>/dev/null)
   if [[ -n "${VCS_BRANCH}" ]] &&
@@ -70,7 +90,7 @@ if [[ -z "${VCS_BRANCH}" ]] && [[ -z "${VCS_TYPE}" || "${VCS_TYPE}" == "git" ]] 
 fi
 
 if debug_enabled; then
-  log::debug "STATE=${STATE} USED_PCT=${USED_PCT} VCS_TYPE=${VCS_TYPE} VCS_BRANCH=${VCS_BRANCH} VCS_DIRTY=${VCS_DIRTY}" \
+  log::debug "STATE=${STATE} USED_PCT=${USED_PCT} VCS_TYPE=${VCS_TYPE} VCS_WORKSPACE=${VCS_WORKSPACE} VCS_BRANCH=${VCS_BRANCH} VCS_DIRTY=${VCS_DIRTY}" \
     "SANDBOX=${SANDBOX} TASKS_COUNT=${TASKS_COUNT} ARTIFACTS_COUNT=${ARTIFACTS_COUNT}" \
     "MODEL_NAME=${MODEL_NAME} COLS=${COLS} CONFIRMATION_DIALOG_PENDING=${CONFIRMATION_DIALOG_PENDING}" \
     "CONVERSATION_ID=${CONVERSATION_ID}"
@@ -171,7 +191,9 @@ esac
 
 # Format VCS
 VCS_FMT=""
-if [ -n "$VCS_BRANCH" ]; then
+if [ -n "$VCS_WORKSPACE" ]; then
+  VCS_FMT=" \033[36m☁ $VCS_WORKSPACE\033[0m"
+elif [ -n "$VCS_BRANCH" ]; then
   if [ "$VCS_DIRTY" = "true" ]; then
     VCS_FMT=" \033[31m $VCS_BRANCH*\033[0m"
   else

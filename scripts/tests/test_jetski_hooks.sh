@@ -892,6 +892,22 @@ printf 'two\n' >> "${SL_REPO}/tracked.txt"
 assert_contains "tc21-branch*" "$(invoke_statusline "${SL_GIT_PAYLOAD}")" \
   "TC-21: Uncommitted changes to tracked files mark the git branch dirty"
 
+# CitC and Fig clients: the workspace name comes from the /google/src/cloud path.
+SL_CITC_CWD="/google/src/cloud/${USER:-$(id -un)}/tc21_ws/google3/foo"
+assert_contains "☁ citc:tc21_ws" \
+  "$(invoke_statusline "$(jq -cn --arg cwd "${SL_CITC_CWD}" '{conversation_id: "tc21-citc", cwd: $cwd, terminal_width: 120}')")" \
+  "TC-21: A CitC client shows its workspace name"
+assert_contains "☁ fig:tc21_ws" \
+  "$(invoke_statusline "$(jq -cn --arg cwd "${SL_CITC_CWD}" \
+    '{conversation_id: "tc21-citc", workspace: {current_dir: $cwd}, vcs: {type: "hg"}, terminal_width: 120}')")" \
+  "TC-21: A Fig (hg) client shows its workspace name tagged fig"
+assert_contains "☁ citc:tc21_other_user/their_ws" \
+  "$(invoke_statusline '{"conversation_id":"tc21-citc","cwd":"/google/src/cloud/tc21_other_user/their_ws","terminal_width":120}')" \
+  "TC-21: Another user's CitC client shows owner/workspace"
+assert_not_contains "☁" \
+  "$(invoke_statusline '{"conversation_id":"tc21-citc","cwd":"/google/src/files/head/depot/google3","terminal_width":120}')" \
+  "TC-21: Read-only depot paths are not shown as a workspace"
+
 OUT_21_INVALID=$(invoke_statusline "not json")
 assert_not_contains "expression expected" "${OUT_21_INVALID}" "TC-21: Unparsable payload falls back to defaults without shell errors"
 assert_contains "READY" "${OUT_21_INVALID}" "TC-21: Unparsable payload still renders the status line"
