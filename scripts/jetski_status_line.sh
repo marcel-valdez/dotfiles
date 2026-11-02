@@ -76,10 +76,13 @@ if [[ "${CWD}" =~ ${CITC_PATH_RE} ]]; then
   fi
 fi
 
-# Newer CLIs send only vcs.type, so ask git for the branch (the short commit
-# when detached) and whether tracked files have uncommitted changes. Skipping
-# untracked files and optional locks keeps it fast (~20ms) and out of the way.
-if [[ -z "${VCS_WORKSPACE}" ]] && [[ -z "${VCS_BRANCH}" ]] && [[ -z "${VCS_TYPE}" || "${VCS_TYPE}" == "git" ]] &&
+# Newer CLIs send only vcs.type (and on gLinux report vcs.type="g4" outside
+# CitC because `g4 info` prints a default client before "Client unknown."), so
+# ask git for the branch (the short commit when detached) and whether tracked
+# files have uncommitted changes. Skipping untracked files and optional locks
+# keeps it fast (~20ms) and out of the way.
+if [[ -z "${VCS_WORKSPACE}" ]] && [[ -z "${VCS_BRANCH}" ]] &&
+   [[ -z "${VCS_TYPE}" || "${VCS_TYPE}" == "git" || "${VCS_TYPE}" == "g4" ]] &&
    [[ -d "${CWD}" ]]; then
   VCS_BRANCH=$(git -C "${CWD}" symbolic-ref --quiet --short HEAD 2>/dev/null ||
     git -C "${CWD}" rev-parse --short HEAD 2>/dev/null)

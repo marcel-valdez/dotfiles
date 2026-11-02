@@ -891,6 +891,10 @@ assert_not_contains "tc21-branch*" "${OUT_21_GIT_CLEAN}" "TC-21: Untracked files
 printf 'two\n' >> "${SL_REPO}/tracked.txt"
 assert_contains "tc21-branch*" "$(invoke_statusline "${SL_GIT_PAYLOAD}")" \
   "TC-21: Uncommitted changes to tracked files mark the git branch dirty"
+SL_GLINUX_G4_PAYLOAD=$(jq -cn --arg cwd "${SL_REPO}" \
+  '{agent_state: "working", conversation_id: "tc21-g4-git", vcs: {type: "g4", client: "user-defaultclient"}, workspace: {current_dir: $cwd}, terminal_width: 120}')
+assert_contains "tc21-branch*" "$(invoke_statusline "${SL_GLINUX_G4_PAYLOAD}")" \
+  "TC-21: Non-CitC git repo still resolves git branch when CLI reports vcs.type=g4 on gLinux"
 
 # CitC and Fig clients: the workspace name comes from the /google/src/cloud path.
 SL_CITC_CWD="/google/src/cloud/${USER:-$(id -un)}/tc21_ws/google3/foo"
