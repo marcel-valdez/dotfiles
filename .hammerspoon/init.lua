@@ -2369,7 +2369,7 @@ keepHotkey({"ctrl", "alt"}, "l", function()
 end)
 
 -- -----------------------------------------------------------------------------
--- 8. Monitor Re-sync After Display Wake (Elgato Dock DisplayPort)
+-- 8. Monitor Re-sync After Display Wake (Elgato Dock DisplayPort; <WM_MOD>r)
 -- -----------------------------------------------------------------------------
 -- After the displays wake (already on the lock screen), the CR240DM plugged into
 -- the Elgato dock's DisplayPort output reconnects and then, about 20s later,
@@ -2378,7 +2378,10 @@ end)
 -- back, so do that automatically, but only when needed: each time that monitor
 -- comes back after dropping out since the displays slept (it does once the
 -- monitors reached "no signal" standby, not after a short lock), shortly after
--- the wake.
+-- the wake. <WM_MOD>r runs the same switch on demand, for when the monitor stays
+-- blank anyway (after hours off, a switch may only stick once it has been on for
+-- a few minutes) or goes blank later; macOS still reports it as working then,
+-- so that can't be detected.
 --
 -- Only acts on a CR240DM that reaches the Mac through the Elgato dock's own
 -- DisplayPort output, wherever it sits in the arrangement: never on one that
@@ -2586,7 +2589,7 @@ local function resyncIfEligible(reason, onDone, requireReconnect)
       end
     end
     if #targets == 0 then resyncLog.i(reason .. ": skipped (" .. why .. ")") end
-    if onDone then onDone(count) end
+    if onDone then onDone(count, why, targets) end
   end
   local profiler = hs.task.new("/usr/sbin/system_profiler", function(_, out)
     facts.serials = displaySerials(out)
@@ -2647,6 +2650,21 @@ resyncScreenWatcher:start()
 _G.HS_KEEPALIVE.watchers.resyncPowerWatcher = resyncPowerWatcher
 _G.HS_KEEPALIVE.watchers.resyncScreenWatcher = resyncScreenWatcher
 
+-- <WM_MOD>r: re-sync the qualifying monitor now (same checks and switch).
+local resyncHotkey = keepHotkey(WM_MOD, "r", function()
+  resyncIfEligible("hotkey", function(count, why, targets)
+    if count > 0 then
+      local names = {}
+      for _, scr in ipairs(targets) do names[#names + 1] = tostring(scr:name()) end
+      hs.alert.show("Re-syncing " .. table.concat(names, ", "), 1)
+    elseif #targets > 0 then
+      hs.alert.show("Display re-sync: no other refresh rate to switch to", 2)
+    else
+      hs.alert.show("Display re-sync skipped: " .. why, 2)
+    end
+  end, false)
+end)
+
 -- Global for live IPC testing and manual use: `displayResync.resyncNow()`
 -- re-syncs the qualifying monitor right away (no drop-out needed) and logs it.
 displayResync = {
@@ -2657,5 +2675,6 @@ displayResync = {
   dockDisplayPortSinks = dockDisplayPortSinks,
   eligibleScreens = eligibleScreens,
   trackScreens = trackScreens,
+  hotkey = resyncHotkey,
   resyncNow = function() resyncIfEligible("manual", nil, false) end,
 }
