@@ -38,11 +38,12 @@ fi
 
 # Extract fields using jq. These defaults stay when the payload is empty or not
 # valid JSON.
-STATE='idle' USED_PCT='0' VCS_BRANCH='' VCS_DIRTY='false' SANDBOX='false' TASKS_COUNT='0'
-ARTIFACTS_COUNT='0' MODEL_NAME='' COLS='80' CONFIRMATION_DIALOG_PENDING='false' CONVERSATION_ID=''
+STATE='idle' USED_PCT='0' VCS_TYPE='' VCS_BRANCH='' VCS_DIRTY='false' SANDBOX='false' TASKS_COUNT='0'
+ARTIFACTS_COUNT='0' MODEL_NAME='' COLS='80' CONFIRMATION_DIALOG_PENDING='false' CONVERSATION_ID='' CWD=''
 eval "$(echo "$DATA" | jq -r '
   "STATE=\(.agent_state // "idle" | @sh)
    USED_PCT=\(.context_window.used_percentage // 0 | @sh)
+   VCS_TYPE=\(.vcs.type // "" | @sh)
    VCS_BRANCH=\(.vcs.branch // "" | @sh)
    VCS_DIRTY=\(.vcs.dirty // false | @sh)
    SANDBOX=\(.sandbox.enabled // false | @sh)
@@ -52,11 +53,24 @@ eval "$(echo "$DATA" | jq -r '
    COLS=\(.terminal_width // 80 | @sh)
    CONFIRMATION_DIALOG_PENDING=\(.tool_confirmation_pending // false | @sh)
    CONVERSATION_ID=\(.conversation_id // "" | @sh)
+   CWD=\(.workspace.current_dir // .cwd // "" | @sh)
   "
 ' 2>/dev/null)"
 
+# Newer CLIs send only vcs.type, so ask git for the branch (the short commit
+# when detached) and whether tracked files have uncommitted changes. Skipping
+# untracked files and optional locks keeps it fast (~20ms) and out of the way.
+if [[ -z "${VCS_BRANCH}" ]] && [[ -z "${VCS_TYPE}" || "${VCS_TYPE}" == "git" ]] && [[ -d "${CWD}" ]]; then
+  VCS_BRANCH=$(git -C "${CWD}" symbolic-ref --quiet --short HEAD 2>/dev/null ||
+    git -C "${CWD}" rev-parse --short HEAD 2>/dev/null)
+  if [[ -n "${VCS_BRANCH}" ]] &&
+     [[ -n "$(git --no-optional-locks -C "${CWD}" status --porcelain --untracked-files=no 2>/dev/null)" ]]; then
+    VCS_DIRTY='true'
+  fi
+fi
+
 if debug_enabled; then
-  log::debug "STATE=${STATE} USED_PCT=${USED_PCT} VCS_BRANCH=${VCS_BRANCH} VCS_DIRTY=${VCS_DIRTY}" \
+  log::debug "STATE=${STATE} USED_PCT=${USED_PCT} VCS_TYPE=${VCS_TYPE} VCS_BRANCH=${VCS_BRANCH} VCS_DIRTY=${VCS_DIRTY}" \
     "SANDBOX=${SANDBOX} TASKS_COUNT=${TASKS_COUNT} ARTIFACTS_COUNT=${ARTIFACTS_COUNT}" \
     "MODEL_NAME=${MODEL_NAME} COLS=${COLS} CONFIRMATION_DIALOG_PENDING=${CONFIRMATION_DIALOG_PENDING}" \
     "CONVERSATION_ID=${CONVERSATION_ID}"

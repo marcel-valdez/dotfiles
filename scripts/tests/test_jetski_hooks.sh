@@ -874,6 +874,24 @@ assert_eq "1" "$(printf '%s\n' "${OUT_21_WIDE}" | wc -l | tr -d ' ')" "TC-21: St
 OUT_21_NARROW=$(invoke_statusline "$(statusline_payload tc21-render 42.5 false 80)")
 assert_eq "2" "$(printf '%s\n' "${OUT_21_NARROW}" | wc -l | tr -d ' ')" "TC-21: Status line uses two lines below 100 columns"
 
+# Newer CLIs send only vcs.type: the branch and dirty marker come from git.
+SL_REPO="${SL_HOME}/repo"
+git init -q "${SL_REPO}" 2>/dev/null
+printf 'one\n' > "${SL_REPO}/tracked.txt"
+git -C "${SL_REPO}" add tracked.txt
+git -C "${SL_REPO}" -c user.name=test -c user.email=test@example.com -c commit.gpgsign=false \
+  commit -q --no-verify -m init
+git -C "${SL_REPO}" checkout -q -b tc21-branch
+SL_GIT_PAYLOAD=$(jq -cn --arg cwd "${SL_REPO}" \
+  '{agent_state: "working", conversation_id: "tc21-git", vcs: {type: "git"}, workspace: {current_dir: $cwd}, terminal_width: 120}')
+printf 'untracked\n' > "${SL_REPO}/untracked.txt"
+OUT_21_GIT_CLEAN=$(invoke_statusline "${SL_GIT_PAYLOAD}")
+assert_contains "tc21-branch" "${OUT_21_GIT_CLEAN}" "TC-21: Without vcs.branch, the branch comes from git"
+assert_not_contains "tc21-branch*" "${OUT_21_GIT_CLEAN}" "TC-21: Untracked files alone don't mark the branch dirty"
+printf 'two\n' >> "${SL_REPO}/tracked.txt"
+assert_contains "tc21-branch*" "$(invoke_statusline "${SL_GIT_PAYLOAD}")" \
+  "TC-21: Uncommitted changes to tracked files mark the git branch dirty"
+
 OUT_21_INVALID=$(invoke_statusline "not json")
 assert_not_contains "expression expected" "${OUT_21_INVALID}" "TC-21: Unparsable payload falls back to defaults without shell errors"
 assert_contains "READY" "${OUT_21_INVALID}" "TC-21: Unparsable payload still renders the status line"
