@@ -824,6 +824,104 @@ assert_contains "-title Darwin Hook Title" "$(cat "${DARWIN_NOTIFY_LOG}" 2>/dev/
 rm -rf "${DARWIN_MOCK_BIN}" "${DARWIN_NOTIFY_LOG}"
 
 # ---------------------------------------------------------
+# TC-21: Status line script (jetski_status_line.sh)
+# ---------------------------------------------------------
+printf "\nTest Case 21: Status line rendering and notifications\n"
+# Hermetic: a HOME with the real log library and a mock agent_notify.sh that
+# records notification titles, tracker files in a temp dir, and /bin/bash
+# (3.2 on macOS) as the CLI uses through the script's shebang.
+SL_HOME="$(mktemp -d "/tmp/jetski_statusline_home.XXXXXX")"
+SL_STATE="${SL_HOME}/state"
+SL_NOTIFY_LOG="${SL_HOME}/notify.log"
+mkdir -p "${SL_HOME}/lib" "${SL_HOME}/scripts" "${SL_STATE}"
+ln -s "${HOME}/lib/log_lib.sh" "${SL_HOME}/lib/log_lib.sh"
+printf '#!/bin/sh\nprintf "%%s\\n" "$1" >> "%s"\n' "${SL_NOTIFY_LOG}" > "${SL_HOME}/scripts/agent_notify.sh"
+chmod +x "${SL_HOME}/scripts/agent_notify.sh"
+
+# Runs the status line on a payload; prints its output (and errors) without colors.
+function invoke_statusline {
+  printf '%s' "$1" |
+    HOME="${SL_HOME}" JETSKI_STATUSLINE_STATE_DIR="${SL_STATE}" /bin/bash "${SCRIPT_DIR}/jetski_status_line.sh" 2>&1 |
+    sed $'s/\033\\[[0-9;]*m//g' || true
+}
+# statusline_payload <conversation id> <used %> <approval pending> <terminal width>
+function statusline_payload {
+  jq -cn --arg cid "$1" --argjson pct "$2" --argjson pending "$3" --argjson width "$4" '{
+    agent_state: "idle", conversation_id: $cid, model: {display_name: "Test Model"},
+    vcs: {branch: "main", dirty: true}, context_window: {used_percentage: $pct},
+    task_count: 2, artifact_count: 3, tool_confirmation_pending: $pending, terminal_width: $width
+  }'
+}
+# Waits for at least <count> recorded notifications, then a little longer so an
+# unexpected extra one would land too.
+function wait_for_statusline_notifications {
+  local i n
+  for i in $(seq 1 30); do
+    n=$(wc -l < "${SL_NOTIFY_LOG}" 2>/dev/null || echo 0)
+    [[ "${n}" -ge "$1" ]] && break
+    sleep 0.1
+  done
+  sleep 0.5
+}
+
+OUT_21_WIDE=$(invoke_statusline "$(statusline_payload tc21-render 42.5 false 120)")
+assert_contains "READY" "${OUT_21_WIDE}" "TC-21: Status line renders the agent state"
+assert_contains "Test Model" "${OUT_21_WIDE}" "TC-21: Status line renders the model name"
+assert_contains "main*" "${OUT_21_WIDE}" "TC-21: Status line marks a dirty VCS branch"
+assert_contains "▰▰▰▰▱▱▱▱▱▱ 42.50%" "${OUT_21_WIDE}" "TC-21: Status line renders the context bar and percentage"
+assert_contains "Tasks: 2 │ Artifacts: 3" "${OUT_21_WIDE}" "TC-21: Status line renders task and artifact counts"
+assert_eq "1" "$(printf '%s\n' "${OUT_21_WIDE}" | wc -l | tr -d ' ')" "TC-21: Status line uses one line at 100+ columns"
+OUT_21_NARROW=$(invoke_statusline "$(statusline_payload tc21-render 42.5 false 80)")
+assert_eq "2" "$(printf '%s\n' "${OUT_21_NARROW}" | wc -l | tr -d ' ')" "TC-21: Status line uses two lines below 100 columns"
+
+OUT_21_INVALID=$(invoke_statusline "not json")
+assert_not_contains "expression expected" "${OUT_21_INVALID}" "TC-21: Unparsable payload falls back to defaults without shell errors"
+assert_contains "READY" "${OUT_21_INVALID}" "TC-21: Unparsable payload still renders the status line"
+
+: > "${SL_NOTIFY_LOG}"
+invoke_statusline "$(statusline_payload tc21-dialog 10 true 120)" > /dev/null
+invoke_statusline "$(statusline_payload tc21-dialog 10 true 120)" > /dev/null
+wait_for_statusline_notifications 1
+assert_eq "1" "$(grep -c 'User approval required' "${SL_NOTIFY_LOG}" || true)" \
+  "TC-21: Pending approval notifies once, not on every refresh (no GNU stat needed)"
+invoke_statusline "$(statusline_payload tc21-dialog 10 false 120)" > /dev/null
+assert_eq "0" "$(wc -c < "${SL_STATE}/jetski_dialog_tc21-dialog.txt" | tr -d ' ')" \
+  "TC-21: Answered approval clears the dialog tracker"
+
+: > "${SL_NOTIFY_LOG}"
+for pct in 50 62 63 86 87; do
+  invoke_statusline "$(statusline_payload tc21-context "${pct}" false 120)" > /dev/null
+done
+wait_for_statusline_notifications 2
+assert_eq "Jetski CLI: Context 60% used|Jetski CLI: Context 85% used" \
+  "$(sort "${SL_NOTIFY_LOG}" | paste -s -d '|' -)" \
+  "TC-21: Context crossing 60% and 85% notifies once each"
+
+touch -t 202001010000 "${SL_STATE}/jetski_dialog_tc21-stale.txt" "${SL_STATE}/jetski_context_pct_tc21-stale.txt"
+invoke_statusline "$(statusline_payload tc21-prune 10 false 120)" > /dev/null
+for _i in $(seq 1 30); do
+  [[ -e "${SL_STATE}/jetski_dialog_tc21-stale.txt" ]] || break
+  sleep 0.1
+done
+assert_file_not_exists "${SL_STATE}/jetski_dialog_tc21-stale.txt" \
+  "TC-21: A new conversation prunes week-old status line tracker files"
+assert_file_exists "${SL_STATE}/jetski_dialog_tc21-prune.txt" \
+  "TC-21: Pruning keeps the current conversation's tracker file"
+
+SL_LOG="${SL_HOME}/statusline.log"
+LOG_FILE="${SL_LOG}" LOG_LEVEL=2 invoke_statusline "$(statusline_payload tc21-log 10 false 120)" > /dev/null
+sleep 0.3
+assert_not_contains "PAYLOAD" "$(cat "${SL_LOG}" 2>/dev/null || true)" \
+  "TC-21: Payload is not dumped (no jq run) at the default log level"
+LOG_FILE="${SL_LOG}" LOG_LEVEL=3 invoke_statusline "$(statusline_payload tc21-log 10 false 120)" > /dev/null
+for _i in $(seq 1 20); do
+  grep -q "PAYLOAD" "${SL_LOG}" 2>/dev/null && break
+  sleep 0.1
+done
+assert_contains "PAYLOAD" "$(cat "${SL_LOG}" 2>/dev/null || true)" "TC-21: Payload is dumped with LOG_LEVEL=3"
+rm -rf "${SL_HOME}"
+
+# ---------------------------------------------------------
 # Test Results Summary
 # ---------------------------------------------------------
 printf "\n========================================\n"

@@ -2,6 +2,11 @@
 # set -euo pipefail
 # set -u
 
+# Jetski CLI status line, set with `/statusline ~/scripts/jetski_status_line.sh`.
+# Renders the JSON payload the CLI sends on stdin and sends a desktop
+# notification when a tool approval is pending and when the context window
+# crosses 60% and 85%. Runs on Linux and on macOS (/bin/bash 3.2, BSD tools).
+
 export LOG_SCRIPT_NAME=
 LOG_SCRIPT_NAME="$(basename "$0")"
 [[ -z "${LOG_LEVEL:-}" ]] && export LOG_LEVEL=2
@@ -19,16 +24,25 @@ function run {
   "$@"
 }
 
+# Every log::debug call forks and the payload dump runs jq, on each refresh, so
+# only do them when debug logging is on (LOG_LEVEL=3, or the deprecated DEBUG).
+function debug_enabled {
+  [[ "${LOG_LEVEL}" -ge 3 ]] || [[ -n "${DEBUG:-}" ]]
+}
+
 # Read JSON payload from stdin
 DATA=$(cat)
-log::debug "PAYLOAD: $(echo "${DATA}" | run jq --monochrome-output)"
+if debug_enabled; then
+  log::debug "PAYLOAD: $(echo "${DATA}" | run jq --monochrome-output)"
+fi
 
-# Extract fields using jq
+# Extract fields using jq. These defaults stay when the payload is empty or not
+# valid JSON.
+STATE='idle' USED_PCT='0' VCS_BRANCH='' VCS_DIRTY='false' SANDBOX='false' TASKS_COUNT='0'
+ARTIFACTS_COUNT='0' MODEL_NAME='' COLS='80' CONFIRMATION_DIALOG_PENDING='false' CONVERSATION_ID=''
 eval "$(echo "$DATA" | jq -r '
   "STATE=\(.agent_state // "idle" | @sh)
-   CWD=\(.workspace.current_dir // "" | @sh)
    USED_PCT=\(.context_window.used_percentage // 0 | @sh)
-   COST=\(.cost.total_cost_usd // 0 | @sh)
    VCS_BRANCH=\(.vcs.branch // "" | @sh)
    VCS_DIRTY=\(.vcs.dirty // false | @sh)
    SANDBOX=\(.sandbox.enabled // false | @sh)
@@ -39,25 +53,28 @@ eval "$(echo "$DATA" | jq -r '
    CONFIRMATION_DIALOG_PENDING=\(.tool_confirmation_pending // false | @sh)
    CONVERSATION_ID=\(.conversation_id // "" | @sh)
   "
-' 2>/dev/null || echo "STATE='idle' CWD='' USED_PCT='0' COST='0' VCS_BRANCH='' VCS_DIRTY='false' SANDBOX='false' TASKS_COUNT='0' ARTIFACTS_COUNT='0' MODEL_NAME='' CONFIRMATION_DIALOG_PENDING='false' CONVERSATION_ID=''")"
+' 2>/dev/null)"
 
-log::debug "STATE=${STATE}"
-log::debug "CWD=${CWD}"
-log::debug "USED_PCT=${USED_PCT}"
-log::debug "COST=${COST}"
-log::debug "VCS_BRANCH=${VCS_BRANCH}"
-log::debug "VCS_DIRTY=${VCS_DIRTY}"
-log::debug "SANDBOX=${SANDBOX}"
-log::debug "TASKS_COUNT=${TASKS_COUNT}"
-log::debug "ARTIFACTS_COUNT=${ARTIFACTS_COUNT}"
-log::debug "MODEL_NAME=${MODEL_NAME}"
-log::debug "CONFIRMATION_DIALOG_PENDING=${CONFIRMATION_DIALOG_PENDING:-}"
-log::debug "CONVERSATION_ID=${CONVERSATION_ID:-}"
+if debug_enabled; then
+  log::debug "STATE=${STATE} USED_PCT=${USED_PCT} VCS_BRANCH=${VCS_BRANCH} VCS_DIRTY=${VCS_DIRTY}" \
+    "SANDBOX=${SANDBOX} TASKS_COUNT=${TASKS_COUNT} ARTIFACTS_COUNT=${ARTIFACTS_COUNT}" \
+    "MODEL_NAME=${MODEL_NAME} COLS=${COLS} CONFIRMATION_DIALOG_PENDING=${CONFIRMATION_DIALOG_PENDING}" \
+    "CONVERSATION_ID=${CONVERSATION_ID}"
+fi
 if [[ -z ${CONVERSATION_ID:-} ]]; then
   CONVERSATION_ID="${PPID}"
 fi
 
-DIALOG_TRACKER_FILE="/tmp/jetski_dialog_${CONVERSATION_ID}.txt"
+# Per-conversation tracker files. When a conversation starts being tracked,
+# delete the ones untouched for a week (the trailing slash makes find descend
+# into macOS's /tmp, which is a symlink to /private/tmp).
+STATE_DIR="${JETSKI_STATUSLINE_STATE_DIR:-/tmp}"
+DIALOG_TRACKER_FILE="${STATE_DIR}/jetski_dialog_${CONVERSATION_ID}.txt"
+CONTEXT_PCT_TRACKER_FILE="${STATE_DIR}/jetski_context_pct_${CONVERSATION_ID}.txt"
+if ! [[ -e "${DIALOG_TRACKER_FILE}" ]]; then
+  dispatch find "${STATE_DIR}/" -maxdepth 1 \
+    \( -name 'jetski_dialog_*.txt' -o -name 'jetski_context_pct_*.txt' \) -mtime +7 -delete
+fi
 run touch "${DIALOG_TRACKER_FILE}"
 
 function populate_tmux_info {
@@ -96,7 +113,7 @@ function handle_dialog_notification {
     should_notify=1
     run echo -n $((start_time-2)) > "${DIALOG_TRACKER_FILE}"
   fi
-     
+
   if [ "${should_notify}" -eq 1 ]; then
     log::info "Notifying user about dialog"
     # TODO: Do all of this in a dispatched script, instead of doing it here inline.
@@ -107,24 +124,27 @@ function handle_dialog_notification {
   fi
 }
 
-# Handle async (fire & forget) processing
-dialog_tracker_size=$(run stat "${DIALOG_TRACKER_FILE}" --format '%s' 2>/dev/null)
-dialog_tracker_size=${dialog_tracker_size:-0}
-log::debug "dialog_tracker_size=${dialog_tracker_size}"
+function notify_context_milestone {
+  local milestone="$1"
+  log::info "Notifying user that the context window reached ${milestone}%"
+  populate_tmux_info
+  dispatch "${HOME}/scripts/agent_notify.sh" "Jetski CLI: Context ${milestone}% used" ""
+}
+
+# Handle async (fire & forget) processing. A non-empty tracker (-s) means the
+# pending dialog was already seen (portable, unlike GNU `stat --format`).
 if [[ "${CONFIRMATION_DIALOG_PENDING}" == "true" ]]; then
-  if [ "${dialog_tracker_size}" -eq 0 ]; then
+  if ! [[ -s "${DIALOG_TRACKER_FILE}" ]]; then
     date '+%s' > "${DIALOG_TRACKER_FILE}"
   fi
   handle_dialog_notification
-elif [ "${dialog_tracker_size}" -ne 0 ]; then
+elif [[ -s "${DIALOG_TRACKER_FILE}" ]]; then
   log::debug "clearing ${DIALOG_TRACKER_FILE}"
-  echo -n > "${DIALOG_TRACKER_FILE}"
+  : > "${DIALOG_TRACKER_FILE}"
 fi
 
-USED_PCT=${USED_PCT:-0}
-USED_PCT_FMT=$(printf "%.2f" "$USED_PCT")
-USED_PCT_INT=${USED_PCT%.*}
-USED_PCT_INT=${USED_PCT_INT:-0}
+printf -v USED_PCT_FMT "%.2f" "${USED_PCT}" 2>/dev/null || USED_PCT_FMT="0.00"
+USED_PCT_INT=${USED_PCT_FMT%.*}
 
 # Format state
 case "$STATE" in
@@ -151,20 +171,20 @@ if [ "$SANDBOX" = "true" ]; then
   SANDBOX_FMT="\033[32mSandbox: ON\033[0m"
 fi
 
-# Format Context usage bar
-CONTEXT_PCT_TRACKER_FILE="/tmp/jetski_context_pct_${CONVERSATION_ID}.txt"
+# Format Context usage bar, notifying once each time usage climbs past 60% and
+# 85% (dropping back below a lower milestone re-arms it).
 if ! [[ -f "${CONTEXT_PCT_TRACKER_FILE}" ]]; then
   echo "${USED_PCT_INT}" > "${CONTEXT_PCT_TRACKER_FILE}"
 fi
 
 PREV_USED_PCT_INT="$(run cat "${CONTEXT_PCT_TRACKER_FILE}" 2>/dev/null)"
-PREV_USED_PCT_INT=${PREV_USED_PCT_INT:-0}
+[[ "${PREV_USED_PCT_INT}" =~ ^[0-9]+$ ]] || PREV_USED_PCT_INT=0
 BAR_COLOR="\033[32m"
 if [ "${USED_PCT_INT}" -ge 85 ]; then
   if [ "${PREV_USED_PCT_INT}" -lt 85 ]; then
     # Track that a higher milestone was reached.
     echo "${USED_PCT_INT}" > "${CONTEXT_PCT_TRACKER_FILE}"
-    # TODO: NOTIFY USER CONTEXT REACHED 85%
+    notify_context_milestone 85
   fi
   BAR_COLOR="\033[31m"
 elif [ "${USED_PCT_INT}" -ge 60 ]; then
@@ -173,9 +193,9 @@ elif [ "${USED_PCT_INT}" -ge 60 ]; then
     echo "${USED_PCT_INT}" > "${CONTEXT_PCT_TRACKER_FILE}"
     # No notification
   elif [ "${PREV_USED_PCT_INT}" -lt 60 ]; then
-    # Tracke that a higher milestone was reached.
+    # Track that a higher milestone was reached.
     echo "${USED_PCT_INT}" > "${CONTEXT_PCT_TRACKER_FILE}"
-    # TODO: NOTIFY USER CONTEXT REACHED 60%
+    notify_context_milestone 60
   fi
   BAR_COLOR="\033[33m"
 elif [ "$USED_PCT_INT" -ge 35 ]; then
