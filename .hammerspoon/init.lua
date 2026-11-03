@@ -2760,7 +2760,12 @@ end
 
 local function currentScreenUUIDs()
   local present = {}
-  for _, scr in ipairs(hs.screen.allScreens()) do present[scr:getUUID()] = true end
+  for _, scr in ipairs(hs.screen.allScreens()) do
+    -- A screen can have no UUID yet while the displays wake (present[nil] used
+    -- to raise "table index is nil" and abort the wake handling)
+    local uuid = scr:getUUID()
+    if uuid then present[uuid] = true end
+  end
   return present
 end
 
@@ -2921,6 +2926,7 @@ displayResync = {
   dockDisplayPortSinks = dockDisplayPortSinks,
   eligibleScreens = eligibleScreens,
   trackScreens = trackScreens,
+  currentScreenUUIDs = currentScreenUUIDs,
   hotkey = resyncHotkey,
   resyncNow = function() resyncIfEligible("manual", nil, false) end,
 }
