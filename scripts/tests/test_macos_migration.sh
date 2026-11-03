@@ -827,18 +827,51 @@ echo "[Test 15] ~/.hammerspoon/init.lua macOS 15+ space-moving & multi-workspace
     bash -c "! grep -q '/opt/homebrew/bin/bash' '${hs_init}'"
 
   # Live checks against the running Hammerspoon over hs.ipc (skipped when it isn't running)
-  hs_cli="/Applications/Hammerspoon.app/Contents/Frameworks/hs/hs"
-  # hs_ipc <timeout_secs> <hs args...>: the hs CLI ignores -t while it shows its
-  # modal "Hammerspoon is not running, launch it?" alert, which happens whenever
-  # LaunchServices cannot see Hammerspoon from this session (e.g. a shell in a
-  # Background launchd session), so enforce a hard deadline with SIGALRM.
+  # hs_ipc <timeout_secs> -c <lua chunk>: evaluates <lua chunk> in the running
+  # Hammerspoon by sending it straight to its "Hammerspoon" hs.ipc message port
+  # (the legacy msgID 0 request: a flag byte + the code). The reply holds any
+  # printed output before the result, so print is silenced during the call, like
+  # `hs -q` (e.g. the "-- Loading extension: json" notice the first time a check
+  # touches hs.json); the handler restores print afterwards. The hs CLI isn't
+  # used: it first asks LaunchServices whether Hammerspoon is running, which
+  # always fails from a shell in a Background launchd session (such as a
+  # long-lived tmux server; see `launchctl managername`), and then shows a modal
+  # "launch it?" alert that ignores -t. SIGALRM still enforces a hard deadline.
+  cat << 'EOF' > "${TEST_TMP}/hs_ipc.py"
+import ctypes, ctypes.util, sys
+cf = ctypes.CDLL(ctypes.util.find_library("CoreFoundation"))
+vp = ctypes.c_void_p
+cf.CFStringCreateWithCString.restype = vp
+cf.CFStringCreateWithCString.argtypes = [vp, ctypes.c_char_p, ctypes.c_uint32]
+cf.CFMessagePortCreateRemote.restype = vp
+cf.CFMessagePortCreateRemote.argtypes = [vp, vp]
+cf.CFDataCreate.restype = vp
+cf.CFDataCreate.argtypes = [vp, ctypes.c_char_p, ctypes.c_long]
+cf.CFMessagePortSendRequest.restype = ctypes.c_int32
+cf.CFMessagePortSendRequest.argtypes = [vp, ctypes.c_int32, vp, ctypes.c_double, ctypes.c_double,
+                                        vp, ctypes.POINTER(vp)]
+cf.CFDataGetLength.restype = ctypes.c_long
+cf.CFDataGetLength.argtypes = [vp]
+cf.CFDataGetBytePtr.restype = vp
+cf.CFDataGetBytePtr.argtypes = [vp]
+timeout, code = float(sys.argv[1]), b"xprint = function() end; " + sys.argv[2].encode("utf-8")
+port = cf.CFMessagePortCreateRemote(None, cf.CFStringCreateWithCString(None, b"Hammerspoon", 0x08000100))
+if not port:
+    sys.exit(69)  # Hammerspoon not running, or hs.ipc not loaded
+reply = vp()
+status = cf.CFMessagePortSendRequest(port, 0, cf.CFDataCreate(None, code, len(code)), timeout, timeout,
+                                     vp.in_dll(cf, "kCFRunLoopDefaultMode"), ctypes.byref(reply))
+if status != 0 or not reply.value:
+    sys.exit(70)  # no reply in time
+print(ctypes.string_at(cf.CFDataGetBytePtr(reply), cf.CFDataGetLength(reply)).decode("utf-8", "replace"))
+EOF
   hs_ipc() {
     local secs="$1"
-    shift
+    [[ "$2" == "-c" ]] || return 64
     perl -e 'alarm shift; exec @ARGV or die "exec: $!"' "$(( secs + 2 ))" \
-      "${hs_cli}" -t "${secs}" -q "$@" </dev/null 2>&1
+      /usr/bin/python3 "${TEST_TMP}/hs_ipc.py" "${secs}" "$3" </dev/null 2>&1
   }
-  if [[ -x "${hs_cli}" ]] && pgrep -x Hammerspoon >/dev/null 2>&1 &&
+  if pgrep -x Hammerspoon >/dev/null 2>&1 &&
      [[ "$(hs_ipc 3 -c 'return "pong"' || true)" == *pong* ]]; then
     hs_syntax="$(hs_ipc 5 -c "local f, e = loadfile('${hs_init}'); return f and 'SYNTAX_OK' or tostring(e)" || true)"
     assert_contains "init.lua compiles in Hammerspoon's Lua runtime (loadfile)" "SYNTAX_OK" "${hs_syntax}"
@@ -974,7 +1007,7 @@ EOF
     assert_contains "running Hammerspoon has the on-demand display re-sync hotkey (<WM_MOD>r) enabled" \
       "HOTKEY_ENABLED" "${hs_resync_hotkey}"
   else
-    echo "  [SKIP] live Hammerspoon IPC checks (Hammerspoon not running, hs.ipc unavailable, or not visible to LaunchServices from this session)"
+    echo "  [SKIP] live Hammerspoon IPC checks (Hammerspoon not running or hs.ipc not loaded)"
   fi
 }
 
