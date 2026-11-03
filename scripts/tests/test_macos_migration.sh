@@ -809,6 +809,18 @@ echo "[Test 15] ~/.hammerspoon/init.lua macOS 15+ space-moving & multi-workspace
     bash -c "grep -q '_G.HS_KEEPALIVE.taps.altTabTap = altTabTap' '${hs_init}' && grep -q '_G.HS_KEEPALIVE.timers.tapWatchdog = tapWatchdog' '${hs_init}'"
   assert_true "init.lua positions windowChooser on the focused window's display (getFocusedWindowScreen)" \
     grep -q "local function getFocusedWindowScreen" "${hs_init}"
+  assert_true "init.lua Alt-Tab focuses exactly the chosen window, never via hs.application:activate() (it follows the app's last window to its Space)" \
+    bash -c "grep -q 'local function focusWindowExactly' '${hs_init}' && ! grep -vE '^[[:space:]]*--' '${hs_init}' | grep -q ':activate('"
+  assert_true "init.lua Alt-Tab skips hs.chooser's default didClose refocus for windowChooser (hands focus over itself)" \
+    grep -q "if whichChooser == windowChooser then return end" "${hs_init}"
+  assert_true "init.lua keeps the Alt-Tab focus hand-off timer referenced and cancels it on a new Alt-Tab" \
+    bash -c "grep -q 'switcherFocusTimer = hs.timer.doAfter' '${hs_init}' && grep -q 'local function cancelSwitcherFocus' '${hs_init}'"
+  assert_true "init.lua re-reads the focused Space before labeling Alt-Tab windows (currentSpaceInfo)" \
+    grep -q "local function currentSpaceInfo" "${hs_init}"
+  assert_true "init.lua Alt-Tab lists minimized windows, tagged [Minimized] (collectSwitcherWindows/recordMinimizedWindows)" \
+    bash -c "grep -q 'local function collectSwitcherWindows' '${hs_init}' && grep -q 'local function recordMinimizedWindows' '${hs_init}' && grep -q '\\[Minimized\\]' '${hs_init}'"
+  assert_true "init.lua exposes windowSwitcher for live IPC testing" \
+    grep -q "^windowSwitcher = {" "${hs_init}"
   assert_true "init.lua has no hardcoded /opt/homebrew/bin/bash paths" \
     bash -c "! grep -q '/opt/homebrew/bin/bash' '${hs_init}'"
 
@@ -830,6 +842,10 @@ echo "[Test 15] ~/.hammerspoon/init.lua macOS 15+ space-moving & multi-workspace
     assert_contains "init.lua compiles in Hammerspoon's Lua runtime (loadfile)" "SYNTAX_OK" "${hs_syntax}"
     hs_api="$(hs_ipc 3 -c "return type(workspaceMover) == 'table' and type(workspaceMover.moveFocusedWindowToAdjacentSpace) == 'function' and 'API_OK' or 'API_MISSING'" || true)"
     assert_contains "running Hammerspoon exposes workspaceMover move functions over IPC" "API_OK" "${hs_api}"
+    # Alt-Tab rows (all workspaces, unfiltered, minimized windows included): each
+    # reads "<workspace> <title> (0x<id>)  |  Workspace <n>[ tags] | <app> | ...".
+    hs_rows="$(hs_ipc 5 -c "local s = windowSwitcher; if type(s) ~= 'table' or type(s.rows) ~= 'function' then return 'MISSING' end; local rows = s.rows(); for _, r in ipairs(rows) do if not r:match('^%d+ .+ %(0x%x+%)  |  Workspace %d+') then return 'BAD_ROW ' .. r end end; return 'ROWS_OK ' .. #rows" || true)"
+    assert_contains "running Hammerspoon lists Alt-Tab rows as '<workspace> <title> (0x<id>)  |  Workspace <n>' (windowSwitcher.rows)" "ROWS_OK" "${hs_rows}"
 
     # Pure helpers (resolution independent): a {enabled = 1} symbolichotkeys entry
     # means the macOS default Ctrl+Arrow, custom bindings are kept, and Chrome

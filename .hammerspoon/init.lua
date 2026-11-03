@@ -1641,9 +1641,16 @@ altDragTap:start()
 -- fzf-window-switcher.sh, and draw_border_around_window.py with O(1) startup:
 --   - Background async indexing tracks windows across all workspaces (1..6) in
 --     knownWindowsById and caches app icons in appIconCache (like USER_ICONS).
---   - Pressing <Alt>Tab only queries hs.window.orderedWindows() on the active
---     Space (< 2ms) and reads other workspaces from in-memory cache (zero
---     hs.window.get / AXUIElement IPC or WindowServer scans on startup).
+--   - Pressing <Alt>Tab only queries the active Space's windows (the single
+--     Accessibility pass hs.window.orderedWindows() makes, ~10ms) and reads
+--     other workspaces from in-memory cache (zero hs.window.get or
+--     WindowServer scans of other Spaces on startup).
+--   - Minimized windows are listed too, tagged [Minimized], under the
+--     workspace they were minimized on and after all other windows (so they
+--     are never the default <Alt>Tab -> Enter target); choosing one restores it.
+--   - Choosing a window focuses exactly that window -- never its app's
+--     last-used window, which may be on another workspace -- and switches
+--     workspaces first only when the chosen window lives on another one.
 --   - Reuses a single pre-allocated hs.canvas border window (highlightCanvas)
 --     and debounces border updates asynchronously (40ms throttle via
 --     borderDebounceTimer) using pre-cached window frames.
@@ -1677,6 +1684,9 @@ local chooserPollTimer = nil
 local lastSelectedRow = nil
 local allChooserChoices = {}
 local initialChooserQuery = ""
+local preChooserFocusedWindow = nil  -- focused when <Alt>Tab opened the chooser (refocused on Escape)
+local switcherFocusTimer = nil       -- strong reference to the pending focus hand-off step
+local switcherFocusToken = 0         -- bumped to cancel a pending focus hand-off
 
 local PREFIXED_APP_SHORTNAMES = {"kitty", "wezterm", "chrome", "emacs"}
 
@@ -1729,6 +1739,8 @@ local function schedulePersistWindowTrackerState()
         pid = meta.pid or 0,
         spaceId = meta.spaceId,
         spaceIdx = meta.spaceIdx or 1,
+        isMinimized = meta.isMinimized or nil,
+        spaceGuessed = meta.spaceGuessed or nil,
       }
     end
     pcall(hs.settings.set, "hammerspoonWindowCache", serializableMeta)
@@ -1759,6 +1771,18 @@ local function refreshSpaceIndexCache()
   return cachedSpaceIndexById, cachedCurrentSpaceId, cachedCurrentSpaceIdx
 end
 
+-- The focused Space and its workspace number. The Space layout (~15ms) is only
+-- re-read when the focused Space changed since the last refresh: <Alt>Tab or a
+-- focus event can arrive before the background sync that follows a Desktop
+-- switch, and a stale workspace would mislabel the windows on screen and prune
+-- the cached ones of the workspace just left.
+local function currentSpaceInfo()
+  if hs.spaces.focusedSpace() ~= cachedCurrentSpaceId then
+    refreshSpaceIndexCache()
+  end
+  return cachedCurrentSpaceId, cachedCurrentSpaceIdx
+end
+
 local function recordActiveWindowFast(win, spaceId, spaceIdx)
   if not win then return nil end
   local wid = win:id()
@@ -1785,6 +1809,8 @@ local function recordActiveWindowFast(win, spaceId, spaceIdx)
   entry.spaceId = spaceId or entry.spaceId or cachedCurrentSpaceId
   entry.spaceIdx = spaceIdx or entry.spaceIdx or cachedCurrentSpaceIdx
   entry.frame = frame
+  entry.isMinimized = false  -- recordMinimizedWindows() sets both after recording
+  entry.spaceGuessed = nil
   knownWindowsById[wid] = entry
   return wid
 end
@@ -1801,17 +1827,88 @@ onWindowMovedToSpace = function(win, spaceId)
   schedulePersistWindowTrackerState()
 end
 
+-- One Accessibility pass over the regular apps, returning (1) the visible windows
+-- of the active Space front to back, exactly as hs.window.orderedWindows() does
+-- (same per-app queries, same on-screen ordering) and (2) the minimized windows,
+-- which orderedWindows() leaves out. AX reports minimized windows whichever Space
+-- they were minimized on.
+local getOrderedWindowIds = hs.window._orderedwinids  -- what orderedWindows() sorts by
+
+local function collectSwitcherWindows()
+  local visibleById, minimized = {}, {}
+  for _, app in ipairs(hs.application.runningApplications()) do
+    if app:kind() > 0 then
+      local hidden = app:isHidden()
+      for _, w in ipairs(app:allWindows()) do
+        if w:isMinimized() then
+          table.insert(minimized, w)
+        elseif not hidden then
+          local id = w:id()
+          if id then visibleById[id] = w end
+        end
+      end
+    end
+  end
+  if not getOrderedWindowIds then
+    return hs.window.orderedWindows(), minimized
+  end
+  local ordered = {}
+  for _, id in ipairs(getOrderedWindowIds()) do
+    local w = visibleById[id]
+    if w then table.insert(ordered, w) end
+  end
+  return ordered, minimized
+end
+
+-- Records the minimized windows and returns the set of their ids. A minimized
+-- window belongs to the workspace WindowServer still places it on; when that is
+-- several Spaces or none, to the one it was last seen on, and when that is unknown
+-- too, to the current one (re-guessed on every pass until it is known).
+local function recordMinimizedWindows(minimizedWins, focusedSpaceId)
+  local ids = {}
+  for _, w in ipairs(minimizedWins) do
+    local wid = w:id()
+    if wid and w:isStandard() then
+      local okSp, winSpaces = pcall(hs.spaces.windowSpaces, wid)
+      local userSpaces = {}
+      for _, sp in ipairs((okSp and type(winSpaces) == "table") and winSpaces or {}) do
+        if cachedSpaceIndexById[sp] then table.insert(userSpaces, sp) end
+      end
+      local spId, guessed = userSpaces[1], false
+      if #userSpaces ~= 1 then
+        local prev = knownWindowsById[wid]
+        if prev and prev.spaceId and not prev.spaceGuessed and cachedSpaceIndexById[prev.spaceId] then
+          spId = prev.spaceId
+        else
+          spId, guessed = focusedSpaceId, true
+        end
+      end
+      wid = recordActiveWindowFast(w, spId, spId and cachedSpaceIndexById[spId])
+      local entry = wid and knownWindowsById[wid]
+      if entry then
+        entry.isMinimized = true
+        entry.spaceGuessed = guessed
+        entry.isSticky = false
+        ids[wid] = true
+      end
+    end
+  end
+  return ids
+end
+
 -- Background-only sync of windows across all Spaces (never run on <Alt>Tab critical path)
 local function syncOtherSpacesWindowsAsync()
   local spaceIndexById, focusedSpaceId, currentSpaceIdx = refreshSpaceIndexCache()
 
+  local orderedWins, minimizedWins = collectSwitcherWindows()
   local activeIds = {}
-  for _, w in ipairs(hs.window.orderedWindows()) do
-    if w:isStandard() and w:isVisible() then
+  for _, w in ipairs(orderedWins) do
+    if w:isStandard() then
       local wid = recordActiveWindowFast(w, focusedSpaceId, currentSpaceIdx)
       if wid then activeIds[wid] = true end
     end
   end
+  local minimizedIds = recordMinimizedWindows(minimizedWins, focusedSpaceId)
 
   -- Map Space window memberships in the background (without hs.window.list(true),
   -- which stalls the main CFRunLoop and causes WindowServer to disable CGEventTaps
@@ -1833,7 +1930,9 @@ local function syncOtherSpacesWindowsAsync()
   -- Prune closed windows and update Space indices
   for wid, meta in pairs(knownWindowsById) do
     local spId = spaceByWinId[wid]
-    if activeIds[wid] then
+    if minimizedIds[wid] then
+      -- Workspace already attributed by recordMinimizedWindows()
+    elseif activeIds[wid] then
       meta.spaceId = focusedSpaceId
       meta.spaceIdx = currentSpaceIdx
       meta.isSticky = (stickyWindows[wid] == true) or ((spaceCountByWinId[wid] or 0) > 1)
@@ -1841,6 +1940,10 @@ local function syncOtherSpacesWindowsAsync()
       meta.spaceId = spId
       meta.spaceIdx = spaceIndexById[spId] or meta.spaceIdx or 1
       meta.isSticky = (stickyWindows[wid] == true) or ((spaceCountByWinId[wid] or 0) > 1)
+      meta.isMinimized = false
+    elseif meta.isMinimized then
+      -- Minimized at the last look and now on no Space at all: it was closed
+      knownWindowsById[wid] = nil
     else
       local appAlive = (meta.pid and meta.pid > 0 and hs.application.applicationForPID(meta.pid) ~= nil)
       if not appAlive or meta.spaceIdx == currentSpaceIdx then
@@ -1865,7 +1968,8 @@ end
 local wf = hs.window.filter.new()
 wf:subscribe(hs.window.filter.windowFocused, function(win)
   if not win then return end
-  local wid = recordActiveWindowFast(win, cachedCurrentSpaceId, cachedCurrentSpaceIdx)
+  local spaceId, spaceIdx = currentSpaceInfo()
+  local wid = recordActiveWindowFast(win, spaceId, spaceIdx)
   if not wid then return end
   for i = #mruWindowIds, 1, -1 do
     if mruWindowIds[i] == wid then
@@ -1975,27 +2079,42 @@ local function scheduleBorderUpdate()
   end)
 end
 
--- Fast O(1) choice builder called on <Alt>Tab: only queries hs.window.orderedWindows()
--- on the active Space (< 2ms) and merges cached windows from other workspaces.
+-- Fast choice builder called on <Alt>Tab: one Accessibility pass for the active
+-- Space's windows (front to back) and all minimized windows, merged with cached
+-- windows from other workspaces.
 local function buildAllWorkspacesChooserChoices()
-  local currentSpaceIdx = cachedCurrentSpaceIdx or 1
-  local focusedSpaceId = cachedCurrentSpaceId
+  local focusedSpaceId, currentSpaceIdx = currentSpaceInfo()
+  currentSpaceIdx = currentSpaceIdx or 1
 
-  local activeOrdered = hs.window.orderedWindows()
+  local activeOrdered, minimizedWins = collectSwitcherWindows()
   local activeSet = {}
   for _, w in ipairs(activeOrdered) do
-    if w:isStandard() and w:isVisible() then
+    if w:isStandard() then
       local wid = recordActiveWindowFast(w, focusedSpaceId, currentSpaceIdx)
       if wid then activeSet[wid] = true end
     end
   end
+  local minimizedSet = recordMinimizedWindows(minimizedWins, focusedSpaceId)
 
   local validEntriesById = {}
   local candidateIds = {}
   for wid, meta in pairs(knownWindowsById) do
     local onActive = (activeSet[wid] == true)
-    if onActive or (meta.spaceIdx and meta.spaceIdx ~= currentSpaceIdx) then
-      local isSticky = (stickyWindows[wid] == true) or (meta.isSticky == true)
+    local isMinimized = (minimizedSet[wid] == true)
+    if meta.isMinimized and not isMinimized and not onActive then
+      -- Minimized at the last look but no longer: restored onto another Space
+      -- (keep it there) or closed (no Space at all: pruned just below)
+      local okSp, winSpaces = pcall(hs.spaces.windowSpaces, wid)
+      local spId = nil
+      for _, sp in ipairs((okSp and type(winSpaces) == "table") and winSpaces or {}) do
+        if cachedSpaceIndexById[sp] then spId = sp break end
+      end
+      meta.isMinimized = false
+      meta.spaceId = spId
+      meta.spaceIdx = spId and cachedSpaceIndexById[spId] or nil
+    end
+    if onActive or isMinimized or (meta.spaceIdx and meta.spaceIdx ~= currentSpaceIdx) then
+      local isSticky = not isMinimized and ((stickyWindows[wid] == true) or (meta.isSticky == true))
       local rawSpaceIdx = onActive and currentSpaceIdx or (meta.spaceIdx or 1)
       local displaySpaceIdx = isSticky and currentSpaceIdx or rawSpaceIdx
       meta.spaceIdx = rawSpaceIdx
@@ -2015,7 +2134,7 @@ local function buildAllWorkspacesChooserChoices()
   local prevOnCurrentSpaceId = nil
   for _, id in ipairs(mruWindowIds) do
     local entry = validEntriesById[id]
-    if entry and id ~= focusedWinId and entry.displaySpaceIdx == currentSpaceIdx then
+    if entry and id ~= focusedWinId and entry.displaySpaceIdx == currentSpaceIdx and not entry.isMinimized then
       prevOnCurrentSpaceId = id
       break
     end
@@ -2029,8 +2148,9 @@ local function buildAllWorkspacesChooserChoices()
 
   local seen = {}
   local orderedIds = {}
-  local function pushId(id)
-    if id and validEntriesById[id] and not seen[id] then
+  local function pushId(id, allowMinimized)
+    local entry = id and validEntriesById[id]
+    if entry and not seen[id] and (allowMinimized or not entry.isMinimized) then
       table.insert(orderedIds, id)
       seen[id] = true
     end
@@ -2056,6 +2176,14 @@ local function buildAllWorkspacesChooserChoices()
   for _, id in ipairs(candidateIds) do
     pushId(id)
   end
+  -- Minimized windows go last (most recently used first), so restoring one is
+  -- always a deliberate choice rather than the default <Alt>Tab -> Enter.
+  for _, id in ipairs(mruWindowIds) do
+    pushId(id, true)
+  end
+  for _, id in ipairs(candidateIds) do
+    pushId(id, true)
+  end
 
   local choices = {}
   for _, wid in ipairs(orderedIds) do
@@ -2079,9 +2207,10 @@ local function buildAllWorkspacesChooserChoices()
 
     local entryText = string.format("%d %s (0x%x)", meta.displaySpaceIdx, prefixedTitle, wid)
     local stickyTag = meta.isSticky and " [All Spaces]" or ""
+    local minimizedTag = meta.isMinimized and " [Minimized]" or ""
     local subText = string.format(
-      "Workspace %d%s | %s | PID: %d | Window ID: %d",
-      meta.displaySpaceIdx, stickyTag, appName, meta.pid or 0, wid
+      "Workspace %d%s%s | %s | PID: %d | Window ID: %d",
+      meta.displaySpaceIdx, stickyTag, minimizedTag, appName, meta.pid or 0, wid
     )
     local textLower = string.lower(entryText)
     local searchText = textLower .. " " .. string.lower(subText)
@@ -2095,6 +2224,7 @@ local function buildAllWorkspacesChooserChoices()
       spaceIdx = meta.spaceIdx,
       displaySpaceIdx = meta.displaySpaceIdx,
       isSticky = meta.isSticky,
+      isMinimized = meta.isMinimized,
       onCurrentSpace = meta.onCurrentSpace,
       frame = meta.frame,
       bundleID = meta.bundleID,
@@ -2170,75 +2300,172 @@ local function filterChooserChoices(choices, rawQuery)
   return filtered
 end
 
+-- Cancels a pending focus hand-off (it must never override a newer <Alt>Tab).
+local function cancelSwitcherFocus()
+  switcherFocusToken = switcherFocusToken + 1
+  if switcherFocusTimer then
+    switcherFocusTimer:stop()
+    switcherFocusTimer = nil
+  end
+end
+
+-- Runs fn after sec seconds unless the hand-off was cancelled meanwhile, holding a
+-- strong reference to the timer (an unreferenced hs.timer is garbage-collected
+-- and silently never fires).
+local function afterSwitcherFocus(token, sec, fn)
+  if switcherFocusTimer then switcherFocusTimer:stop() end
+  switcherFocusTimer = hs.timer.doAfter(sec, function()
+    switcherFocusTimer = nil
+    if token == switcherFocusToken then fn() end
+  end)
+end
+
+-- Set of the Space ids currently shown on any display.
+local function visibleSpaceSet()
+  local set = {}
+  local ok, active = pcall(hs.spaces.activeSpaces)
+  for _, sp in pairs((ok and type(active) == "table") and active or {}) do
+    set[sp] = true
+  end
+  return set
+end
+
+-- The hs.window for winId: the tracked object (it stays valid while its Space is
+-- not visible), else a fresh lookup.
+local function resolveSwitcherWindow(winId)
+  local meta = knownWindowsById[winId]
+  local w = meta and meta.win
+  if w then
+    local ok, id = pcall(function() return w:id() end)
+    if ok and id == winId then return w end
+  end
+  return hs.window.get(winId)
+end
+
+-- Focuses exactly this window. Never hs.application:activate() first: it brings
+-- the app's *own* focused window forward (app:focusedWindow():becomeMain() +
+-- _bringtofront()), and when that window is on another Space macOS follows it
+-- there ("When switching to an application, switch to a Space with open windows
+-- for the application") -- picking a Chrome window on this workspace used to jump
+-- to the Chrome window last used on another one. hs.window:focus() makes *this*
+-- window main before bringing its app forward with only its front window.
+local function focusWindowExactly(w)
+  return pcall(function()
+    if w:isMinimized() then w:unminimize() end
+    w:raise()
+    w:focus()
+  end)
+end
+
+-- Focuses winId now and re-checks a few times while macOS settles (an unminimize
+-- animation or a just-finished Space switch can swallow a single attempt).
+local SWITCHER_FOCUS_RETRIES = 3
+local SWITCHER_FOCUS_RETRY_SEC = 0.15
+
+local function focusSwitcherWindow(token, winId)
+  local retries = 0
+  local function attempt()
+    local w = resolveSwitcherWindow(winId)
+    if not w then return end
+    focusWindowExactly(w)
+    if retries >= SWITCHER_FOCUS_RETRIES then return end
+    retries = retries + 1
+    afterSwitcherFocus(token, SWITCHER_FOCUS_RETRY_SEC, function()
+      local fw = hs.window.focusedWindow()
+      if not (fw and fw:id() == winId) then attempt() end
+    end)
+  end
+  attempt()
+end
+
 local function focusSelectedWindowChoice(choice)
   if not choice or not choice.winId then return end
+  cancelSwitcherFocus()
+  local token = switcherFocusToken
   local winId = choice.winId
   local targetSpaceId = choice.spaceId
-  local targetSpaceIdx = choice.spaceIdx
 
-  local function raiseAndFocusTarget()
-    local meta = knownWindowsById[winId]
-    local w = (meta and meta.win) or hs.window.get(winId)
-    if w then
-      local okFocus = pcall(function()
-        if w:isMinimized() then w:unminimize() end
-        local app = w:application()
-        if app then app:activate() end
-        w:raise()
-        w:focus()
-      end)
-      if okFocus then return true end
-    end
-    local app = (choice.bundleID and hs.application.get(choice.bundleID)) or
-                (choice.appName and hs.application.get(choice.appName))
-    if app then
-      app:activate()
-      for _, aw in ipairs(app:allWindows()) do
-        if aw:id() == winId then
-          aw:raise()
-          aw:focus()
-          return true
-        end
-      end
-    end
-    return false
-  end
-
-  -- Same workspace (or sticky across all workspaces): raise and focus immediately
-  if choice.onCurrentSpace or choice.isSticky or not targetSpaceIdx or targetSpaceIdx == cachedCurrentSpaceIdx then
-    raiseAndFocusTarget()
+  -- On screen here, on every workspace (sticky), or a minimized window of this
+  -- workspace (or of an unknown one): focus it right away
+  if choice.onCurrentSpace or not targetSpaceId or visibleSpaceSet()[targetSpaceId] then
+    focusSwitcherWindow(token, winId)
     return
   end
 
-  -- Different workspace: switch to the target workspace first, then raise & focus window
-  if targetSpaceIdx >= 1 and targetSpaceIdx <= 6 then
-    switchToWorkspaceIndex(targetSpaceIdx)
-  elseif targetSpaceId then
-    pcall(hs.spaces.gotoSpace, targetSpaceId)
+  -- Different workspace: switch to the target workspace first, then raise & focus
+  -- window (looked up by Space id, as workspace numbers shift when Spaces change)
+  local targetIdx = indexOf(getOrderedUserSpacesForCurrentScreen(hs.screen.mainScreen()), targetSpaceId)
+  if not targetIdx then
+    -- Not a workspace of this display (anymore): focusing it lets macOS follow it
+    focusSwitcherWindow(token, winId)
+    return
   end
-
-  local attempts = 0
-  local focusTimer = nil
-  focusTimer = hs.timer.doEvery(0.05, function()
-    attempts = attempts + 1
-    local nowSpace = hs.spaces.focusedSpace()
-    if (targetSpaceId and nowSpace == targetSpaceId) or attempts >= 10 then
-      if focusTimer then
-        focusTimer:stop()
-        focusTimer = nil
-      end
-      raiseAndFocusTarget()
-      hs.timer.doAfter(0.08, raiseAndFocusTarget)
+  switchToWorkspaceIndex(targetIdx)
+  local deadline = hs.timer.secondsSinceEpoch() + 3.0
+  local function focusOnArrival()
+    if hs.spaces.focusedSpace() == targetSpaceId or hs.timer.secondsSinceEpoch() >= deadline then
+      focusSwitcherWindow(token, winId)
+    else
+      afterSwitcherFocus(token, 0.05, focusOnArrival)
     end
-  end)
+  end
+  afterSwitcherFocus(token, 0.05, focusOnArrival)
+end
+
+-- <Escape>: give focus back to the window that had it when <Alt>Tab opened the
+-- chooser (a non-activating panel that took keyboard focus) -- unless that window
+-- is not on a visible Space (an app keeps its focused window after you switch
+-- Desktops away from it), in which case the frontmost window here gets focus
+-- instead, so dismissing the switcher never switches Desktops. Nothing is
+-- refocused when the chooser closed because another window was clicked.
+local function restorePreChooserFocus()
+  local w = preChooserFocusedWindow
+  preChooserFocusedWindow = nil
+  local fw = hs.window.focusedWindow()
+  local fwApp = fw and fw:application()
+  if fwApp and fwApp:name() ~= "Hammerspoon" and not (w and fw:id() == w:id()) then
+    return
+  end
+  if w then
+    local okSp, winSpaces = pcall(function() return hs.spaces.windowSpaces(w:id()) end)
+    local visible = visibleSpaceSet()
+    for _, sp in ipairs((okSp and type(winSpaces) == "table") and winSpaces or {}) do
+      if visible[sp] then
+        pcall(function() w:focus() end)
+        return
+      end
+    end
+  end
+  for _, ow in ipairs(hs.window.orderedWindows()) do
+    local app = ow:application()
+    if app and app:name() ~= "Hammerspoon" and ow:isStandard() then
+      pcall(function() ow:focus() end)
+      return
+    end
+  end
 end
 
 windowChooser = hs.chooser.new(function(choice)
   clearWindowBorder()
-  focusSelectedWindowChoice(choice)
+  if choice then
+    preChooserFocusedWindow = nil
+    focusSelectedWindowChoice(choice)
+  else
+    restorePreChooserFocus()
+  end
 end)
 windowChooser:bgDark(true)
 windowChooser:searchSubText(true)
+
+-- hs.chooser's default globalCallback refocuses the window that had focus when a
+-- chooser opened on "didClose", which fires *before* the completion callback
+-- above -- so choosing a window first re-activated the previous one, and when
+-- that one sits on another Space, macOS switched Desktops there. The switcher
+-- hands focus over itself (see above); every other chooser keeps the default.
+hs.chooser.globalCallback = function(whichChooser, state)
+  if whichChooser == windowChooser then return end
+  return hs.chooser._defaultGlobalCallback(whichChooser, state)
+end
 
 windowChooser:queryChangedCallback(function(newQuery)
   local filtered = filterChooserChoices(allChooserChoices, newQuery)
@@ -2264,6 +2491,12 @@ local function getFocusedWindowScreen(activeOrdered)
 end
 
 local function openWindowSwitcherChooser()
+  cancelSwitcherFocus()
+  if not windowChooser:isVisible() then
+    local fw = hs.window.focusedWindow()
+    local fwApp = fw and fw:application()
+    preChooserFocusedWindow = (fwApp and fwApp:name() ~= "Hammerspoon") and fw or nil
+  end
   local choices, currentSpaceIdx, activeOrdered = buildAllWorkspacesChooserChoices()
   local targetScreen = getFocusedWindowScreen(activeOrdered)
   allChooserChoices = choices
@@ -2301,6 +2534,19 @@ end
 
 _G.HS_KEEPALIVE.choosers.windowChooser = windowChooser
 keepHotkey({"alt"}, "tab", openWindowSwitcherChooser)
+
+-- Debug hook for the live Hammerspoon CLI: the rows <Alt>Tab would list right
+-- now (all workspaces, unfiltered), without showing the chooser, e.g.
+--   hs -c 'return hs.inspect(windowSwitcher.rows())'
+windowSwitcher = {
+  rows = function()
+    local rows = {}
+    for i, c in ipairs((buildAllWorkspacesChooserChoices())) do
+      rows[i] = c.text .. "  |  " .. c.subText
+    end
+    return rows
+  end,
+}
 
 -- High-priority CGEventTap for <Alt>Tab so macOS Spotlight or symbolic hotkeys
 -- registered at login can never hijack Option+Tab before Hammerspoon sees it.
