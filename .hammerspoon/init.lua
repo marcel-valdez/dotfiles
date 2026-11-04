@@ -19,7 +19,9 @@
 --   7. <WM_MOD>z Zen Mode toggle & <WM_MOD>n terminal-scoped Notes launcher.
 --   8. Re-sync of the CR240DM on the Elgato dock's DisplayPort after the displays
 --      wake (it can come back blank until its refresh rate is switched and
---      switched back).
+--      switched back), a 10-minute warm-up at brightness 25 after an hour-plus
+--      display sleep (its backlight gives out above that while cold), and
+--      <WM_MOD>6/<WM_MOD>7 to step the left monitor's brightness by 25.
 -- =============================================================================
 
 -- Live Hammerspoon CLI (`/Applications/Hammerspoon.app/Contents/Frameworks/hs/hs -c '<lua>'`)
@@ -2615,7 +2617,8 @@ keepHotkey({"ctrl", "alt"}, "l", function()
 end)
 
 -- -----------------------------------------------------------------------------
--- 8. Monitor Re-sync After Display Wake (Elgato Dock DisplayPort; <WM_MOD>r)
+-- 8. Monitor Re-sync After Display Wake (Elgato Dock DisplayPort; <WM_MOD>r),
+--    Warm-up Brightness & Brightness Steps (<WM_MOD>6/<WM_MOD>7)
 -- -----------------------------------------------------------------------------
 -- After the displays wake (already on the lock screen), the CR240DM plugged into
 -- the Elgato dock's DisplayPort output reconnects and then, about 20s later,
@@ -2916,6 +2919,256 @@ local resyncHotkey = keepHotkey(WM_MOD, "r", function()
   end, false)
 end)
 
+-- -- Warm-up brightness & <WM_MOD>6/<WM_MOD>7 (left monitor) -------------------
+-- That CR240DM's backlight gives out above brightness 25 (of 100) while it is
+-- cold: minutes after a 2.5h display sleep it went blank at 26 -- the same
+-- blank-but-connected state a re-sync clears -- yet ran fine at 75 about 12
+-- minutes after the wake. So when the displays wake after sleeping an hour or
+-- more, the left monitor is held at 25 while it warms up, then put back where it
+-- was (unless its brightness was changed meanwhile). <WM_MOD>6 / <WM_MOD>7 step it
+-- down / up by 25 and cancel a pending restore. Both use BetterDisplay's direct
+-- DDC access (VCP luminance: the 0-100 value of the monitor's own menu) through
+-- its notification-based integration, so BetterDisplay must be running.
+-- Everything lives in one table: Lua caps a chunk at 200 locals, and this one is
+-- close to that.
+local leftBrightness = {
+  config = {
+    minSleepSec = 3600,  -- warm up only after the displays slept at least this long
+    warmupLevel = 25,    -- highest level that held while cold
+    warmupSec = 600,     -- then restore the previous level
+    waitSec = 60,        -- for the monitor to come back (and answer DDC) after a wake
+    step = 25,           -- <WM_MOD>6 / <WM_MOD>7
+  },
+  pending = {}, seq = 0,  -- BetterDisplay requests awaiting a response
+  sleptAt = nil,          -- when the displays went to sleep
+  targetUUID = nil,       -- the left monitor's UUID at that moment
+  restoreLevel = nil,     -- level to put back once warm (nil: no warm-up pending)
+  token = 0,              -- bumped to cancel the warm-up steps in flight
+  timer = nil,            -- next warm-up step (strong reference)
+  lastStep = nil,         -- { uuid, level, at } of the last <WM_MOD>6/7 step
+  alert = nil,            -- its on-screen level, replaced by the next one
+}
+
+-- JSON request for BetterDisplay: {uuid, commands, parameters}, keys sorted.
+-- Parameter values are plain tokens (UUIDs, names, numbers); `true` sends a
+-- parameter without a value (null).
+function leftBrightness.requestJSON(id, commands, params)
+  local keys, fields = {}, {}
+  for k in pairs(params) do keys[#keys + 1] = k end
+  table.sort(keys)
+  for i, k in ipairs(keys) do
+    local v = params[k]
+    fields[i] = string.format('"%s":%s', k, v == true and "null" or ('"' .. tostring(v) .. '"'))
+  end
+  return string.format('{"uuid":"%s","commands":["%s"],"parameters":{%s}}',
+    id, table.concat(commands, '","'), table.concat(fields, ","))
+end
+
+-- Sends a request to BetterDisplay; callback(ok, payload) once it answers, or
+-- callback(false, nil) after 3s (BetterDisplay not running, integration disabled).
+function leftBrightness.request(commands, params, callback)
+  leftBrightness.seq = leftBrightness.seq + 1
+  local id = "hs-brightness-" .. leftBrightness.seq
+  local entry = { callback = callback }
+  entry.timer = hs.timer.doAfter(3, function()
+    if leftBrightness.pending[id] then
+      leftBrightness.pending[id] = nil
+      callback(false, nil)
+    end
+  end)
+  leftBrightness.pending[id] = entry
+  hs.distributednotifications.post("pro.betterdisplay.BetterDisplay.request",
+    leftBrightness.requestJSON(id, commands, params))
+end
+
+leftBrightness.responseWatcher = hs.distributednotifications.new(function(_, object)
+  local ok, resp = pcall(hs.json.decode, object or "")
+  local entry = ok and type(resp) == "table" and resp.uuid and leftBrightness.pending[resp.uuid]
+  if not entry then return end
+  leftBrightness.pending[resp.uuid] = nil
+  entry.timer:stop()
+  entry.callback(resp.result == true, resp.payload)
+end, "pro.betterdisplay.BetterDisplay.response")
+leftBrightness.responseWatcher:start()
+
+-- Gets (level nil) or sets the monitor's DDC luminance (0-100) through
+-- BetterDisplay; calls back with the level it reports, or nil on failure.
+function leftBrightness.luminance(uuid, level, callback)
+  local params = { UUID = uuid, feature = "ddc", vcp = "luminance", value = level and math.floor(level) or true }
+  leftBrightness.request(level and { "set", "get" } or { "get" }, params, function(ok, payload)
+    callback(ok and tonumber(tostring(payload or ""):match("^%s*(%d+)")) or nil)
+  end)
+end
+
+-- The left monitor: the leftmost screen of the DISPLAY_RESYNC.monitorName model.
+function leftBrightness.monitor()
+  local left = nil
+  for _, scr in ipairs(hs.screen.allScreens()) do
+    local name = modelName(scr)
+    if not name:find("^Built%-in") and (DISPLAY_RESYNC.monitorName == nil or name == DISPLAY_RESYNC.monitorName)
+       and (not left or scr:frame().x < left:frame().x) then
+      left = scr
+    end
+  end
+  return left
+end
+
+-- Level after a <WM_MOD>6/7 step, within 0-100.
+function leftBrightness.stepAfter(level, delta)
+  return math.max(0, math.min(100, math.floor(level + delta + 0.5)))
+end
+
+function leftBrightness.cancelWarmup()
+  leftBrightness.token = leftBrightness.token + 1
+  if leftBrightness.timer then leftBrightness.timer:stop(); leftBrightness.timer = nil end
+  leftBrightness.restoreLevel = nil
+end
+
+-- <WM_MOD>6 / <WM_MOD>7. Presses in quick succession build on the level just set
+-- (BetterDisplay may not have re-read the monitor yet).
+function leftBrightness.stepBy(delta)
+  local scr = leftBrightness.monitor()
+  if not scr then
+    hs.alert.show("Left monitor brightness: no " .. (DISPLAY_RESYNC.monitorName or "external monitor") .. " connected", 2)
+    return
+  end
+  leftBrightness.cancelWarmup()  -- an explicit choice wins over a pending restore
+  local uuid = scr:getUUID()
+  local function apply(level)
+    if not level then
+      hs.alert.show("Left monitor brightness: BetterDisplay did not respond", 2)
+      return
+    end
+    local target = leftBrightness.stepAfter(level, delta)
+    leftBrightness.lastStep = { uuid = uuid, level = target, at = hs.timer.secondsSinceEpoch() }
+    leftBrightness.luminance(uuid, target, function(now)
+      if leftBrightness.alert then hs.alert.closeSpecific(leftBrightness.alert) end
+      leftBrightness.alert = hs.alert.show(now and ("Left monitor brightness: " .. now)
+        or "Left monitor brightness: BetterDisplay did not respond", {}, scr, 1)
+    end)
+  end
+  local last = leftBrightness.lastStep
+  if last and last.uuid == uuid and hs.timer.secondsSinceEpoch() - last.at < 3 then
+    apply(last.level)
+  else
+    leftBrightness.luminance(uuid, nil, apply)
+  end
+end
+
+-- After a long display sleep: wait for the left monitor (the one that was left when
+-- the displays slept) to answer DDC, hold it at warmupLevel -- re-checked after 10s
+-- and 30s, as BetterDisplay re-applies its own settings after a wake -- and after
+-- warmupSec put back the previous level, unless the level was changed meanwhile.
+function leftBrightness.startWarmup(asleepFor)
+  local cfg = leftBrightness.config
+  leftBrightness.token = leftBrightness.token + 1
+  local token, uuid = leftBrightness.token, leftBrightness.targetUUID
+  local deadline = hs.timer.secondsSinceEpoch() + cfg.waitSec
+  local function after(sec, fn)
+    if leftBrightness.timer then leftBrightness.timer:stop() end
+    leftBrightness.timer = hs.timer.doAfter(sec, function()
+      leftBrightness.timer = nil
+      if token == leftBrightness.token then fn() end
+    end)
+  end
+  local function current(fn)  -- fn(level or nil); dropped once cancelled
+    leftBrightness.luminance(uuid, nil, function(level)
+      if token == leftBrightness.token then fn(level) end
+    end)
+  end
+  local function name()
+    local scr = findScreenByUUID(uuid)
+    return scr and scr:name() or "left monitor"
+  end
+  local restoreTries = 0
+  local function restore()
+    current(function(level)
+      if not level and restoreTries < 6 then  -- no DDC answer: try again shortly
+        restoreTries = restoreTries + 1
+        return after(5, restore)
+      end
+      local back = leftBrightness.restoreLevel
+      leftBrightness.restoreLevel = nil
+      if not back then return end
+      if level ~= cfg.warmupLevel then
+        resyncLog.i(string.format("warm-up: %s is at %s, not restoring %d (changed meanwhile)",
+          name(), tostring(level), back))
+        return
+      end
+      leftBrightness.luminance(uuid, back, function(now)
+        resyncLog.i(string.format("warm-up: %s brightness %d -> %s", name(), cfg.warmupLevel, tostring(now)))
+      end)
+    end)
+  end
+  local function hold(nextSec, nextFn)  -- lowers it back to warmupLevel, never raises it
+    current(function(level)
+      if level and level > cfg.warmupLevel then
+        leftBrightness.luminance(uuid, cfg.warmupLevel, function() end)
+      end
+      after(nextSec, nextFn)
+    end)
+  end
+  local dim
+  local function retry(why)
+    if hs.timer.secondsSinceEpoch() < deadline then return after(1, dim) end
+    resyncLog.i("warm-up: skipped (" .. why .. ")")
+  end
+  dim = function()
+    if not findScreenByUUID(uuid) then return retry("the left monitor did not come back") end
+    current(function(level)
+      if not level then return retry("no DDC answer from " .. name()) end
+      if not leftBrightness.restoreLevel then
+        if level <= cfg.warmupLevel then return end  -- already low enough
+        leftBrightness.restoreLevel = level
+      end
+      leftBrightness.luminance(uuid, cfg.warmupLevel, function(now)
+        if token ~= leftBrightness.token then return end
+        if now ~= cfg.warmupLevel then return retry("no DDC answer from " .. name()) end
+        resyncLog.i(string.format("warm-up: %s brightness %d -> %d for %ds (displays slept %dm)",
+          name(), leftBrightness.restoreLevel, cfg.warmupLevel, cfg.warmupSec, math.floor(asleepFor / 60)))
+        after(10, function()
+          hold(20, function() hold(math.max(1, cfg.warmupSec - 30), restore) end)
+        end)
+      end)
+    end)
+  end
+  dim()
+end
+
+-- Display sleep/wake (now: injectable clock for tests).
+function leftBrightness.onPowerEvent(event, now)
+  local w = hs.caffeinate.watcher
+  now = now or hs.timer.secondsSinceEpoch()
+  if event == w.screensDidSleep then
+    -- Pause a warm-up in progress (the next wake resumes it) and note which
+    -- monitor is the left one while every screen is still connected.
+    leftBrightness.token = leftBrightness.token + 1
+    if leftBrightness.timer then leftBrightness.timer:stop(); leftBrightness.timer = nil end
+    if not leftBrightness.sleptAt then
+      leftBrightness.sleptAt = now
+      local scr = leftBrightness.monitor()
+      if scr then leftBrightness.targetUUID = scr:getUUID() end
+    end
+  elseif event == w.screensDidWake and leftBrightness.sleptAt then
+    local asleepFor = now - leftBrightness.sleptAt
+    leftBrightness.sleptAt = nil
+    if leftBrightness.targetUUID and
+       (asleepFor >= leftBrightness.config.minSleepSec or leftBrightness.restoreLevel) then
+      leftBrightness.startWarmup(asleepFor)
+    end
+  end
+end
+
+leftBrightness.powerWatcher = hs.caffeinate.watcher.new(function(event) leftBrightness.onPowerEvent(event) end)
+leftBrightness.powerWatcher:start()
+_G.HS_KEEPALIVE.watchers.brightnessPowerWatcher = leftBrightness.powerWatcher
+_G.HS_KEEPALIVE.watchers.betterDisplayResponseWatcher = leftBrightness.responseWatcher
+
+leftBrightness.hotkeys = {
+  keepHotkey(WM_MOD, "6", function() leftBrightness.stepBy(-leftBrightness.config.step) end),
+  keepHotkey(WM_MOD, "7", function() leftBrightness.stepBy(leftBrightness.config.step) end),
+}
+
 -- Global for live IPC testing and manual use: `displayResync.resyncNow()`
 -- re-syncs the qualifying monitor right away (no drop-out needed) and logs it.
 displayResync = {
@@ -2928,5 +3181,6 @@ displayResync = {
   trackScreens = trackScreens,
   currentScreenUUIDs = currentScreenUUIDs,
   hotkey = resyncHotkey,
+  brightness = leftBrightness,
   resyncNow = function() resyncIfEligible("manual", nil, false) end,
 }
