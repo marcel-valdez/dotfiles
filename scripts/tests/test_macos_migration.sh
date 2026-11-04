@@ -793,10 +793,10 @@ echo "[Test 15] ~/.hammerspoon/init.lua macOS 15+ space-moving & multi-workspace
     bash -c "grep -q 'local resyncHotkey = keepHotkey(WM_MOD, \"r\", function()' '${hs_init}' && grep -q 'resyncIfEligible(\"hotkey\",' '${hs_init}'"
   assert_true "init.lua leaves out screens that have no UUID yet when tracking drop-outs (no 'table index is nil' at wake)" \
     grep -Fq "if uuid then present[uuid] = true end" "${hs_init}"
-  assert_true "init.lua holds the left monitor at brightness 25 for 10 minutes after an hour-plus display sleep" \
-    bash -c "grep -q 'minSleepSec = 3600' '${hs_init}' && grep -q 'warmupLevel = 25' '${hs_init}' && grep -q 'warmupSec = 600' '${hs_init}'"
-  assert_true "init.lua binds <WM_MOD>6/<WM_MOD>7 to step the left monitor's brightness by 25 (BetterDisplay DDC)" \
-    bash -c "grep -q 'keepHotkey(WM_MOD, \"6\", function() leftBrightness.stepBy(-leftBrightness.config.step) end)' '${hs_init}' && grep -q 'keepHotkey(WM_MOD, \"7\", function() leftBrightness.stepBy(leftBrightness.config.step) end)' '${hs_init}' && grep -q 'step = 25' '${hs_init}'"
+  assert_true "init.lua sets the left monitor to contrast 50 and brightness 25 for 10 minutes, then 50, after an hour-plus display sleep" \
+    bash -c "grep -q 'minSleepSec = 3600' '${hs_init}' && grep -q 'warmupLevel = 25' '${hs_init}' && grep -q 'warmupSec = 600' '${hs_init}' && grep -q 'brightness = 50' '${hs_init}' && grep -q 'contrast = 50' '${hs_init}'"
+  assert_true "init.lua binds <WM_MOD>6/7 and <WM_MOD>F6/F7 to step the left monitor's brightness and contrast by 25 (BetterDisplay DDC)" \
+    bash -c "grep -q 'keepHotkey(WM_MOD, \"6\", function() leftMonitor.step(\"luminance\", -leftMonitor.config.step) end)' '${hs_init}' && grep -q 'keepHotkey(WM_MOD, \"7\", function() leftMonitor.step(\"luminance\", leftMonitor.config.step) end)' '${hs_init}' && grep -q 'keepHotkey(WM_MOD, \"f6\", function() leftMonitor.step(\"contrast\", -leftMonitor.config.step) end)' '${hs_init}' && grep -q 'keepHotkey(WM_MOD, \"f7\", function() leftMonitor.step(\"contrast\", leftMonitor.config.step) end)' '${hs_init}' && grep -q 'step = 25' '${hs_init}'"
   assert_true "init.lua defines buildAllWorkspacesChooserChoices for cross-workspace Alt-Tab" \
     grep -q "local function buildAllWorkspacesChooserChoices" "${hs_init}"
   assert_true "init.lua pre-populates default workspace prefix filter ^<N> " \
@@ -1007,21 +1007,23 @@ EOF
     # raising "table index is nil" (hs.screen.allScreens is stubbed for this call only).
     hs_uuids="$(hs_ipc 5 -c "local u = displayResync and displayResync.currentScreenUUIDs; if type(u) ~= 'function' then return 'MISSING' end; local orig = hs.screen.allScreens; hs.screen.allScreens = function() return { { getUUID = function() return nil end }, { getUUID = function() return 'A' end } } end; local ok, r = pcall(u); hs.screen.allScreens = orig; if not ok then return 'ERROR ' .. tostring(r) end; local n = 0; for _ in pairs(r) do n = n + 1 end; return string.format('A=%s count=%d', tostring(r.A), n)" || true)"
     assert_eq "display re-sync leaves out screens that have no UUID yet (currentScreenUUIDs)" "A=true count=1" "${hs_uuids}"
-    # Left monitor brightness: BetterDisplay request JSON (sorted keys, true -> null)
-    # and the 0-100 clamped <WM_MOD>6/7 steps.
-    hs_bright="$(hs_ipc 5 -c "local b = displayResync and displayResync.brightness; if type(b) ~= 'table' then return 'MISSING' end; return b.requestJSON('id', { 'set', 'get' }, { UUID = 'U', feature = 'ddc', vcp = 'luminance', value = 25, max = true }) .. ' ' .. table.concat({ b.stepAfter(50, -25), b.stepAfter(10, -25), b.stepAfter(90, 25), b.stepAfter(0, 25) }, ',')" || true)"
-    assert_eq "left monitor brightness: BetterDisplay request JSON and 0-100 clamped steps of 25" \
+    # Left monitor: BetterDisplay request JSON (sorted keys, true -> null) and the
+    # 0-100 clamped hotkey steps.
+    hs_bright="$(hs_ipc 5 -c "local b = displayResync and displayResync.leftMonitor; if type(b) ~= 'table' then return 'MISSING' end; return b.requestJSON('id', { 'set', 'get' }, { UUID = 'U', feature = 'ddc', vcp = 'luminance', value = 25, max = true }) .. ' ' .. table.concat({ b.stepAfter(50, -25), b.stepAfter(10, -25), b.stepAfter(90, 25), b.stepAfter(0, 25) }, ',')" || true)"
+    assert_eq "left monitor: BetterDisplay request JSON and 0-100 clamped steps of 25" \
       '{"uuid":"id","commands":["set","get"],"parameters":{"UUID":"U","feature":"ddc","max":null,"value":"25","vcp":"luminance"}} 25,0,100,25' "${hs_bright}"
-    # Warm-up after a display sleep of 60m+ (not 59m59s), and resuming one that a
-    # display sleep interrupted; startWarmup is stubbed, so brightness is untouched.
-    hs_warmup="$(hs_ipc 5 -c "local b = displayResync and displayResync.brightness; if type(b) ~= 'table' then return 'MISSING' end; if b.restoreLevel then return '3600,60 (skipped: a warm-up is in progress)' end; local W = hs.caffeinate.watcher; local orig, saved = b.startWarmup, { b.sleptAt, b.targetUUID }; local calls = {}; b.startWarmup = function(s) calls[#calls + 1] = tostring(math.floor(s)) end; local ok, err = pcall(function() b.sleptAt, b.targetUUID = nil, 'T'; b.onPowerEvent(W.screensDidSleep, 1000); b.onPowerEvent(W.screensDidWake, 4599); b.onPowerEvent(W.screensDidSleep, 5000); b.onPowerEvent(W.screensDidWake, 8600); b.restoreLevel = 75; b.onPowerEvent(W.screensDidSleep, 9000); b.onPowerEvent(W.screensDidWake, 9060) end); b.startWarmup, b.restoreLevel = orig, nil; b.sleptAt, b.targetUUID = saved[1], saved[2]; return ok and table.concat(calls, ',') or ('ERROR ' .. tostring(err))" || true)"
-    assert_contains "left monitor warm-up starts only after a 60m+ display sleep (or resumes an interrupted one)" "3600,60" "${hs_warmup}"
+    # Warm-up (with the contrast reset) after a display sleep of 60m+ (not 59m59s);
+    # one that a shorter display sleep interrupted resumes without the contrast
+    # reset. startWarmup is stubbed, so the monitor is untouched.
+    hs_warmup="$(hs_ipc 5 -c "local b = displayResync and displayResync.leftMonitor; if type(b) ~= 'table' then return 'MISSING' end; if b.pendingLevel then return '3600:true,60:false (skipped: a warm-up is in progress)' end; local W = hs.caffeinate.watcher; local orig, saved = b.startWarmup, { b.sleptAt, b.targetUUID }; local calls = {}; b.startWarmup = function(s, c) calls[#calls + 1] = math.floor(s) .. ':' .. tostring(c) end; local ok, err = pcall(function() b.sleptAt, b.targetUUID = nil, 'T'; b.onPowerEvent(W.screensDidSleep, 1000); b.onPowerEvent(W.screensDidWake, 4599); b.onPowerEvent(W.screensDidSleep, 5000); b.onPowerEvent(W.screensDidWake, 8600); b.pendingLevel = 50; b.onPowerEvent(W.screensDidSleep, 9000); b.onPowerEvent(W.screensDidWake, 9060) end); b.startWarmup, b.pendingLevel = orig, nil; b.sleptAt, b.targetUUID = saved[1], saved[2]; return ok and table.concat(calls, ',') or ('ERROR ' .. tostring(err))" || true)"
+    assert_contains "left monitor warm-up (with the contrast reset) starts only after a 60m+ display sleep; an interrupted one resumes without it" "3600:true,60:false" "${hs_warmup}"
     # Round trip through BetterDisplay's notification integration: read the left
-    # monitor's DDC luminance (passes without a request when no CR240DM is connected).
-    hs_ipc 5 -c "local b = displayResync and displayResync.brightness; local scr = b and b.monitor(); if not scr then _G.__t15bd = 'LEVEL_OK (no CR240DM connected)' return end; _G.__t15bd = 'PENDING'; b.luminance(scr:getUUID(), nil, function(l) _G.__t15bd = (l and l >= 0 and l <= 100) and ('LEVEL_OK ' .. l) or 'NO_ANSWER' end)" >/dev/null 2>&1 || true
+    # monitor's DDC luminance and contrast (passes without a request when no
+    # CR240DM is connected).
+    hs_ipc 5 -c "local b = displayResync and displayResync.leftMonitor; local scr = b and b.screen(); if not scr then _G.__t15bd = 'LEVEL_OK (no CR240DM connected)' return end; _G.__t15bd = 'PENDING'; local uuid = scr:getUUID(); b.ddc(uuid, 'luminance', nil, function(l) b.ddc(uuid, 'contrast', nil, function(c) _G.__t15bd = (l and c) and string.format('LEVEL_OK brightness=%d contrast=%d', l, c) or 'NO_ANSWER' end) end)" >/dev/null 2>&1 || true
     sleep 1
     hs_bd="$(hs_ipc 3 -c "local r = _G.__t15bd; _G.__t15bd = nil; return tostring(r)" || true)"
-    assert_contains "left monitor brightness reads back through BetterDisplay's DDC integration" "LEVEL_OK" "${hs_bd}"
+    assert_contains "left monitor brightness and contrast read back through BetterDisplay's DDC integration" "LEVEL_OK" "${hs_bd}"
     hs_resync_hotkey="$(hs_ipc 3 -c "local h = displayResync and displayResync.hotkey; if not h then return 'MISSING' end; for _, k in ipairs(hs.hotkey.getHotkeys()) do if k.idx == h.idx then return 'HOTKEY_ENABLED ' .. h.idx end end; return 'HOTKEY_DISABLED'" || true)"
     assert_contains "running Hammerspoon has the on-demand display re-sync hotkey (<WM_MOD>r) enabled" \
       "HOTKEY_ENABLED" "${hs_resync_hotkey}"
