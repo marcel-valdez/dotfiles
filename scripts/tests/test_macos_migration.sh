@@ -206,6 +206,103 @@ echo "[Test 4] kitten-cmd live-PID socket selection and stale socket cleanup"
     grep -q "BASH_VERSINFO\[0\] >= 4" "${HOME}/scripts/retry_after_key.sh"
   fzf_stripped="$(perl -pe 's/^[^\t]*\t//gm' <<< $'-42\twhich emacs')"
   assert_eq "__fzf_history__ strips negative history index prefix (-42\\t)" "which emacs" "${fzf_stripped}"
+
+  # Hermetic end-to-end regression test for ~/.fzf.bash and __fzf_history__:
+  # 1. Verifies PATH demotion of ${HOME}/.fzf/bin to the end of PATH.
+  # 2. Verifies __fzf_defaults, __fzfcmd, __fzf_history_delete, __fzf_history__
+  #    are defined in both non-interactive and interactive shells.
+  # 3. Verifies single-line, multi-line, macOS Bash 3.2 unset-READLINE_POINT
+  #    stdout mode, unset FZF_DEFAULT_OPTS_FILE/FZF_CTRL_R_OPTS, and no-match
+  #    exit code 1 handling with zero leaked history numbers or concatenated
+  #    neighbor entries.
+  fzf_e2e_out="$(
+    set -euo pipefail
+    export HISTFILE=/dev/null
+    export HISTCONTROL=
+    export HISTSIZE=100
+    export PATH="${HOME}/.fzf/bin:${PATH}"
+    source "${HOME}/.fzf.bash"
+
+    declare -F __fzf_defaults __fzfcmd __fzf_history_delete __fzf_history__ >/dev/null
+    if [[ -d "${HOME}/.fzf/bin" ]]; then
+      [[ "${PATH}" == *":${HOME}/.fzf/bin" ]] || {
+        echo "FAIL: ~/.fzf/bin not demoted to end of PATH (${PATH})" >&2
+        exit 1
+      }
+    fi
+
+    _test_fzf_filter() {
+      fzf --filter="$2" --print0 |
+        command perl -0 -ne 'if ($. == 1) { chomp; print; $ok = 1; exit } END { exit($ok ? 0 : 1) }'
+    }
+    __fzfcmd() { echo _test_fzf_filter; }
+
+    builtin history -c
+    builtin history -s "echo alpha_first_cmd"
+    builtin history -s $'echo multi_line_one\necho multi_line_two'
+    builtin history -s "hg status --rev p4head"
+    builtin history -s ": __fzf_test_sentinel__"
+
+    # Path 1: Single-line selection (READLINE_POINT=0)
+    READLINE_LINE="hg status"
+    READLINE_POINT=0
+    __fzf_history__
+    [[ "${READLINE_LINE}" == "hg status --rev p4head" ]] || {
+      echo "FAIL single-line: got [${READLINE_LINE}]" >&2
+      exit 1
+    }
+
+    # Path 2: Multi-line selection (READLINE_POINT=0)
+    READLINE_LINE="multi_line_two"
+    READLINE_POINT=0
+    __fzf_history__
+    [[ "${READLINE_LINE}" == $'echo multi_line_one\necho multi_line_two' ]] || {
+      echo "FAIL multi-line: got [${READLINE_LINE}]" >&2
+      exit 1
+    }
+
+    # Path 3: macOS /bin/bash 3.2 unset READLINE_POINT stdout mode
+    unset READLINE_POINT
+    READLINE_LINE="alpha_first_cmd"
+    stdout_res="$(__fzf_history__)"
+    [[ "${stdout_res}" == "echo alpha_first_cmd" ]] || {
+      echo "FAIL bash32-stdout: got [${stdout_res}]" >&2
+      exit 1
+    }
+
+    # Path 4: Unset FZF_DEFAULT_OPTS_FILE and FZF_CTRL_R_OPTS post-source
+    unset FZF_DEFAULT_OPTS_FILE FZF_CTRL_R_OPTS
+    READLINE_LINE="hg status"
+    READLINE_POINT=0
+    __fzf_history__
+    [[ "${READLINE_LINE}" == "hg status --rev p4head" ]] || {
+      echo "FAIL unset-opts: got [${READLINE_LINE}]" >&2
+      exit 1
+    }
+
+    # Path 5: No-match query (_test_fzf_filter exits 1 under set -euo pipefail)
+    READLINE_LINE="__nonexistent_history_query_token_999__"
+    READLINE_POINT=0
+    __fzf_history__
+    echo "PASS"
+  )"
+  assert_eq "~/.fzf.bash __fzf_history__ end-to-end (single-line, multi-line, bash3.2 stdout, no-match)" "PASS" "${fzf_e2e_out}"
+
+  fzf_interactive_out="$(
+    bash --norc -i -c '
+      set -euo pipefail
+      unset FZF_DEFAULT_OPTS_FILE
+      source "${HOME}/.fzf.bash"
+      declare -F __fzf_defaults __fzf_history__ >/dev/null
+      if [[ -f /usr/share/doc/fzf/examples/key-bindings.bash ]]; then
+        declare -F __fzf_exec_awk __fzf_orig_completion_get_orig_func >/dev/null
+      fi
+      defs_out="$(__fzf_defaults "" "--read0")"
+      [[ "${defs_out}" == *"--read0"* ]]
+      printf "PASS"
+    ' 2>/dev/null
+  )"
+  assert_eq "Interactive bash --norc -i ~/.fzf.bash defines modern 0.73.1 functions and --read0" "PASS" "${fzf_interactive_out}"
 }
 
 # ------------------------------------------------------------------------------
@@ -525,8 +622,9 @@ EOF
   chmod +x "${mock_bin}/sshfs" "${mock_bin}/mount"
 
   t11_run_mount() {
-    HOME="${fake_home}" PATH="${mock_bin}:${PATH}" OS_COMPAT_UNAME_S="Darwin" \
-      SSHFS_LOG_DIR="${TEST_TMP}" SWE_SCRIPT="${HOME}/scripts/setup_work_environment.sh" \
+    SWE_SCRIPT="${HOME}/scripts/setup_work_environment.sh" \
+      HOME="${fake_home}" PATH="${mock_bin}:${PATH}" OS_COMPAT_UNAME_S="Darwin" \
+      SSHFS_LOG_DIR="${TEST_TMP}" \
       perl -e 'alarm 30; exec @ARGV' bash -c '
         source "${SWE_SCRIPT}"
         mount_remote_gcloud_folders
