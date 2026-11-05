@@ -2920,18 +2920,21 @@ local resyncHotkey = keepHotkey(WM_MOD, "r", function()
   end, false)
 end)
 
--- -- Warm-up brightness & contrast, <WM_MOD>6/7 and <WM_MOD>F6/F7 (left monitor) -
+-- -- Wake values, warm-up brightness, <WM_MOD>6/7 and <WM_MOD>F6/F7 (left monitor) -
 -- That CR240DM's backlight gives out above brightness 25 (of 100) while it is
 -- cold: minutes after a 2.5h display sleep it went blank at 26 -- the same
 -- blank-but-connected state a re-sync clears -- yet ran fine at 75 about 12
 -- minutes after the wake. So when the displays wake after sleeping an hour or
 -- more, the left monitor gets contrast 50 right away and brightness 25 while it
 -- warms up, then brightness 50 (unless its brightness was changed meanwhile);
--- shorter sleeps leave both alone. <WM_MOD>6 / <WM_MOD>7 step its brightness and
+-- shorter sleeps leave both alone. Its red, green and blue gains go back to 50
+-- at every wake: it has woken up with its brightness, and once its green and
+-- blue gains, at 2 -- also saved by BetterDisplay, which re-applies its saved
+-- DDC values on wake. <WM_MOD>6 / <WM_MOD>7 step its brightness and
 -- <WM_MOD>F6 / <WM_MOD>F7 its contrast down / up by 25; each takes that control
 -- over from the warm-up, whose other control carries on. Both use BetterDisplay's
--- direct DDC access (VCP luminance and contrast: the 0-100 values of the
--- monitor's own menu) through its notification-based integration, so
+-- direct DDC access (VCP luminance, contrast and the RGB gains: the 0-100 values
+-- of the monitor's own menu) through its notification-based integration, so
 -- BetterDisplay must be running. Everything lives in one table: Lua caps a chunk
 -- at 200 locals, and this one is close to that.
 local leftMonitor = {
@@ -2941,9 +2944,11 @@ local leftMonitor = {
     warmupSec = 600,     -- then the brightness goes to `brightness`
     brightness = 50,     -- after the warm-up
     contrast = 50,       -- right at the wake
+    color = 50,          -- red, green and blue gains, at every wake
     waitSec = 60,        -- for the monitor to come back (and answer DDC) after a wake
     step = 25,           -- <WM_MOD>6/7 (brightness), <WM_MOD>F6/F7 (contrast)
   },
+  colorVCPs = { { "red", "0x16" }, { "green", "0x18" }, { "blue", "0x1A" } },  -- gain VCP codes
   pending = {}, seq = 0,  -- BetterDisplay requests awaiting a response
   sleptAt = nil,          -- when the displays went to sleep
   targetUUID = nil,       -- the left monitor's UUID at that moment
@@ -2998,14 +3003,17 @@ end, "pro.betterdisplay.BetterDisplay.response")
 leftMonitor.responseWatcher:start()
 
 -- Gets (value nil) or sets a DDC control of the monitor through BetterDisplay
--- (vcp "luminance" or "contrast", 0-100); calls back with the level it reports,
--- or nil on failure.
+-- (vcp "luminance", "contrast" or a VCP code such as "0x18", 0-100); calls back
+-- with the level it reports, or nil on failure.
 function leftMonitor.ddc(uuid, vcp, value, callback)
   local params = { UUID = uuid, feature = "ddc", vcp = vcp, value = value and math.floor(value) or true }
   leftMonitor.request(value and { "set", "get" } or { "get" }, params, function(ok, payload)
     callback(ok and tonumber(tostring(payload or ""):match("^%s*(%d+)")) or nil)
   end)
 end
+
+-- Console line about the left monitor (a field, so tests can capture it).
+function leftMonitor.log(msg) resyncLog.i(msg) end
 
 -- The left monitor: the leftmost screen of the DISPLAY_RESYNC.monitorName model.
 function leftMonitor.screen()
@@ -3058,19 +3066,30 @@ function leftMonitor.step(vcp, delta)
   end
 end
 
--- After a long display sleep: wait for the left monitor (the one that was left when
--- the displays slept) to answer DDC, set contrast and the warm-up brightness --
--- enforced again after 10s and 30s, as BetterDisplay re-applies its own settings
--- after a wake -- and after warmupSec raise the brightness to `brightness`, unless
--- it was changed meanwhile. resetContrast is false when resuming a warm-up that a
--- shorter display sleep interrupted (the contrast was set at the first wake).
-function leftMonitor.startWarmup(asleepFor, resetContrast)
+-- After a display sleep: wait for the left monitor (the one that was left when
+-- the displays slept) to answer DDC, then put each control this still owns back
+-- to its wake value -- checked again after 10s and 30s, as BetterDisplay
+-- re-applies its own settings after a wake. Its red, green and blue gains are
+-- owned at every wake; after a long sleep (long) also its contrast and the
+-- warm-up brightness, raised to `brightness` after warmupSec unless it was
+-- changed meanwhile. A warm-up that a shorter display sleep interrupted resumes
+-- its brightness step (the contrast was set at the first wake).
+function leftMonitor.startWarmup(asleepFor, long)
   local cfg = leftMonitor.config
   leftMonitor.token = leftMonitor.token + 1
-  leftMonitor.pendingLevel = cfg.brightness
-  leftMonitor.holdContrast = resetContrast
+  if long then leftMonitor.pendingLevel = cfg.brightness end
+  leftMonitor.holdContrast = long
   local token, uuid = leftMonitor.token, leftMonitor.targetUUID
+  local holdColors = true
   local deadline = hs.timer.secondsSinceEpoch() + cfg.waitSec
+  -- { label, vcp, value it must have now (nil: not, or no longer, owned) }
+  local controls = {
+    { "brightness", "luminance", function() return leftMonitor.pendingLevel and cfg.warmupLevel end },
+    { "contrast", "contrast", function() return leftMonitor.holdContrast and cfg.contrast end },
+  }
+  for _, c in ipairs(leftMonitor.colorVCPs) do
+    controls[#controls + 1] = { c[1], c[2], function() return holdColors and cfg.color end }
+  end
   local function after(sec, fn)
     if leftMonitor.timer then leftMonitor.timer:stop() end
     leftMonitor.timer = hs.timer.doAfter(sec, function()
@@ -3083,24 +3102,43 @@ function leftMonitor.startWarmup(asleepFor, resetContrast)
       if token == leftMonitor.token then fn(level) end
     end)
   end
+  local function write(vcp, value, fn)  -- fn(level it reports after); likewise
+    leftMonitor.ddc(uuid, vcp, value, function(level)
+      if token == leftMonitor.token then fn(level) end
+    end)
+  end
   local function name()
     local scr = findScreenByUUID(uuid)
     return scr and scr:name() or "left monitor"
   end
-  -- Puts each control the warm-up still owns back to its warm-up value.
+  -- Puts each control still owned back to its value, one at a time, then calls
+  -- done(changes): "label old -> new" for each one that was off.
   local function enforce(done)
-    read("luminance", function(level)
-      if leftMonitor.pendingLevel and level and level ~= cfg.warmupLevel then
-        leftMonitor.ddc(uuid, "luminance", cfg.warmupLevel, function() end)
-      end
-      if not leftMonitor.holdContrast then return done() end
-      read("contrast", function(contrast)
-        if leftMonitor.holdContrast and contrast and contrast ~= cfg.contrast then
-          leftMonitor.ddc(uuid, "contrast", cfg.contrast, function() end)
-        end
-        done()
+    local changes, i = {}, 0
+    local function nextControl()
+      i = i + 1
+      local c = controls[i]
+      if not c then return done(changes) end
+      if not c[3]() then return nextControl() end
+      read(c[2], function(level)
+        local value = c[3]()  -- a hotkey may have taken it over meanwhile
+        if not (value and level and level ~= value) then return nextControl() end
+        write(c[2], value, function(now)
+          changes[#changes + 1] = string.format("%s %d -> %s", c[1], level, tostring(now))
+          nextControl()
+        end)
       end)
-    end)
+    end
+    nextControl()
+  end
+  -- done callback of a later check: logs what it put back, then runs fn.
+  local function report(when, fn)
+    return function(changes)
+      if #changes > 0 then
+        leftMonitor.log(string.format("wake: %s %s: %s", name(), when, table.concat(changes, ", ")))
+      end
+      fn()
+    end
   end
   local finishTries = 0
   local function finish()
@@ -3115,42 +3153,48 @@ function leftMonitor.startWarmup(asleepFor, resetContrast)
       leftMonitor.pendingLevel = nil
       if not target then return end
       if level ~= cfg.warmupLevel then
-        resyncLog.i(string.format("warm-up: %s brightness is %s, leaving it (changed meanwhile)",
+        leftMonitor.log(string.format("warm-up: %s brightness is %s, leaving it (changed meanwhile)",
           name(), tostring(level)))
         return
       end
       leftMonitor.ddc(uuid, "luminance", target, function(now)
-        resyncLog.i(string.format("warm-up: %s brightness %d -> %s", name(), cfg.warmupLevel, tostring(now)))
+        leftMonitor.log(string.format("warm-up: %s brightness %d -> %s", name(), cfg.warmupLevel, tostring(now)))
       end)
     end)
   end
   local start
   local function retry(why)
     if hs.timer.secondsSinceEpoch() < deadline then return after(1, start) end
-    resyncLog.i("warm-up: skipped (" .. why .. ")")
+    if leftMonitor.pendingLevel or leftMonitor.holdContrast then  -- quiet if only the gains were due
+      leftMonitor.log("warm-up: skipped (" .. why .. ")")
+    end
   end
   start = function()
     if not findScreenByUUID(uuid) then return retry("the left monitor did not come back") end
     read("luminance", function(level)
       if not level then return retry("no DDC answer from " .. name()) end
-      local changes = {}
-      if leftMonitor.holdContrast then
-        leftMonitor.ddc(uuid, "contrast", cfg.contrast, function() end)
-        changes[#changes + 1] = "contrast " .. cfg.contrast
-      end
-      if leftMonitor.pendingLevel then
-        leftMonitor.ddc(uuid, "luminance", cfg.warmupLevel, function() end)
-        changes[#changes + 1] = string.format("brightness %d -> %d for %ds, then %d",
-          level, cfg.warmupLevel, cfg.warmupSec, leftMonitor.pendingLevel)
-      end
-      if #changes == 0 then return end  -- both controls already taken over by hotkeys
-      resyncLog.i(string.format("warm-up: %s %s (displays slept %dm)",
-        name(), table.concat(changes, ", "), math.floor(asleepFor / 60)))
-      after(10, function()
-        enforce(function()
-          after(20, function()
-            enforce(function() after(math.max(1, cfg.warmupSec - 30), finish) end)
-          end)
+      enforce(function(changes)
+        if leftMonitor.pendingLevel then
+          changes[#changes + 1] = string.format("then brightness %d after %ds",
+            leftMonitor.pendingLevel, cfg.warmupSec)
+        end
+        if #changes > 0 then
+          leftMonitor.log(string.format("wake: %s %s (displays slept %dm)",
+            name(), table.concat(changes, ", "), math.floor(asleepFor / 60)))
+        end
+        after(10, function()
+          enforce(report("+10s", function()
+            after(20, function()
+              enforce(report("+30s", function()
+                holdColors = false
+                if leftMonitor.pendingLevel then
+                  after(math.max(1, cfg.warmupSec - 30), finish)
+                else
+                  leftMonitor.holdContrast = false
+                end
+              end))
+            end)
+          end))
         end)
       end)
     end)
@@ -3164,20 +3208,20 @@ function leftMonitor.onPowerEvent(event, now)
   now = now or hs.timer.secondsSinceEpoch()
   if event == w.screensDidSleep then
     -- Pause a warm-up in progress (the next wake resumes its brightness step) and
-    -- note which monitor is the left one while every screen is still connected.
+    -- note which monitor is the left one while every screen is still connected
+    -- (no CR240DM: nothing to do at the wake).
     leftMonitor.token = leftMonitor.token + 1
     if leftMonitor.timer then leftMonitor.timer:stop(); leftMonitor.timer = nil end
     if not leftMonitor.sleptAt then
       leftMonitor.sleptAt = now
       local scr = leftMonitor.screen()
-      if scr then leftMonitor.targetUUID = scr:getUUID() end
+      leftMonitor.targetUUID = scr and scr:getUUID() or nil
     end
   elseif event == w.screensDidWake and leftMonitor.sleptAt then
     local asleepFor = now - leftMonitor.sleptAt
-    local long = asleepFor >= leftMonitor.config.minSleepSec
     leftMonitor.sleptAt = nil
-    if leftMonitor.targetUUID and (long or leftMonitor.pendingLevel) then
-      leftMonitor.startWarmup(asleepFor, long)
+    if leftMonitor.targetUUID then
+      leftMonitor.startWarmup(asleepFor, asleepFor >= leftMonitor.config.minSleepSec)
     end
   end
 end
