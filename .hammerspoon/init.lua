@@ -1832,35 +1832,77 @@ end
 
 -- One Accessibility pass over the regular apps, returning (1) the visible windows
 -- of the active Space front to back, exactly as hs.window.orderedWindows() does
--- (same per-app queries, same on-screen ordering) and (2) the minimized windows,
--- which orderedWindows() leaves out. AX reports minimized windows whichever Space
--- they were minimized on.
+-- (same per-app queries, same on-screen ordering), (2) the minimized windows,
+-- which orderedWindows() leaves out, and (3) the set of pids of the apps it
+-- skipped (see axGuard). AX reports minimized windows whichever Space they were
+-- minimized on.
 local getOrderedWindowIds = hs.window._orderedwinids  -- what orderedWindows() sorts by
 
+-- Apps that do not answer an Accessibility query within axGuard.timeout (hung,
+-- busy or starved of CPU) are skipped by the window passes for axGuard.skipSec;
+-- their windows are kept as last seen but left out of <Alt>Tab meanwhile. A pass
+-- runs on the main thread, and waiting out the default timeout (seconds per app)
+-- stalled <Alt>Tab, every hotkey and the event taps -- a runaway Shortcuts at ~13
+-- cores once made a pass take 7-8s. slow: pid -> time until which the app is
+-- skipped. One table: the main chunk is close to Lua's 200 locals.
+local axGuard = { timeout = 0.25, skipSec = 60, slow = {}, log = hs.logger.new("altTab", "info") }
+
+-- How many windows app reports over Accessibility (asked with the short
+-- timeout), or nil when it did not answer in time.
+function axGuard.windowCount(app)
+  local ok, el = pcall(hs.axuielement.applicationElement, app)
+  if not ok or not el then return 0 end
+  el:setTimeout(axGuard.timeout)
+  local t0 = hs.timer.absoluteTime()
+  local count = el:attributeValueCount("AXWindows")
+  if count then return count end
+  -- No count: no AXWindows at all (an answer), or no reply in time
+  if (hs.timer.absoluteTime() - t0) / 1e9 >= axGuard.timeout * 0.8 then return nil end
+  return 0
+end
+
 local function collectSwitcherWindows()
-  local visibleById, minimized = {}, {}
+  local visibleById, minimized, skipped = {}, {}, {}
+  local now = hs.timer.secondsSinceEpoch()
+  for pid, untilT in pairs(axGuard.slow) do
+    if untilT <= now then axGuard.slow[pid] = nil end
+  end
   for _, app in ipairs(hs.application.runningApplications()) do
     if app:kind() > 0 then
-      local hidden = app:isHidden()
-      for _, w in ipairs(app:allWindows()) do
-        if w:isMinimized() then
-          table.insert(minimized, w)
-        elseif not hidden then
-          local id = w:id()
-          if id then visibleById[id] = w end
+      local pid = app:pid()
+      local count = nil
+      if not axGuard.slow[pid] then
+        count = axGuard.windowCount(app)
+        if not count then
+          axGuard.slow[pid] = now + axGuard.skipSec
+          axGuard.log.w(string.format("%s (pid %d) did not answer Accessibility within %.2fs; skipping it for %ds",
+            tostring(app:name()), pid, axGuard.timeout, axGuard.skipSec))
+        end
+      end
+      if not count then
+        skipped[pid] = true
+      elseif count > 0 then
+        local hidden = app:isHidden()
+        for _, w in ipairs(app:allWindows()) do
+          if w:isMinimized() then
+            table.insert(minimized, w)
+          elseif not hidden then
+            local id = w:id()
+            if id then visibleById[id] = w end
+          end
         end
       end
     end
   end
   if not getOrderedWindowIds then
-    return hs.window.orderedWindows(), minimized
+    return hs.window.orderedWindows(), minimized, skipped
   end
   local ordered = {}
   for _, id in ipairs(getOrderedWindowIds()) do
     local w = visibleById[id]
     if w then table.insert(ordered, w) end
   end
-  return ordered, minimized
+  return ordered, minimized, skipped
 end
 
 -- Records the minimized windows and returns the set of their ids. A minimized
@@ -1903,7 +1945,7 @@ end
 local function syncOtherSpacesWindowsAsync()
   local spaceIndexById, focusedSpaceId, currentSpaceIdx = refreshSpaceIndexCache()
 
-  local orderedWins, minimizedWins = collectSwitcherWindows()
+  local orderedWins, minimizedWins, skippedPids = collectSwitcherWindows()
   local activeIds = {}
   for _, w in ipairs(orderedWins) do
     if w:isStandard() then
@@ -1939,6 +1981,8 @@ local function syncOtherSpacesWindowsAsync()
       meta.spaceId = focusedSpaceId
       meta.spaceIdx = currentSpaceIdx
       meta.isSticky = (stickyWindows[wid] == true) or ((spaceCountByWinId[wid] or 0) > 1)
+    elseif skippedPids[meta.pid] then
+      -- Its app did not answer this pass (axGuard): keep it as last seen
     elseif spId then
       meta.spaceId = spId
       meta.spaceIdx = spaceIndexById[spId] or meta.spaceIdx or 1
@@ -2089,7 +2133,7 @@ local function buildAllWorkspacesChooserChoices()
   local focusedSpaceId, currentSpaceIdx = currentSpaceInfo()
   currentSpaceIdx = currentSpaceIdx or 1
 
-  local activeOrdered, minimizedWins = collectSwitcherWindows()
+  local activeOrdered, minimizedWins, skippedPids = collectSwitcherWindows()
   local activeSet = {}
   for _, w in ipairs(activeOrdered) do
     if w:isStandard() then
@@ -2104,7 +2148,8 @@ local function buildAllWorkspacesChooserChoices()
   for wid, meta in pairs(knownWindowsById) do
     local onActive = (activeSet[wid] == true)
     local isMinimized = (minimizedSet[wid] == true)
-    if meta.isMinimized and not isMinimized and not onActive then
+    local lastSeen = (skippedPids[meta.pid] == true)
+    if meta.isMinimized and not isMinimized and not onActive and not lastSeen then
       -- Minimized at the last look but no longer: restored onto another Space
       -- (keep it there) or closed (no Space at all: pruned just below)
       local okSp, winSpaces = pcall(hs.spaces.windowSpaces, wid)
@@ -2116,7 +2161,10 @@ local function buildAllWorkspacesChooserChoices()
       meta.spaceId = spId
       meta.spaceIdx = spId and cachedSpaceIndexById[spId] or nil
     end
-    if onActive or isMinimized or (meta.spaceIdx and meta.spaceIdx ~= currentSpaceIdx) then
+    if lastSeen then
+      -- Its app did not answer this pass (axGuard): keep the window as last seen,
+      -- but leave it out of the list -- focusing it would block on the app too
+    elseif onActive or isMinimized or (meta.spaceIdx and meta.spaceIdx ~= currentSpaceIdx) then
       local isSticky = not isMinimized and ((stickyWindows[wid] == true) or (meta.isSticky == true))
       local rawSpaceIdx = onActive and currentSpaceIdx or (meta.spaceIdx or 1)
       local displaySpaceIdx = isSticky and currentSpaceIdx or rawSpaceIdx
@@ -2541,6 +2589,8 @@ keepHotkey({"alt"}, "tab", openWindowSwitcherChooser)
 -- Debug hook for the live Hammerspoon CLI: the rows <Alt>Tab would list right
 -- now (all workspaces, unfiltered), without showing the chooser, e.g.
 --   hs -c 'return hs.inspect(windowSwitcher.rows())'
+-- axGuard, collect (the window pass) and known (a tracked window's record) are
+-- exposed for live tests.
 windowSwitcher = {
   rows = function()
     local rows = {}
@@ -2549,6 +2599,9 @@ windowSwitcher = {
     end
     return rows
   end,
+  axGuard = axGuard,
+  collect = collectSwitcherWindows,
+  known = function(wid) return knownWindowsById[wid] end,
 }
 
 -- High-priority CGEventTap for <Alt>Tab so macOS Spotlight or symbolic hotkeys

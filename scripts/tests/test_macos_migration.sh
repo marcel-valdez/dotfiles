@@ -927,6 +927,8 @@ echo "[Test 15] ~/.hammerspoon/init.lua macOS 15+ space-moving & multi-workspace
     bash -c "grep -q 'local function collectSwitcherWindows' '${hs_init}' && grep -q 'local function recordMinimizedWindows' '${hs_init}' && grep -q '\\[Minimized\\]' '${hs_init}'"
   assert_true "init.lua exposes windowSwitcher for live IPC testing" \
     grep -q "^windowSwitcher = {" "${hs_init}"
+  assert_true "init.lua Alt-Tab skips apps that don't answer Accessibility within 0.25s for 60s, keeping their windows as last seen (axGuard)" \
+    bash -c "grep -Fq 'local axGuard = { timeout = 0.25, skipSec = 60, slow = {}, log = hs.logger.new(\"altTab\", \"info\") }' '${hs_init}' && grep -Fq 'el:setTimeout(axGuard.timeout)' '${hs_init}' && grep -Fq 'return ordered, minimized, skipped' '${hs_init}' && grep -Fq 'elseif skippedPids[meta.pid] then' '${hs_init}' && grep -Fq 'if lastSeen then' '${hs_init}'"
   assert_true "init.lua has no hardcoded /opt/homebrew/bin/bash paths" \
     bash -c "! grep -q '/opt/homebrew/bin/bash' '${hs_init}'"
 
@@ -985,6 +987,12 @@ EOF
     # reads "<workspace> <title> (0x<id>)  |  Workspace <n>[ tags] | <app> | ...".
     hs_rows="$(hs_ipc 5 -c "local s = windowSwitcher; if type(s) ~= 'table' or type(s.rows) ~= 'function' then return 'MISSING' end; local rows = s.rows(); for _, r in ipairs(rows) do if not r:match('^%d+ .+ %(0x%x+%)  |  Workspace %d+') then return 'BAD_ROW ' .. r end end; return 'ROWS_OK ' .. #rows" || true)"
     assert_contains "running Hammerspoon lists Alt-Tab rows as '<workspace> <title> (0x<id>)  |  Workspace <n>' (windowSwitcher.rows)" "ROWS_OK" "${hs_rows}"
+    # An app that doesn't answer Accessibility in time (its probe is stubbed to
+    # time out) is skipped and probed only once, its window is left out of the
+    # rows but still tracked, and it is listed again once the app answers.
+    alttab_expected="skipped=true probes=1 hidden=true kept=true back=true"
+    hs_axguard="$(hs_ipc 5 -c "local ws = windowSwitcher; if type(ws) ~= 'table' or type(ws.axGuard) ~= 'table' or type(ws.collect) ~= 'function' or type(ws.known) ~= 'function' then return 'MISSING' end; local g = ws.axGuard; local w; for _, cand in ipairs(hs.window.orderedWindows()) do local a = cand:application(); if a and a:name() ~= 'Hammerspoon' and cand:isStandard() then w = cand break end end; if not w then return '${alttab_expected} (no window to test with)' end; local pid, wid = w:application():pid(), w:id(); local tag = string.format('(0x%x)', wid); local function listed() for _, r in ipairs(ws.rows()) do if r:find(tag, 1, true) then return true end end return false end; listed(); local origCount, origLog, probes = g.windowCount, g.log, 0; g.windowCount = function(a) if a:pid() == pid then probes = probes + 1 return nil end return origCount(a) end; g.log = { w = function() end }; local ok, res = pcall(function() local _, _, skipped = ws.collect(); local hidden = not listed(); local kept = ws.known(wid) ~= nil; g.windowCount = origCount; g.slow[pid] = nil; local back = listed(); return string.format('skipped=%s probes=%d hidden=%s kept=%s back=%s', tostring(skipped[pid] == true), probes, tostring(hidden), tostring(kept), tostring(back)) end); g.windowCount, g.log, g.slow[pid] = origCount, origLog, nil; return ok and res or ('ERROR ' .. tostring(res))" || true)"
+    assert_contains "Alt-Tab skips an app that doesn't answer Accessibility (probed once), keeps its window tracked, and lists it again once it answers" "${alttab_expected}" "${hs_axguard}"
 
     # Pure helpers (resolution independent): a {enabled = 1} symbolichotkeys entry
     # means the macOS default Ctrl+Arrow, custom bindings are kept, and Chrome
