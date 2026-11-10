@@ -1,22 +1,144 @@
 #!/usr/bin/env bash
+# tmux-notify: Shows a modal tmux popup sized to fit a wrapped message.
+#
+# Usage:
+#   tmux-notify [--print-layout] [--client-size WxH] <title> <message...>
+#   tmux-notify <message>            # title defaults to NOTIFICATION
+#
+# The message is word-wrapped to the popup interior (popup width minus the
+# 2-column border and 1 column of padding on each side). The popup height is
+# the number of wrapped rows plus the 2-row border. When the wrapped message
+# is taller than the client allows, the last visible row is replaced with
+# "... (+N more lines)" so the beginning of the message is never lost.
+#
+# Options:
+#   --print-layout     Print "<popup_w> <popup_h>" followed by the rendered
+#                      body instead of opening a popup (used by tests).
+#   --client-size WxH  Use this client size instead of querying tmux.
+#
+# Environment:
+#   TMUX_NOTIFY_MAX_COLS  Maximum popup width in columns (default: 80).
+#   TMUX_NOTIFY_TIMEOUT   Seconds before the popup closes itself (default:
+#                         7200).
+#
+# Usage Example:
+#   $ tmux-notify --print-layout --client-size 100x30 "Build" "Done."
+#   30 3
+#    Done.
 
+# shellcheck source=/dev/null
 [[ -f "${HOME}/lib/os_compat.sh" ]] && source "${HOME}/lib/os_compat.sh"
+
+readonly BORDER_COLS=2
+readonly BORDER_ROWS=2
+readonly PAD_COLS=1
+readonly CLIENT_MARGIN=4
+readonly MIN_POPUP_COLS=30
+readonly MAX_POPUP_COLS="${TMUX_NOTIFY_MAX_COLS:-80}"
+readonly TAB_SPACES="    "
+
+# Character counting (${#var}) and fold need a UTF-8 locale; systemd-run and
+# Knock may start this script without one.
+if [[ "$(locale charmap 2>/dev/null)" != "UTF-8" ]]; then
+  export LC_ALL=C.UTF-8
+fi
+
+print_layout="false"
+client_size=""
+while (( $# > 0 )); do
+  case "$1" in
+    --print-layout)
+      print_layout="true"
+      shift
+      ;;
+    --client-size)
+      client_size="$2"
+      shift 2
+      ;;
+    *)
+      break
+      ;;
+  esac
+done
 
 TITLE="$1"
 shift
 MESSAGE="$*"
-
 if [[ -z "${MESSAGE}" ]]; then
   MESSAGE="${TITLE}"
   TITLE="NOTIFICATION"
 fi
 
-line_count=$(echo "${MESSAGE}" | wc -l)
-line_count=$((line_count+2))
+if [[ -n "${client_size}" ]]; then
+  if [[ ! "${client_size}" =~ ^([0-9]+)x([0-9]+)$ ]]; then
+    echo "tmux-notify: --client-size must be WxH, got '${client_size}'" >&2
+    exit 2
+  fi
+  client_w="${BASH_REMATCH[1]}"
+  client_h="${BASH_REMATCH[2]}"
+else
+  read -r client_w client_h < <(tmux display-message -p \
+    '#{client_width} #{client_height}' 2>/dev/null)
+  [[ "${client_w}" =~ ^[0-9]+$ ]] || client_w=80
+  [[ "${client_h}" =~ ^[0-9]+$ ]] || client_h=24
+fi
 
-b64_msg=$(printf "%s" "${MESSAGE}" | os::base64_nowrap)
+max_popup_w=$(( client_w - CLIENT_MARGIN ))
+(( max_popup_w > MAX_POPUP_COLS )) && max_popup_w=${MAX_POPUP_COLS}
+(( max_popup_w < MIN_POPUP_COLS )) && max_popup_w=${MIN_POPUP_COLS}
+wrap_w=$(( max_popup_w - BORDER_COLS - 2 * PAD_COLS ))
+
+# Word-wrap each logical line to the interior width, keeping blank lines.
+wrapped=()
+needs_wrap="false"
+while IFS= read -r line || [[ -n "${line}" ]]; do
+  line="${line%$'\r'}"
+  line="${line//$'\t'/${TAB_SPACES}}"
+  if [[ -z "${line}" ]]; then
+    wrapped+=("")
+    continue
+  fi
+  (( ${#line} > wrap_w )) && needs_wrap="true"
+  while IFS= read -r seg; do
+    wrapped+=("${seg% }")
+  done < <(printf '%s\n' "${line}" | fold -s -w "${wrap_w}")
+done <<< "${MESSAGE}"
+
+# Wrapped messages use the full width; short ones shrink to fit, always
+# within [MIN_POPUP_COLS, max_popup_w].
+content_w=$(( ${#TITLE} + 4 ))
+if [[ "${needs_wrap}" == "true" ]]; then
+  content_w=${wrap_w}
+fi
+for seg in "${wrapped[@]}"; do
+  (( ${#seg} > content_w )) && content_w=${#seg}
+done
+popup_w=$(( content_w + BORDER_COLS + 2 * PAD_COLS ))
+(( popup_w > max_popup_w )) && popup_w=${max_popup_w}
+(( popup_w < MIN_POPUP_COLS )) && popup_w=${MIN_POPUP_COLS}
+
+# Truncate overflow at the end so the beginning of the message stays visible.
+max_rows=$(( client_h - CLIENT_MARGIN - BORDER_ROWS ))
+(( max_rows < 1 )) && max_rows=1
+if (( ${#wrapped[@]} > max_rows )); then
+  hidden=$(( ${#wrapped[@]} - max_rows + 1 ))
+  wrapped=("${wrapped[@]:0:max_rows-1}" "... (+${hidden} more lines)")
+fi
+popup_h=$(( ${#wrapped[@]} + BORDER_ROWS ))
+
+pad="$(printf '%*s' "${PAD_COLS}" '')"
+body="$(printf "${pad}%s\n" "${wrapped[@]}")"
+
+if [[ "${print_layout}" == "true" ]]; then
+  printf '%s %s\n%s\n' "${popup_w}" "${popup_h}" "${body}"
+  exit 0
+fi
+
+# The body is printed without a trailing newline: a newline on the last
+# interior row would scroll the first row out of view.
+b64_msg=$(printf '%s' "${body}" | os::base64_nowrap)
 popup_timeout="${TMUX_NOTIFY_TIMEOUT:-7200}"
 outer_timeout=$((popup_timeout + 10))
-os::timeout "${outer_timeout}s" tmux display-popup -T "${TITLE}" -h "${line_count}" -E \
-  "tput civis; echo \"${b64_msg}\" | base64 -d; echo; read -s -n 1 -t ${popup_timeout} || true"
-
+os::timeout "${outer_timeout}s" tmux display-popup \
+  -T "${TITLE//#/##}" -w "${popup_w}" -h "${popup_h}" -E \
+  "tput civis; echo \"${b64_msg}\" | base64 -d; read -s -n 1 -t ${popup_timeout} || true"
