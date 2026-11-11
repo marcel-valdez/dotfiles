@@ -759,8 +759,10 @@ EOF
     grep -q "command -v fd" "${HOME}/.googlerc.d/fzf-at-google.sh"
   assert_true "~/bin/notify includes darwin terminal-notifier/osascript support" \
     grep -q "darwin" "${HOME}/bin/notify"
-  assert_true "kitty.conf enables macos_thicken_font 0.25 for 1080p external displays" \
-    grep -q "^macos_thicken_font 0.25" "${HOME}/.config/kitty/kitty.conf"
+  assert_true "kitty.conf disables macos_thicken_font (no extra glyph outline on 1080p displays)" \
+    grep -q "^macos_thicken_font 0$" "${HOME}/.config/kitty/kitty.conf"
+  assert_true "kitty.conf uses JetBrains Mono Light" \
+    grep -q "^font_family .*family='JetBrains Mono' style=Light " "${HOME}/.config/kitty/kitty.conf"
   assert_true "kitty.conf sets shell_integration no-rc to avoid --posix on macOS Bash 3.2" \
     grep -q "^shell_integration no-rc" "${HOME}/.config/kitty/kitty.conf"
   assert_true ".tmux.conf scrubs POSIXLY_CORRECT from global tmux environment" \
