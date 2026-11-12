@@ -16,6 +16,10 @@ alias nano-crypto=crypto-file
 # refreshed kitty environment
 alias rk='refresh_kitty'
 
+if type batcat &>/dev/null; then
+  alias cat='batcat -p'
+fi
+
 # start git commands
 
 alias g='git'
