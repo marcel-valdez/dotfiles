@@ -52,10 +52,12 @@ EOF
         )
 
 # 1. Send push notification via Google Knock if available
-if [[ -x /google/bin/releases/knock/send && -r /google/bin/releases/knock/knock.sh ]]; then
-  log::debug "source /google/bin/releases/knock/knock.sh"
-  source /google/bin/releases/knock/knock.sh &>/dev/null
-  dispatch knock "${FULL_MSG}"
+if [[ -r "${HOME}/.googlerc.d/lib/knock_resolver.sh" ]]; then
+  source "${HOME}/.googlerc.d/lib/knock_resolver.sh"
+  if knock::source &>/dev/null; then
+    log::debug "knock sourced (${KNOCK_RELEASE_DIR:-})"
+    dispatch knock "${FULL_MSG}"
+  fi
 fi
 
 # 2. Send in-tmux modal popup notification if available

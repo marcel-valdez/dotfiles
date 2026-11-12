@@ -44,9 +44,9 @@ if [[ -z "${MSG}" ]]; then
   MSG="Gemini CLI needs approval for '${TOOL_NAME}'"
 fi
 
-if [[ -e /google/bin/releases/knock/knock.sh ]]; then
-  # If we don't have access to knock due to missing gcert, skip.
-  source /google/bin/releases/knock/knock.sh
+if [[ -r "${HOME}/.googlerc.d/lib/knock_resolver.sh" ]] && \
+   source "${HOME}/.googlerc.d/lib/knock_resolver.sh" && \
+   knock::source &>/dev/null; then
   if [[ -n "${GOOGLE3_DIR}" ]]; then
     dispatch knock "[CitC Workspace $WORKSPACE] ${MSG}"
   else

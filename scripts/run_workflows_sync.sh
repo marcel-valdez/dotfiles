@@ -3,15 +3,17 @@ CURR_SCRIPT=${BASH_SOURCE[0]}
 
 USE_KNOCK=
 USE_KNOCKER=
-if [[ -f /google/bin/releases/knock/knock.sh ]]; then
-  source /google/bin/releases/knock/knock.sh --auto
-  USE_KNOCK=1
-  if [[ -f "${HOME}/.googlerc.d/.google_functions" ]]; then
-    if [[ -f "${HOME}/.bash_functions" ]]; then
-      source "${HOME}/.bash_functions"
+if [[ -r "${HOME}/.googlerc.d/lib/knock_resolver.sh" ]]; then
+  source "${HOME}/.googlerc.d/lib/knock_resolver.sh"
+  if knock::source --auto &>/dev/null; then
+    USE_KNOCK=1
+    if [[ -f "${HOME}/.googlerc.d/.google_functions" ]]; then
+      if [[ -f "${HOME}/.bash_functions" ]]; then
+        source "${HOME}/.bash_functions"
+      fi
+      source "${HOME}/.googlerc.d/.google_functions"
+      USE_KNOCKER=1
     fi
-    source "${HOME}/.googlerc.d/.google_functions"
-    USE_KNOCKER=1
   fi
 fi
 

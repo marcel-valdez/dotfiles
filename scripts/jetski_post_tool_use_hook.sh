@@ -102,8 +102,9 @@ EOF
        )
 
     # Attempt to use knock to notify
-    if [[ -e /google/bin/releases/knock/knock.sh ]]; then
-      source /google/bin/releases/knock/knock.sh &>/dev/null
+    if [[ -r "${HOME}/.googlerc.d/lib/knock_resolver.sh" ]] && \
+       source "${HOME}/.googlerc.d/lib/knock_resolver.sh" && \
+       knock::source &>/dev/null; then
       dispatch knock "${msg}"
     else
       # Otherwise use local notifications on terminal & desktop.

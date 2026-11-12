@@ -245,8 +245,9 @@ function dispatch_notification {
   fi
 
   # Attempt to use knock to notify
-  if [[ -x /google/bin/releases/knock/send && -r /google/bin/releases/knock/knock.sh ]]; then
-    source /google/bin/releases/knock/knock.sh &>/dev/null
+  if [[ -r "${HOME}/.googlerc.d/lib/knock_resolver.sh" ]] && \
+     source "${HOME}/.googlerc.d/lib/knock_resolver.sh" && \
+     knock::source &>/dev/null; then
     dispatch knock "${msg}"
   else
     local notified=""
