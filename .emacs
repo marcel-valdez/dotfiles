@@ -95,7 +95,7 @@
         :config
         (default-text-scale-mode))
       (global-display-line-numbers-mode t)
-      (custom-set-faces '(default ((t (:family "Azeret Mono")))))
+      (custom-set-faces '(default ((t (:family "JetBrains Mono" :height 150 :weight regular :width normal :foundry "nil" :inherit nil :extend nil)))))
       (load-theme 'company-dark t)
 ;;      (global-unset-key (kbd "C-x C-+"))
 ;;      (global-set-key (kbd "C-x C-+") '(lambda () (interactive) (change-font-height +2)))
@@ -661,7 +661,7 @@
  ;; If you edit it by hand, you could mess it up, so be careful.
  ;; Your init file should contain only one such instance.
  ;; If there is more than one, they won't work right.
- '(c-basic-offset 2)
+ '(c-basic-offset 2 t)
  '(cider-agent-complex-task-model "agent_gemini_3_pro_preview")
  '(cider-agent-simple-coding-model "chat_with_edits_gemini_for_google_2_5_pro")
  '(column-number-mode t)
@@ -696,7 +696,6 @@
  ;; If you edit it by hand, you could mess it up, so be careful.
  ;; Your init file should contain only one such instance.
  ;; If there is more than one, they won't work right.
- '(default ((t (:family "Azeret Mono"))))
  '(clang-include-fixer-highlight ((t (:background "white"))))
  '(diff-added ((t (:inherit diff-changed :extend t :background "#338833"))))
  '(diff-indicator-added ((t (:inherit diff-added :foreground "#055505"))))
