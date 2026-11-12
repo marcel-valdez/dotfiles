@@ -2693,6 +2693,9 @@ end)
 -- serial number. macOS refreshes those tunnel details only on some link events,
 -- so when they don't mention a monitor, the one CR240DM that is not behind a
 -- branch device is taken to be on the dock's DisplayPort (none if ambiguous).
+-- A monitor last seen behind a branch device (remembered per screen UUID, also
+-- across reloads) never counts as that one: with the left monitor off at a
+-- wake, the details went stale and the KVM monitor was re-synced instead.
 local DISPLAY_RESYNC = {
   monitorName = "CR240DM",        -- monitor model (EDID name); nil for any model
   dockVendor = "Elgato Systems",  -- Thunderbolt dock vendor reported by macOS
@@ -2708,6 +2711,9 @@ local resyncState = {
   tracked = {},      -- screen UUIDs present (or dropped out) at the last check
   missing = {},      -- screen UUIDs that dropped out since the displays slept
   reconnected = {},  -- screen UUIDs that came back after dropping out
+  -- screen UUID -> "direct" / "branch": how the dock's tunnel details last
+  -- showed that monitor (persisted, see eligibleScreens)
+  links = hs.settings.get("dispResync.dockLinks") or {},
 }
 
 -- Returns the current mode and another refresh rate at the same resolution:
@@ -2775,18 +2781,22 @@ local function modelName(scr)
 end
 
 -- Returns the screens on the dock's DisplayPort output that qualify for a
--- re-sync (possibly none) and the reason.
-local function eligibleScreens(screens, serials, dock)
+-- re-sync (possibly none) and the reason. With `links` (screen UUID ->
+-- "direct" / "branch"), records how the tunnel details show each monitor, and
+-- a monitor they don't mention that was last seen behind a branch device is
+-- not taken for the one on the dock's DisplayPort.
+local function eligibleScreens(screens, serials, dock, links)
   local model = DISPLAY_RESYNC.monitorName
   if not (dock and dock.present) then
     return {}, DISPLAY_RESYNC.dockVendor .. " dock not attached"
   end
-  local direct, unknown, candidates = {}, {}, 0
+  local direct, unknown, candidates, remembered = {}, {}, 0, 0
   for _, scr in ipairs(screens or {}) do
     local name = modelName(scr)
     if not name:find("^Built%-in") and (model == nil or name == model) then
       candidates = candidates + 1
       local serial = (serials or {})[tostring(scr:id())] or 0
+      local uuid = links and scr.getUUID and scr:getUUID()
       local onDirect, onBranch = false, false
       for _, sink in ipairs(dock.sinks or {}) do
         if sink.product == name and sink.serial == serial then
@@ -2795,7 +2805,12 @@ local function eligibleScreens(screens, serials, dock)
       end
       if onDirect then
         direct[#direct + 1] = scr
-      elseif not onBranch then
+        if uuid then links[uuid] = "direct" end
+      elseif onBranch then
+        if uuid then links[uuid] = "branch" end
+      elseif uuid and links[uuid] == "branch" then
+        remembered = remembered + 1
+      else
         unknown[#unknown + 1] = scr
       end
     end
@@ -2804,6 +2819,7 @@ local function eligibleScreens(screens, serials, dock)
   if #direct > 0 then return direct, "on the dock's DisplayPort" end
   if #unknown == 1 then return unknown, "the only " .. what .. " not behind the KVM" end
   if #unknown > 1 then return {}, "can't tell which " .. what .. " is on the dock's DisplayPort" end
+  if remembered > 0 then return {}, what .. " was last seen behind the KVM" end
   if candidates > 0 then return {}, what .. " reaches the dock through a KVM or adapter" end
   return {}, "no " .. what .. " connected"
 end
@@ -2876,8 +2892,9 @@ end
 
 -- Collects display serials and the dock's DisplayPort sinks in the background
 -- (system_profiler and ioreg), then re-syncs the qualifying monitors; with
--- requireReconnect, only those that came back after dropping out.
-local function resyncIfEligible(reason, onDone, requireReconnect)
+-- requireReconnect, only those that came back after dropping out. With
+-- learnOnly it just records (and saves) how each monitor reaches the dock.
+local function resyncIfEligible(reason, onDone, requireReconnect, learnOnly)
   if resyncState.checking then return end
   resyncState.checking = true
   local facts, pending = {}, 2
@@ -2885,7 +2902,9 @@ local function resyncIfEligible(reason, onDone, requireReconnect)
     pending = pending - 1
     if pending > 0 then return end
     resyncState.checking, resyncState.tasks = false, {}
-    local targets, why = eligibleScreens(hs.screen.allScreens(), facts.serials, facts.dock)
+    local targets, why = eligibleScreens(hs.screen.allScreens(), facts.serials, facts.dock, resyncState.links)
+    hs.settings.set("dispResync.dockLinks", resyncState.links)
+    if learnOnly then return end
     local count = 0
     for _, scr in ipairs(targets) do
       local uuid = scr:getUUID()
@@ -2947,6 +2966,8 @@ local resyncPowerWatcher = hs.caffeinate.watcher.new(function(event)
 end)
 resyncState.tracked = currentScreenUUIDs()
 resyncPowerWatcher:start()
+-- Learn how the monitors reach the dock now, while they are settled.
+resyncIfEligible("startup", nil, false, true)
 
 local resyncScreenWatcher = hs.screen.watcher.new(function()
   local busy = hs.timer.secondsSinceEpoch() < resyncState.busyUntil

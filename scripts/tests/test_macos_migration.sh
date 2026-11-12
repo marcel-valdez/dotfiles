@@ -1052,25 +1052,27 @@ EOF
       "165=60 60=50 120=100 only60=nil" "${hs_resync}"
     # Display re-sync eligibility: only a CR240DM on the Elgato dock's own
     # DisplayPort output, wherever it is in the arrangement, never one that macOS
-    # reports behind a branch device (KVM or adapter); plus the system_profiler
-    # serial and ioreg dock-tunnel parsers.
+    # reports behind a branch device (KVM or adapter), nor one last seen behind
+    # one when the tunnel details are stale (remembered by screen UUID); plus
+    # the system_profiler serial and ioreg dock-tunnel parsers.
     cat << 'EOF' > "${TEST_TMP}/t15_resync.lua"
 local d = displayResync
 if type(d) ~= "table" or type(d.eligibleScreens) ~= "function" then return "MISSING" end
-local function screen(name, id)
-  return { name = function() return name end, id = function() return id end }
+local function screen(name, id, uuid)
+  return { name = function() return name end, id = function() return id end, getUUID = function() return uuid end }
 end
 local builtin = screen("Built-in Retina Display", 1)
-local left = screen("CR240DM (2)", 4)
-local right = screen("CR240DM (1)", 3)
+local left = screen("CR240DM (2)", 4, "L")
+local right = screen("CR240DM (1)", 3, "R")
 local serials = { ["1"] = 4251086178, ["3"] = 0, ["4"] = 1, ["5"] = 7 }
 local function sink(serial, direct) return { product = "CR240DM", serial = serial, direct = direct } end
-local function verdict(screens, dock)
-  local targets, why = d.eligibleScreens(screens, serials, dock)
+local function verdict(screens, dock, links)
+  local targets, why = d.eligibleScreens(screens, serials, dock, links)
   local names = {}
   for _, t in ipairs(targets) do names[#names + 1] = t:name() end
   return (#names > 0 and table.concat(names, ",") or "none") .. ":" .. why
 end
+local learned = {}
 local results = {
   "direct-left=" .. verdict({ builtin, left, right }, { present = true, sinks = { sink(1, true), sink(0, false) } }),
   "direct-right=" .. verdict({ builtin, left, right }, { present = true, sinks = { sink(0, true), sink(1, false) } }),
@@ -1079,7 +1081,12 @@ local results = {
   "kvm-only=" .. verdict({ right }, { present = true, sinks = { sink(0, false) } }),
   "other=" .. verdict({ screen("DELL U2720Q", 5) }, { present = true, sinks = {} }),
   "nodock=" .. verdict({ left, right }, { present = false, sinks = {} }),
+  "learn=" .. verdict({ builtin, left, right }, { present = true, sinks = { sink(1, true), sink(0, false) } }, learned),
 }
+results[#results + 1] = string.format("learned=L:%s,R:%s", tostring(learned.L), tostring(learned.R))
+results[#results + 1] = "remembered-kvm-alone=" .. verdict({ right }, { present = true, sinks = {} }, learned)
+results[#results + 1] = "remembered-kvm-stale=" .. verdict({ right }, { present = true, sinks = { sink(1, true) } }, learned)
+results[#results + 1] = "remembered-pair=" .. verdict({ left, right }, { present = true, sinks = {} }, learned)
 local json = '{"SPDisplaysDataType":[{"spdisplays_ndrvs":[{"_name":"CR240DM","_spdisplays_displayID":"3"},'
   .. '{"_name":"Color LCD","_spdisplays_displayID":"1","_spdisplays_display-serial-number":"fd626d62"},'
   .. '{"_name":"CR240DM","_spdisplays_displayID":"4","_spdisplays_display-serial-number":"1"}]}]}'
@@ -1104,8 +1111,8 @@ results[#results + 1] = string.format("dock=%s:%s other-vendor=%s", tostring(doc
 return table.concat(results, " | ")
 EOF
     hs_eligible="$(hs_ipc 5 -c "return dofile('${TEST_TMP}/t15_resync.lua')" || true)"
-    assert_eq "display re-sync only targets a CR240DM on the Elgato dock's DisplayPort, in any position" \
-      "direct-left=CR240DM (2):on the dock's DisplayPort | direct-right=CR240DM (1):on the dock's DisplayPort | stale=CR240DM (2):the only CR240DM not behind the KVM | ambiguous=none:can't tell which CR240DM is on the dock's DisplayPort | kvm-only=none:CR240DM reaches the dock through a KVM or adapter | other=none:no CR240DM connected | nodock=none:Elgato Systems dock not attached | serials=4251086178,0,1 | dock=true:0b,1d other-vendor=false" \
+    assert_eq "display re-sync only targets a CR240DM on the Elgato dock's DisplayPort, in any position, never one last seen behind the KVM" \
+      "direct-left=CR240DM (2):on the dock's DisplayPort | direct-right=CR240DM (1):on the dock's DisplayPort | stale=CR240DM (2):the only CR240DM not behind the KVM | ambiguous=none:can't tell which CR240DM is on the dock's DisplayPort | kvm-only=none:CR240DM reaches the dock through a KVM or adapter | other=none:no CR240DM connected | nodock=none:Elgato Systems dock not attached | learn=CR240DM (2):on the dock's DisplayPort | learned=L:direct,R:branch | remembered-kvm-alone=none:CR240DM was last seen behind the KVM | remembered-kvm-stale=none:CR240DM was last seen behind the KVM | remembered-pair=CR240DM (2):the only CR240DM not behind the KVM | serials=4251086178,0,1 | dock=true:0b,1d other-vendor=false" \
       "${hs_eligible}"
     # Drop-out tracking: a re-sync is due only when a screen that dropped out
     # since the displays slept comes back; drop-outs during our own mode
