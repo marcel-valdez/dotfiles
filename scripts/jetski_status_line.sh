@@ -102,15 +102,59 @@ if [[ -z ${CONVERSATION_ID:-} ]]; then
   CONVERSATION_ID="${PPID}"
 fi
 
+STATE_DIR="${JETSKI_STATUSLINE_STATE_DIR:-/tmp}"
+
+# Auto-sync GTD Master Agent live HTTP port and --csrf_token from parent CLI process.
+# Guard strictly with -f and != /dev/* so a PTY slave (/dev/pts/*) is never grepped,
+# and cache per (PPID, log_path) to avoid re-scanning multi-MB CLI logs on every tick.
+GTD_HOME="${GTD_HOME:-${HOME}/gtd}"
+if [[ -d "${GTD_HOME}" && -d "/proc/${PPID}" ]]; then
+  GTD_SESSION=$(head -n 1 "${GTD_HOME}/.session_id" 2>/dev/null | tr -d '[:space:]' || true)
+  if [[ ( -n "${GTD_SESSION}" && "${CONVERSATION_ID}" == "${GTD_SESSION}" ) || "${CWD}" == "${GTD_HOME}"* ]]; then
+    _gtd_log=$(readlink -f "/proc/${PPID}/fd/1" 2>/dev/null || true)
+    if [[ -n "${_gtd_log}" && -f "${_gtd_log}" && "${_gtd_log}" != /dev/* && -r "${_gtd_log}" ]]; then
+      _gtd_port_cache="${STATE_DIR}/jetski_gtd_port_${PPID}.txt"
+      _gtd_port=""
+      if [[ -s "${_gtd_port_cache}" ]]; then
+        _cached_entry=$(head -n 1 "${_gtd_port_cache}" 2>/dev/null || true)
+        if [[ "${_cached_entry}" == "${_gtd_log}:"* ]]; then
+          _gtd_port="${_cached_entry##*:}"
+        fi
+      fi
+      if [[ -z "${_gtd_port}" ]]; then
+        _gtd_port=$(head -c 65536 "${_gtd_log}" 2>/dev/null | grep -oP 'Language server listening on \S+ port at \K[0-9]+(?= for HTTP)' 2>/dev/null | tail -n 1 || true)
+        if [[ -n "${_gtd_port}" ]]; then
+          printf "%s:%s\n" "${_gtd_log}" "${_gtd_port}" > "${_gtd_port_cache}" 2>/dev/null || true
+        fi
+      fi
+      if [[ -n "${_gtd_port}" ]]; then
+        _cur_addr=$(head -n 1 "${GTD_HOME}/.ls_address" 2>/dev/null | tr -d '[:space:]' || true)
+        if [[ "${_cur_addr}" != "localhost:${_gtd_port}" ]]; then
+          printf "localhost:%s\n" "${_gtd_port}" > "${GTD_HOME}/.ls_address" 2>/dev/null || true
+        fi
+      fi
+    fi
+    if [[ -r "/proc/${PPID}/cmdline" ]]; then
+      _gtd_tok=$(tr '\0' '\n' < "/proc/${PPID}/cmdline" 2>/dev/null | sed -n 's/^--csrf_token=//p' | tail -n 1 || true)
+      if [[ -n "${_gtd_tok}" ]]; then
+        _cur_tok=$(head -n 1 "${GTD_HOME}/.csrf_token" 2>/dev/null | tr -d '[:space:]' || true)
+        if [[ "${_cur_tok}" != "${_gtd_tok}" ]]; then
+          printf "%s\n" "${_gtd_tok}" > "${GTD_HOME}/.csrf_token" 2>/dev/null || true
+          chmod 600 "${GTD_HOME}/.csrf_token" 2>/dev/null || true
+        fi
+      fi
+    fi
+  fi
+fi
+
 # Per-conversation tracker files. When a conversation starts being tracked,
 # delete the ones untouched for a week (the trailing slash makes find descend
 # into macOS's /tmp, which is a symlink to /private/tmp).
-STATE_DIR="${JETSKI_STATUSLINE_STATE_DIR:-/tmp}"
 DIALOG_TRACKER_FILE="${STATE_DIR}/jetski_dialog_${CONVERSATION_ID}.txt"
 CONTEXT_PCT_TRACKER_FILE="${STATE_DIR}/jetski_context_pct_${CONVERSATION_ID}.txt"
 if ! [[ -e "${DIALOG_TRACKER_FILE}" ]]; then
   dispatch find "${STATE_DIR}/" -maxdepth 1 \
-    \( -name 'jetski_dialog_*.txt' -o -name 'jetski_context_pct_*.txt' \) -mtime +7 -delete
+    \( -name 'jetski_dialog_*.txt' -o -name 'jetski_context_pct_*.txt' -o -name 'jetski_gtd_port_*.txt' \) -mtime +7 -delete
 fi
 run touch "${DIALOG_TRACKER_FILE}"
 
