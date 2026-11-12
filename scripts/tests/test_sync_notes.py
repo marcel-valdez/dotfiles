@@ -8,7 +8,13 @@ import tempfile
 import unittest
 
 sys.path.insert(0, os.path.expanduser("~/scripts"))
-from sync_notes_engine import SyncEngine, sha256_file
+from sync_notes_engine import (
+    SyncEngine,
+    sha256_file,
+    has_g3mark_optin,
+    ensure_g3mark_optin,
+    convert_org_to_md,
+)
 
 
 class TestSyncNotesEngine(unittest.TestCase):
@@ -46,7 +52,7 @@ class TestSyncNotesEngine(unittest.TestCase):
     remote_index = os.path.join(self.output_dir, "index.md")
     self.assertTrue(os.path.exists(remote_index))
     with open(remote_index) as f:
-      self.assertEqual(f.read(), "# Index\nHello world\n")
+      self.assertEqual(f.read(), "<!-- go/g3mark-in-g3doc -->\n\n# Index\nHello world\n")
 
   def test_local_modified_only(self):
     local_file = os.path.join(self.input_dir, "linux_tips.md")
@@ -64,7 +70,7 @@ class TestSyncNotesEngine(unittest.TestCase):
     self.assertEqual(stats["remote_updated"], 1)
     remote_file = os.path.join(self.output_dir, "linux_tips.md")
     with open(remote_file) as f:
-      self.assertEqual(f.read(), "Line 1\nLine 2\nLine 3 local\n")
+      self.assertEqual(f.read(), "<!-- go/g3mark-in-g3doc -->\n\nLine 1\nLine 2\nLine 3 local\n")
 
   def test_remote_modified_only(self):
     local_file = os.path.join(self.input_dir, "linux_tips.md")
@@ -82,7 +88,7 @@ class TestSyncNotesEngine(unittest.TestCase):
 
     self.assertEqual(stats["local_updated"], 1)
     with open(local_file) as f:
-      self.assertEqual(f.read(), "Line 1\nLine 2\nLine 3 remote\n")
+      self.assertEqual(f.read(), "<!-- go/g3mark-in-g3doc -->\n\nLine 1\nLine 2\nLine 3 remote\n")
 
   def test_both_modified_clean_merge(self):
     local_file = os.path.join(self.input_dir, "doc.md")
@@ -104,7 +110,7 @@ class TestSyncNotesEngine(unittest.TestCase):
     self.assertEqual(stats["merged_clean"], 1)
     self.assertEqual(stats["conflicts"], 0)
 
-    expected = "Top line LOCAL EDIT\n\nMiddle line\n\nBottom line REMOTE EDIT\n"
+    expected = "<!-- go/g3mark-in-g3doc -->\n\nTop line LOCAL EDIT\n\nMiddle line\n\nBottom line REMOTE EDIT\n"
     with open(local_file) as f:
       self.assertEqual(f.read(), expected)
     with open(remote_file) as f:
@@ -469,7 +475,7 @@ class TestSyncNotesEngine(unittest.TestCase):
       )
       with open(remote_doc) as f:
         self.assertEqual(
-            f.read(), f"# {folder} Documentation\nProject content.\n"
+            f.read(), f"<!-- go/g3mark-in-g3doc -->\n\n# {folder} Documentation\nProject content.\n"
         )
 
     # Validate archive and root file
@@ -552,7 +558,7 @@ class TestSyncNotesEngine(unittest.TestCase):
 
     # Assert 3-way merge result
     with open(os.path.join(self.input_dir, "prompts", "prompt1.md")) as f:
-      self.assertEqual(f.read(), "Line A LOCAL\nLine B\nLine C REMOTE\n")
+      self.assertEqual(f.read(), "<!-- go/g3mark-in-g3doc -->\n\nLine A LOCAL\nLine B\nLine C REMOTE\n")
 
     # Assert remote deletion occurred
     self.assertFalse(
@@ -786,6 +792,151 @@ class TestSyncNotesEngine(unittest.TestCase):
     self.assertEqual(stats["remote_updated"], 1)
     self.assertTrue(os.path.exists(os.path.join(self.output_dir, "my_published_doc.md")))
     self.assertFalse(os.path.exists(os.path.join(self.output_dir, "my_excluded_doc.md")))
+
+
+
+  # =========================================================================
+  # G3mark Opt-in Unit Tests
+  # =========================================================================
+
+  def test_has_g3mark_optin_positive_plain_heading(self):
+    content = "<!-- go/g3mark-in-g3doc -->\n\n# Document Title\nContent here."
+    self.assertTrue(has_g3mark_optin(content))
+
+  def test_has_g3mark_optin_positive_with_yaml_frontmatter(self):
+    content = (
+        "---\nname: test-skill\ndescription: Test description\n---\n"
+        "<!-- go/g3mark-in-g3doc -->\n\n# Skill Title\nBody text."
+    )
+    self.assertTrue(has_g3mark_optin(content))
+
+  def test_has_g3mark_optin_positive_with_lint_g3mark(self):
+    content = "<!-- lint-g3mark -->\n\n# Public Doc\nBody text."
+    self.assertTrue(has_g3mark_optin(content))
+
+  def test_has_g3mark_optin_negative_unmarked_markdown(self):
+    content = "# Document Title\nUnmarked content without optin."
+    self.assertFalse(has_g3mark_optin(content))
+
+  def test_has_g3mark_optin_negative_yaml_without_optin(self):
+    content = "---\ntitle: My Note\n---\n# Document Title\nContent."
+    self.assertFalse(has_g3mark_optin(content))
+
+  def test_ensure_g3mark_optin_prepends_to_plain_markdown(self):
+    raw = "# Note Heading\nLine 1\nLine 2\n"
+    formatted = ensure_g3mark_optin(raw)
+    self.assertTrue(has_g3mark_optin(formatted))
+    self.assertEqual(formatted, "<!-- go/g3mark-in-g3doc -->\n\n# Note Heading\nLine 1\nLine 2\n")
+
+  def test_ensure_g3mark_optin_inserts_after_yaml_frontmatter(self):
+    raw = "---\ntitle: Test Note\nauthor: marcelvaldez\n---\n# Heading\nBody\n"
+    formatted = ensure_g3mark_optin(raw)
+    self.assertTrue(has_g3mark_optin(formatted))
+    expected = (
+        "---\ntitle: Test Note\nauthor: marcelvaldez\n---\n\n"
+        "<!-- go/g3mark-in-g3doc -->\n\n# Heading\nBody\n"
+    )
+    self.assertEqual(formatted, expected)
+
+  def test_ensure_g3mark_optin_is_idempotent(self):
+    raw = "<!-- go/g3mark-in-g3doc -->\n\n# Heading\nBody text\n"
+    self.assertEqual(ensure_g3mark_optin(raw), raw)
+
+  def test_ensure_g3mark_optin_handles_empty_content(self):
+    self.assertEqual(ensure_g3mark_optin(""), "<!-- go/g3mark-in-g3doc -->\n")
+    self.assertEqual(ensure_g3mark_optin("\n\n"), "<!-- go/g3mark-in-g3doc -->\n")
+
+  def test_convert_org_to_md_includes_g3mark_optin(self):
+    org_file = os.path.join(self.input_dir, "test_note.org")
+    md_file = os.path.join(self.input_dir, "test_note.md")
+    with open(org_file, "w") as f:
+      f.write("* Section One\nThis is an org mode document.\n")
+
+    res = convert_org_to_md(org_file, md_file)
+    if res and os.path.exists(md_file):
+      with open(md_file, "r") as f:
+        md_content = f.read()
+      self.assertTrue(has_g3mark_optin(md_content))
+      self.assertTrue(md_content.startswith("<!-- go/g3mark-in-g3doc -->"))
+
+  def test_reconcile_opened_markdown_files(self):
+    """Verifies that reconcile_opened_markdown_files repairs opened files missing optin."""
+    remote_file = os.path.join(self.output_dir, "iba_generic_plaque_adapter_migration_plan.md")
+    local_file = os.path.join(self.input_dir, "iba_generic_plaque_adapter_migration_plan.md")
+    raw_content = "# Plan: Migration\nSome content here."
+    with open(remote_file, "w") as f:
+      f.write(raw_content)
+    with open(local_file, "w") as f:
+      f.write(raw_content)
+
+    engine = self._make_engine()
+    # Mock subprocess.run for g4 status
+    import subprocess
+    orig_run = subprocess.run
+
+    def mock_run(cmd, *args, **kwargs):
+      if cmd == ["g4", "status"]:
+        class MockResult:
+          returncode = 0
+          stdout = (
+              "//depot/company/users/marcelvaldez/iba_generic_plaque_adapter_migration_plan.md#1"
+              " - add change 986525440 (text)\n"
+          )
+        return MockResult()
+      return orig_run(cmd, *args, **kwargs)
+
+    subprocess.run = mock_run
+    try:
+      engine.reconcile_opened_markdown_files()
+    finally:
+      subprocess.run = orig_run
+
+    with open(remote_file) as f:
+      remote_reconciled = f.read()
+    with open(local_file) as f:
+      local_reconciled = f.read()
+
+    self.assertTrue(has_g3mark_optin(remote_reconciled))
+    self.assertTrue(has_g3mark_optin(local_reconciled))
+    self.assertEqual(remote_reconciled, local_reconciled)
+
+  def test_gen_notes_cl_description_includes_no_g3mark_ok_when_set(self):
+    import subprocess
+    script_path = os.path.expanduser("~/scripts/gen_notes_cl_description.sh")
+    if not os.path.exists(script_path):
+      return
+    test_cl_file = os.path.join(self.test_dir, "test_cl_desc.txt")
+    with open(test_cl_file, "w") as f:
+      f.write("Line 1\nLine 2\nLine 3\nLine 4 original\n")
+
+    env = os.environ.copy()
+    env["NO_G3MARK_OK"] = "Unsupported Hoedown macro syntax"
+    env["SKIP_SUBMIT"] = "1"
+    subprocess.run([script_path, test_cl_file], env=env, check=True)
+
+    with open(test_cl_file) as f:
+      desc = f.read()
+
+    self.assertIn("NO_G3MARK_OK=Unsupported Hoedown macro syntax", desc)
+
+  def test_gen_notes_cl_description_omits_no_g3mark_ok_by_default(self):
+    import subprocess
+    script_path = os.path.expanduser("~/scripts/gen_notes_cl_description.sh")
+    if not os.path.exists(script_path):
+      return
+    test_cl_file = os.path.join(self.test_dir, "test_cl_desc_default.txt")
+    with open(test_cl_file, "w") as f:
+      f.write("Line 1\nLine 2\nLine 3\nLine 4 original\n")
+
+    env = os.environ.copy()
+    env.pop("NO_G3MARK_OK", None)
+    env["SKIP_SUBMIT"] = "1"
+    subprocess.run([script_path, test_cl_file], env=env, check=True)
+
+    with open(test_cl_file) as f:
+      desc = f.read()
+
+    self.assertNotIn("NO_G3MARK_OK", desc)
 
 
 if __name__ == "__main__":

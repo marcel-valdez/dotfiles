@@ -19,4 +19,11 @@ AUTOSUBMIT_BEHAVIOR=SYNC_SUBMIT
 EOF
 fi
 
+if [ -n "${NO_G3MARK_OK:-}" ]; then
+  cat << EOF >>"${output_file}"
+NO_G3MARK_OK=${NO_G3MARK_OK}
+
+EOF
+fi
+
 echo "${rest}" >> "${output_file}"

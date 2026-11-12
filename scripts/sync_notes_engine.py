@@ -318,8 +318,70 @@ def is_staging_only(rel_path: str) -> bool:
   return False
 
 
+G3MARK_OPTIN_COMMENT = "<!-- go/g3mark-in-g3doc -->"
+G3MARK_OPTIN_PATTERN = re.compile(
+    r"^(?:---\n(?:(?:-{0,2}(?:[^-\n][^\n]*)?|---[^\n]+)\n)+---\n)?"
+    r"\s*<!--\s*(?:go/g3mark-in-g3doc|lint-g3mark)\s*-->"
+)
+FRONTMATTER_PATTERN = re.compile(
+    r"^(---\n(?:(?:-{0,2}(?:[^-\n][^\n]*)?|---[^\n]+)\n)+---\n)"
+)
+
+
+def has_g3mark_optin(content: str) -> bool:
+  """Checks whether markdown content satisfies the g3mark opt-in presubmit check.
+
+  Args:
+    content: Raw markdown string to validate.
+
+  Returns:
+    True if the content contains a compliant g3mark opt-in directive at the
+    beginning or immediately after an optional YAML frontmatter block.
+
+  Usage Example:
+    >>> has_g3mark_optin("<!-- go/g3mark-in-g3doc -->\n# Title")
+    True
+  """
+  return bool(G3MARK_OPTIN_PATTERN.match(content))
+
+
+def ensure_g3mark_optin(content: str) -> str:
+  """Idempotently ensures markdown content includes the g3mark opt-in directive.
+
+  If the content already contains the directive in a compliant position, it is
+  returned unchanged. Otherwise, the directive is inserted immediately after
+  the closing YAML frontmatter delimiter or prepended to the top of the file.
+
+  Args:
+    content: Markdown string to format.
+
+  Returns:
+    Compliant markdown string with the g3mark opt-in directive.
+
+  Usage Example:
+    >>> ensure_g3mark_optin("# Plan\nDetails")
+    '<!-- go/g3mark-in-g3doc -->\n\n# Plan\nDetails'
+  """
+  if has_g3mark_optin(content):
+    return content
+
+  match = FRONTMATTER_PATTERN.match(content)
+  if match:
+    fm_block = match.group(1)
+    rest = content[match.end():]
+    cleaned_rest = rest.lstrip("\r\n")
+    if cleaned_rest:
+      return f"{fm_block}\n<!-- go/g3mark-in-g3doc -->\n\n{cleaned_rest}"
+    return f"{fm_block}\n<!-- go/g3mark-in-g3doc -->\n"
+
+  cleaned = content.lstrip("\r\n")
+  if cleaned:
+    return f"<!-- go/g3mark-in-g3doc -->\n\n{cleaned}"
+  return "<!-- go/g3mark-in-g3doc -->\n"
+
+
 def convert_org_to_md(org_path: str, md_out_path: str) -> bool:
-  """Converts an .org file to markdown using pandoc."""
+  """Converts an org file to markdown using pandoc and formats for g3mark."""
   cmd = [
       "pandoc",
       org_path,
@@ -337,6 +399,11 @@ def convert_org_to_md(org_path: str, md_out_path: str) -> bool:
     if res.returncode != 0:
       log(f"Warning: pandoc conversion failed for {org_path}: {res.stderr}")
       return False
+    with open(md_out_path, "r", encoding="utf-8") as f:
+      raw_content = f.read()
+    formatted = ensure_g3mark_optin(raw_content)
+    with open(md_out_path, "w", encoding="utf-8") as f:
+      f.write(formatted)
     return True
   except FileNotFoundError:
     log(f"Warning: pandoc executable not found when converting {org_path}")
@@ -358,6 +425,7 @@ class SyncEngine:
       skip_vcs: bool = False,
       skip_submit: bool = False,
       ignore_file: Optional[str] = None,
+      no_g3mark_ok: Optional[str] = None,
   ):
     self.input_dir = os.path.abspath(input_dir)
     self.output_dir = os.path.abspath(output_dir)
@@ -367,6 +435,7 @@ class SyncEngine:
     self.dry_run = dry_run
     self.skip_vcs = skip_vcs
     self.skip_submit = skip_submit
+    self.no_g3mark_ok = no_g3mark_ok
     self.ignore_rules = load_ignore_rules(
         input_dir=self.input_dir,
         state_dir=self.state_dir,
@@ -533,6 +602,22 @@ class SyncEngine:
     temp_target.close()
     shutil.copy2(local_path, temp_target.name)
 
+    temp_base = tempfile.NamedTemporaryFile(delete=False)
+    temp_base.close()
+    shutil.copy2(base_path, temp_base.name)
+
+    temp_remote = tempfile.NamedTemporaryFile(delete=False)
+    temp_remote.close()
+    shutil.copy2(remote_path, temp_remote.name)
+
+    if local_path.endswith('.md') or remote_path.endswith('.md'):
+      for path in (temp_target.name, temp_base.name, temp_remote.name):
+        with open(path, 'r', encoding='utf-8', errors='replace') as f:
+          c = f.read()
+        if not has_g3mark_optin(c):
+          with open(path, 'w', encoding='utf-8') as f:
+            f.write(ensure_g3mark_optin(c))
+
     cmd = [
         'git',
         'merge-file',
@@ -543,14 +628,16 @@ class SyncEngine:
         '-L',
         'company_docs',
         temp_target.name,
-        base_path,
-        remote_path,
+        temp_base.name,
+        temp_remote.name,
     ]
     res = subprocess.run(cmd, capture_output=True, text=True)
     with open(temp_target.name, 'r', encoding='utf-8', errors='replace') as f:
       merged_content = f.read()
 
     os.remove(temp_target.name)
+    os.remove(temp_base.name)
+    os.remove(temp_remote.name)
     clean = res.returncode == 0
     return clean, merged_content
 
@@ -613,8 +700,11 @@ class SyncEngine:
             log(f"UPDATE COMPANY DOCS: {rel_path} (local modified)")
             if not self.dry_run:
               os.makedirs(os.path.dirname(target_remote), exist_ok=True)
-              shutil.copy2(loc_info["content_path"], target_remote)
-              self._update_base_cache(rel_path, loc_info["content_path"])
+              if rel_path.endswith('.md'):
+                self._publish_markdown(loc_info["content_path"], target_remote, target_local)
+              else:
+                shutil.copy2(loc_info["content_path"], target_remote)
+              self._update_base_cache(rel_path, target_remote)
             stats["remote_updated"] += 1
           elif loc_hash == base_hash and rem_hash != base_hash:
             log(f"UPDATE LOCAL NOTES: {rel_path} (company docs newer)")
@@ -653,6 +743,8 @@ class SyncEngine:
                 if not self.dry_run:
                   os.makedirs(os.path.dirname(target_local), exist_ok=True)
                   os.makedirs(os.path.dirname(target_remote), exist_ok=True)
+                  if rel_path.endswith('.md'):
+                    merged_content = ensure_g3mark_optin(merged_content)
                   with open(target_local, "w", encoding="utf-8") as f:
                     f.write(merged_content)
                   with open(target_remote, "w", encoding="utf-8") as f:
@@ -673,8 +765,11 @@ class SyncEngine:
           log(f"NEW LOCAL NOTE: {rel_path} -> publishing to company docs")
           if not self.dry_run:
             os.makedirs(os.path.dirname(target_remote), exist_ok=True)
-            shutil.copy2(loc_info["content_path"], target_remote)
-            self._update_base_cache(rel_path, loc_info["content_path"])
+            if rel_path.endswith('.md'):
+              self._publish_markdown(loc_info["content_path"], target_remote, target_local)
+            else:
+              shutil.copy2(loc_info["content_path"], target_remote)
+            self._update_base_cache(rel_path, target_remote)
           stats["remote_updated"] += 1
 
         # Case 4: Exists on both sides, but no base recorded yet (initial sync)
@@ -687,8 +782,11 @@ class SyncEngine:
             log(f"INITIAL BASE ESTABLISHED: {rel_path} (recording local notes)")
             if not self.dry_run:
               os.makedirs(os.path.dirname(target_remote), exist_ok=True)
-              shutil.copy2(loc_info["content_path"], target_remote)
-              self._update_base_cache(rel_path, loc_info["content_path"])
+              if rel_path.endswith('.md'):
+                self._publish_markdown(loc_info["content_path"], target_remote, target_local)
+              else:
+                shutil.copy2(loc_info["content_path"], target_remote)
+              self._update_base_cache(rel_path, target_remote)
             stats["remote_updated"] += 1
 
         # Case 5: Deleted locally (in base and remote, not in local)
@@ -727,8 +825,11 @@ class SyncEngine:
             )
             if not self.dry_run:
               os.makedirs(os.path.dirname(target_remote), exist_ok=True)
-              shutil.copy2(loc_info["content_path"], target_remote)
-              self._update_base_cache(rel_path, loc_info["content_path"])
+              if rel_path.endswith('.md'):
+                self._publish_markdown(loc_info["content_path"], target_remote, target_local)
+              else:
+                shutil.copy2(loc_info["content_path"], target_remote)
+              self._update_base_cache(rel_path, target_remote)
             stats["remote_updated"] += 1
 
         # Case 7: In base only (already deleted on both sides)
@@ -749,6 +850,89 @@ class SyncEngine:
       self.vcs_commit_and_upload()
 
     return stats
+
+  def _publish_markdown(
+      self, src_content_path: str, target_remote: str, target_local: str
+  ) -> None:
+    """Publishes markdown content to company docs ensuring g3mark compliance.
+
+    Args:
+      src_content_path: Path to source or staged markdown file.
+      target_remote: Destination path in company docs.
+      target_local: Corresponding path in local notes directory.
+
+    Usage Example:
+      >>> engine._publish_markdown("/tmp/n.md", "/c/n.md", "~/notes/n.md")
+    """
+    with open(src_content_path, "r", encoding="utf-8") as f:
+      raw = f.read()
+
+    formatted = ensure_g3mark_optin(raw)
+    with open(target_remote, "w", encoding="utf-8") as f:
+      f.write(formatted)
+
+    if (
+        os.path.exists(target_local)
+        and target_local.endswith(".md")
+        and formatted != raw
+    ):
+      with open(target_local, "w", encoding="utf-8") as f:
+        f.write(formatted)
+
+  def reconcile_opened_markdown_files(self) -> None:
+    """Reconciles opened files in Piper client to guarantee g3mark compliance.
+
+    Inspects `g4 status` in output_dir, identifies opened markdown files that
+    are missing the required g3mark opt-in directive, formats them in-place,
+    and updates the local note and base cache to maintain hash parity.
+    """
+    if not os.path.exists(self.output_dir):
+      return
+
+    g4_status = subprocess.run(
+        ["g4", "status"],
+        cwd=self.output_dir,
+        capture_output=True,
+        text=True,
+    )
+    if g4_status.returncode != 0 or not g4_status.stdout.strip():
+      return
+
+    for status_line in g4_status.stdout.splitlines():
+      line = status_line.strip()
+      if not ("- add" in line or "- edit" in line):
+        continue
+      depot_path = line.split("#")[0].strip()
+      if not depot_path.endswith(".md"):
+        continue
+
+      if "company/users/" in depot_path:
+        parts = depot_path.split("company/users/")[-1].split("/", 1)
+        rel_path = parts[1] if len(parts) > 1 else os.path.basename(depot_path)
+      else:
+        rel_path = os.path.basename(depot_path)
+
+      target_remote = os.path.join(self.output_dir, rel_path)
+      if not os.path.exists(target_remote):
+        continue
+
+      with open(target_remote, "r", encoding="utf-8") as f:
+        raw = f.read()
+
+      if not has_g3mark_optin(raw):
+        log(f"Reconciling g3mark opt-in for opened file: {rel_path}")
+        formatted = ensure_g3mark_optin(raw)
+        with open(target_remote, "w", encoding="utf-8") as f:
+          f.write(formatted)
+
+        target_local = os.path.join(self.input_dir, rel_path)
+        if os.path.exists(target_local):
+          with open(target_local, "w", encoding="utf-8") as f:
+            f.write(formatted)
+
+        self._update_base_cache(rel_path, target_remote)
+
+    self._save_state()
 
   def _update_base_cache(self, rel_path: str, src_path: str) -> None:
     """Updates base cache file and state entry."""
@@ -777,6 +961,7 @@ class SyncEngine:
     )
     if g4_check.returncode == 0:
       log("Reconciling Piper files in company docs directory...")
+      self.reconcile_opened_markdown_files()
       subprocess.run(["g4", "fix"], cwd=self.output_dir, capture_output=True)
 
       # Check if any files modified / added / deleted
@@ -800,6 +985,8 @@ class SyncEngine:
 
       if self.skip_submit:
         env["SKIP_SUBMIT"] = "1"
+      if self.no_g3mark_ok:
+        env["NO_G3MARK_OK"] = self.no_g3mark_ok
 
       log("Creating/updating Piper change description...")
       subprocess.run(["g4", "change"], cwd=self.output_dir, env=env)
@@ -855,6 +1042,11 @@ def main():
       default=None,
       help="Path to custom .syncnotesignore file",
   )
+  parser.add_argument(
+      "--no-g3mark-ok",
+      default=os.environ.get("NO_G3MARK_OK", None),
+      help="Optional reason tag for NO_G3MARK_OK to disable g3mark presubmit check",
+  )
 
   args = parser.parse_args()
 
@@ -866,6 +1058,7 @@ def main():
       skip_vcs=args.skip_vcs,
       skip_submit=args.skip_submit,
       ignore_file=args.ignore_file,
+      no_g3mark_ok=args.no_g3mark_ok,
   )
 
   stats = engine.sync()
