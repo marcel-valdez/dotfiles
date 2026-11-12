@@ -533,6 +533,19 @@
                                 "type": "basic"
                             }
                         ]
+                    },
+                    {
+                        "description": "Ctrl+Cmd+Y -> Dictation key (same as the mic/F5 key; the mic key keeps working)",
+                        "manipulators": [
+                            {
+                                "from": {
+                                    "key_code": "y",
+                                    "modifiers": { "mandatory": ["control", "command"], "optional": ["caps_lock"] }
+                                },
+                                "to": [{ "consumer_key_code": "dictation" }],
+                                "type": "basic"
+                            }
+                        ]
                     }
                 ]
             },
