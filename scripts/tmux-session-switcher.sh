@@ -48,10 +48,11 @@ tmux switch-client -t {1}:\${window_selection_delta}
 EOF
 )
 current_session_name="$(tmux display-message -p "#{session_name}")"
-current_session_index="$(tmux list-sessions -F '#{session_name}' | nl -n'ln' | grep "${current_session_name}" | cut -d' ' -f1)"
+current_session_index="$(tmux list-sessions -F '#{session_name}' | grep -v '^_jetski_dash$' | nl -n'ln' | grep "${current_session_name}" | cut -d' ' -f1)"
 header="TMUX Sessions
 ID name"
 tmux list-sessions -F '#{session_id} #{session_name}' | \
+  grep -v ' _jetski_dash$' | \
   fzf --cycle --reverse --header "${header}" \
   --bind="enter:become<${enter_script}>" \
   --bind="shift-up:execute<${shift_up_script}>+preview<${preview_script}>" \
