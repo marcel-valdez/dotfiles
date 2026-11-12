@@ -28,6 +28,16 @@ else
   # command line, and therefore don't need to execute .bashrc
 
   # Instructions required even when not in bash shell
+
+  # Homebrew: macOS only (POSIX tests, since non-bash shells such as dash run this)
+  if [ "$(uname -s)" = Darwin ] && [ -d "${HOME}/homebrew" ]; then
+    export PATH="${HOME}/homebrew/bin:${HOME}/homebrew/sbin:${PATH}"
+  fi
+  
+  if [ "$(uname -s)" = Darwin ] && [ -d "/opt/homebrew" ]; then
+    export PATH="/opt/homebrew/bin:/opt/homebrew/sbin:${PATH}"
+  fi
+  
   if [ -d "${HOME}/bin" ]; then
     export PATH="${PATH}:${HOME}/bin"
   fi

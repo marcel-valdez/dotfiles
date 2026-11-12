@@ -269,6 +269,15 @@ alias l='ls -CF'
 # alias alert='notify-send --urgency=low -i "$([ ${?} = 0 ] && echo terminal || echo error)" "$(history|tail -n1|sed -e '\''s/^\s*[0-9]\+\s*//;s/[;&|]\s*alert$//'\'')"'
 
 # Path additions
+# Homebrew: macOS only
+if [[ "${OSTYPE}" == darwin* && -d "${HOME}/homebrew" ]]; then
+  export PATH="${HOME}/homebrew/bin:${HOME}/homebrew/sbin:${PATH}"
+fi
+  
+if [[ "${OSTYPE}" == darwin* && -d "/opt/homebrew" ]]; then
+  export PATH="/opt/homebrew/bin:/opt/homebrew/sbin:${PATH}"
+fi
+  
 if [ -d "${HOME}/bin" ]; then
   export PATH="${PATH}:${HOME}/bin"
 fi
