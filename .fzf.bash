@@ -52,6 +52,24 @@ if declare -F ble/function#pop >/dev/null 2>&1; then
   ble/function#pop bind
 fi
 
+# Guard `builtin printf '\e[5n'` (Device Status Report 5) in fzf >= 0.53
+# completion helpers (`_fzf_complete` and `__fzf_generic_path_completion`).
+# Upstream fzf switched from `printf '\e[5n'` to `builtin printf '\e[5n'`,
+# bypassing ble.sh's `ble/function#push printf` wrapper in
+# `contrib/integration/fzf.common.bash` while ble.sh still suppresses
+# `bind '"\e[0n": redraw-current-line'`. When ble.sh is attached, the terminal's
+# `\e[0n` (`dsr0`) reply both aborts candidate insertion in
+# `ble/complete/check-cancel` and triggers the `unbound keyseq: dsr0` bell.
+for _fzf_dsr_fn in _fzf_complete __fzf_generic_path_completion; do
+  if declare -F "${_fzf_dsr_fn}" >/dev/null 2>&1; then
+    _fzf_fn_def="$(declare -f "${_fzf_dsr_fn}")"
+    if [[ "${_fzf_fn_def}" == *'\e[5n'* && "${_fzf_fn_def}" != *'_ble_attached'* ]]; then
+      eval "$(builtin printf '%s\n' "${_fzf_fn_def}" | command sed 's/builtin printf '\''\\e\[5n'\''/[[ -n ${_ble_attached-} ]] || &/g')"
+    fi
+  fi
+done
+unset _fzf_dsr_fn _fzf_fn_def
+
 # Unconditional set -e-safe __fzf_defaults() and non-interactive/legacy helpers
 __fzf_defaults() {
   if [[ "${_fzf_legacy_mode:-0}" == "1" ]]; then
