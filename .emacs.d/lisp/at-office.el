@@ -29,6 +29,60 @@
       (make-llm-goose :model "goose-v3.5-s"))
 (setq llm-default-model "goose-v3.5-s")
 
+(let ((jetski-elisp-dir "/usr/share/google-emacs/site-lisp/emacs-google-config/devtools/editors/emacs/jetski/elisp"))
+  (when (file-directory-p jetski-elisp-dir)
+    (add-to-list 'load-path jetski-elisp-dir)))
+
+(condition-case err
+    (when (require 'jetski nil t)
+      (setq jetski-permissions-allow
+            '(
+              "command(fileutil cat)" "command(fileutil ls)" "command(fileutil tail)"
+              "command(fileutil head)" "command(fileutil stat)" "command(fileutil test)"
+              "command(blaze)" "command(ls)" "command(cat)" "command(grep)" "command(pwd)"
+              "command(tail)" "command(head)" "command(rg)" "command(test -f)"
+              "command(git status)" "command(git log)"
+              "command(hg log)" "command(hg cls)" "command(hg status)" "command(hg diff)" "command(hg files)" "command(hg cat)" "command(hg parents)"
+              "command(/google/bin/releases/test-fusion-agents-cli/test-fusion-for-agents get-fusion-entity)"
+              "command(/google/bin/releases/test-fusion-agents-cli/test-fusion-for-agents get-guitar-workflow)"
+              "command(ANALOG=\"/google/bin/releases/analog-cli/analog --logtostderr --minloglevel=3\")"
+              "command(ANALOG=\"/google/bin/releases/analog-cli/analog --logtostderr --minloglevel=2\")"
+              "command(ANALOG=\"/google/bin/releases/analog-cli/analog --logtostderr --minloglevel=1\")"
+              "command(ANALOG=\"/google/bin/releases/analog-cli/analog --logtostderr --minloglevel=0\")"
+              "command(ANALOG)"
+              "command(ANALOG=*)"
+              "command(python3 prototypes/projects/test_fusion_agents/skills*)"
+              "command(python3 prototypes/projects/guitar_agents/skills*)"
+              "command(/google/bin/releases/gemini-agents-sponge-cli/sponge)"
+              "command(/google/bin/releases/gemini-agents-analog-cli/analog)"
+              "command(/google/bin/releases/analog-cli/analog)"
+              "command(/google/bin/releases/lumbermill/public/lumbermill/lumbermill)"
+              "command(/google/bin/releases/piper-fig/vcstool/vcstool debug-vcs-string)"
+              "command(/usr/local/google/home/marcelvaldez/bin/tmux-notify)"
+              "command(SKYBUILD=1 /google/bin/releases/arca9-local-blaze-cli/blaze-for-agents test)"
+              "command(SKYBUILD=1 /google/bin/releases/arca9-local-blaze-cli/blaze-for-agents query)"
+              "command(SKYBUILD=1 /google/bin/releases/arca9-local-blaze-cli/blaze-for-agents build)"
+              "command(/google/bin/releases/arca9-local-blaze-cli/blaze-for-agents test)"
+              "command(/google/bin/releases/arca9-local-blaze-cli/blaze-for-agents query)"
+              "command(/google/bin/releases/arca9-local-blaze-cli/blaze-for-agents build)"
+              "command(/google/bin/releases/gemini-agents-duckie/duckie_cli)"
+              "command(/google/bin/releases/code-hygiene/cli/tricorder)"
+              "read_file(/)"
+              "mcp(duckie/*)"
+              "ask_duckie(/)"
+              "command(guitar)"
+              ))
+      (setq jetski-permissions-deny
+            '("command(git clean)" "command(sponge)" "command(/usr/bin/sponge)"))
+      (setq jetski-permissions-ask
+            '("write_file(/)" "command(git push)" "command(hg amend)" "command(hg evolve)"
+              "command(hg histedit)"  "command(hg rebase)"
+              ))
+      (when (file-executable-p "/usr/bin/jetski-emacs-bridge")
+        (setq jetski-bridge-binary "/usr/bin/jetski-emacs-bridge")))
+  (error
+   (message "Skipping optional jetski configuration: %s" (error-message-string err))))
+
 ;;;###autoload
 (defun eglot-hook-fn ()
   "Set up keybindings for Eglot in the current buffer.
