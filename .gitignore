@@ -60,12 +60,33 @@ bin/jq
 bin/kitten
 bin/kitty
 bin/rg
+# Google-internal binaries and helpers
+bin/aw-tunnel.sh
+bin/blaze-for-agents
+bin/critique
+bin/fzf-xl-select
+bin/gtd-report
+bin/hg
+bin/jetski-emacs-bridge
+bin/jetski_tmux.par
+bin/pt
+bin/sync_notes
+bin/vcstool
+lib/fzf-completions.bash
+scripts/check-weekly-review-fallback.py
+scripts/cl_submit_stats.sh
+scripts/find_affected_targets.sh
+scripts/link_skills.sh
+scripts/monitor_supermixer_asrf_cutover.py
+scripts/supermixer_cutover_constants.py
+scripts/tests/test_monitor_supermixer_asrf_cutover.py
 
 !.emacs
 !.emacs.d/
 !.emacs.d/lisp/
 !.emacs.d/lisp/*
 .emacs.d/lisp/at-office.el
+.emacs.d/lisp/beframe/
 !.emacs.d/lisp/external
 !.emacs.d/lisp/external/*
 .emacs.d/lisp/external/helm/
