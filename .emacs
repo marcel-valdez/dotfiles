@@ -334,13 +334,21 @@
         "Helm buffer list filtered through Beframe."
         (interactive)
         (require 'helm-buffers)
-        (helm
-         :sources
-         (helm-build-sync-source "Beframe Buffers"
-           :candidates (lambda () (beframe--buffer-names))
-           :coerce     #'get-buffer
-           :action     helm-type-buffer-actions)
-         :buffer "*Helm Beframe buffers*"))
+        ;; Capture the frame up front so the candidates are always the
+        ;; buffers of the frame Helm was invoked from.
+        (let ((frame (selected-frame)))
+          (helm
+           :sources
+           (helm-build-sync-source "Beframe Buffers"
+             ;; `beframe-buffer-names' is the public API (beframe >= 1.x);
+             ;; fall back to the old private helper on older versions.
+             :candidates (lambda ()
+                           (if (fboundp 'beframe-buffer-names)
+                               (beframe-buffer-names frame)
+                             (beframe--buffer-names frame)))
+             :coerce     #'get-buffer
+             :action     helm-type-buffer-actions)
+           :buffer "*Helm Beframe buffers*")))
 
       ;; [2] Global buffer list (ignores Beframe)
       (defun custom-helm-global-buffers ()
