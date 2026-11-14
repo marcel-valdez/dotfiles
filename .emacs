@@ -23,7 +23,6 @@
 ;; Register minibuffer hooks.
 (add-hook 'minibuffer-setup-hook #'gc/minibuffer-setup-hook)
 (add-hook 'minibuffer-exit-hook #'gc/minibuffer-exit-hook)
-
 (setq inhibit-startup-screen t)
 (setq load-prefer-newer t)
 
@@ -677,25 +676,27 @@
  '(custom-safe-themes
    '("6068d911f0ad3f9e6834d4849038ef3a317510f23683ff9656da7d49a5ab3ed5"
      "d4890c4d8d262c61decb7c0e43b1dc5c92b378e9acada6c04d9e94f00cc70ead"
-     "4badd47b5ba16df46b849137903f2210d344f3c7021e979ff8ed68b8c3827d84" default))
+     "4badd47b5ba16df46b849137903f2210d344f3c7021e979ff8ed68b8c3827d84"
+     default))
  '(graphviz-dot-indent-width 2 t)
  '(line-number-mode t)
  '(package-selected-packages
-   '(apache-mode async bar-cursor beframe bind-chord bm boxquote browse-kill-ring
-                 centaur-tabs color-theme-approximate color-theme-modern
-                 comany-mode company company-mode dart-mode dash
-                 default-text-scale diminish eat editorconfig eglot epl eproject
-                 ess f flycheck flymake flymake-pyrefly flymake-shellcheck
-                 folding fzf git-modes goto-chg graphviz-dot-mode helm helm-core
-                 helm-flycheck helm-lsp helm-xref ht htmlize
-                 ido-completing-read+ imenu-list initsplit llm-goose lsp-mode
-                 lsp-treemacs lsp-ui lv markdown-mode memoize multi-term
-                 multiple-cursors nav-flash ox-gfm ox-html5slide ox-pandoc
-                 perspective pkg-info popup puppet-mode rotate rust-mode s
-                 session tabbar telephone-line term-run treemacs-perspective
-                 undo-tree use-package use-package-chords vterm w3m which-key
-                 windresize xclip yaml-mode yasnippet yasnippet-snippets
-                 zenburn-theme))
+   '(apache-mode async bar-cursor beframe bind-chord bm boxquote
+		 browse-kill-ring centaur-tabs color-theme-approximate
+		 color-theme-modern comany-mode company-mode dart-mode
+		 dash default-text-scale diminish eat editorconfig
+		 eglot epl eproject ess f flymake flymake-pyrefly
+		 flymake-shellcheck folding fzf git-modes goto-chg
+		 graphviz-dot-mode helm-flycheck helm-lsp helm-xref ht
+		 htmlize ido-completing-read+ imenu-list initsplit
+		 llm-goose lsp-ui lv markdown-mode memoize multi-term
+		 multiple-cursors nav-flash ox-gfm ox-html5slide
+		 ox-pandoc perspective pkg-info popup puppet-mode
+		 rotate rust-mode s session tabbar telephone-line
+		 term-run treemacs-perspective undo-tree use-package
+		 use-package-chords vterm w3m which-key windresize
+		 xclip yaml-mode yasnippet yasnippet-snippets
+		 zenburn-theme))
  '(show-paren-mode t)
  '(tool-bar-mode nil)
  '(warning-suppress-types '((comp))))
@@ -704,6 +705,7 @@
  ;; If you edit it by hand, you could mess it up, so be careful.
  ;; Your init file should contain only one such instance.
  ;; If there is more than one, they won't work right.
+ '(default ((t (:family "JetBrains Mono" :height 150 :weight regular :width normal :foundry "nil" :inherit nil :extend nil))))
  '(clang-include-fixer-highlight ((t (:background "white"))))
  '(diff-added ((t (:inherit diff-changed :extend t :background "#338833"))))
  '(diff-indicator-added ((t (:inherit diff-added :foreground "#055505"))))
