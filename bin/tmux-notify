@@ -1,50 +1,536 @@
 #!/usr/bin/env bash
-# tmux-notify: Shows a modal tmux popup sized to fit a wrapped message.
+# tmux-notify: Broadcasts a dynamically sized modal tmux notification popup
+# across attached outer clients and pages overflow via batcat, bat, or less.
 #
 # Usage:
-#   tmux-notify [--print-layout] [--client-size WxH] <title> <message...>
-#   tmux-notify <message>            # title defaults to NOTIFICATION
-#
-# The message is word-wrapped to the popup interior (popup width minus the
-# 2-column border and 1 column of padding on each side). The popup height is
-# the number of wrapped rows plus the 2-row border. When the wrapped message
-# is taller than the client allows, the last visible row is replaced with
-# "... (+N more lines)" so the beginning of the message is never lost.
+#   tmux-notify [options] [--] <title> <message...>
+#   tmux-notify [options] [--] <message>   # title defaults to NOTIFICATION
 #
 # Options:
-#   --print-layout     Print "<popup_w> <popup_h>" followed by the rendered
-#                      body instead of opening a popup (used by tests).
-#   --client-size WxH  Use this client size instead of querying tmux.
+#   --print-layout        Print "<popup_w> <popup_h> <inline|pager>" followed
+#                         by the rendered or wrapped body instead of opening a
+#                         popup.
+#   --client-size WxH     Repeatable client dimension override (for tests).
+#   --select-pane PANE    Focus PANE on interactive dismissal by the user.
+#   --session SESSION     Restrict client discovery to SESSION.
+#   --                    End option parsing (allows leading-dash titles).
 #
 # Environment:
-#   TMUX_NOTIFY_MAX_COLS  Maximum popup width in columns (default: 80).
-#   TMUX_NOTIFY_TIMEOUT   Seconds before the popup closes itself (default:
-#                         7200).
+#   TMUX_NOTIFY_MAX_COLS           Optional upper bound on popup width.
+#   TMUX_NOTIFY_TIMEOUT            Seconds before popup auto-closes (7200).
+#   TMUX_NOTIFY_NO_PATH_BOOTSTRAP  Skip PATH splicing when non-empty.
+#   OS_COMPAT_UNAME_S              Optional uname -s override for tests.
 #
 # Usage Example:
-#   $ tmux-notify --print-layout --client-size 100x30 "Build" "Done."
-#   30 3
+#   $ tmux-notify --print-layout --client-size 200x50 "Build" "Done."
+#   30 3 inline
 #    Done.
+
+# Re-exec into Homebrew Bash 5.x on macOS when launched via /bin/bash 3.2.
+_os_name="${OS_COMPAT_UNAME_S:-$(uname -s)}"
+if (( BASH_VERSINFO[0] < 5 )) && [[ -z "${_TMUX_NOTIFY_REEXEC:-}" ]] \
+    && [[ "${_os_name}" == "Darwin" ]]; then
+  for _b5 in /opt/homebrew/bin/bash /usr/local/bin/bash; do
+    if [[ -x "${_b5}" ]] \
+        && "${_b5}" -c '(( BASH_VERSINFO[0] >= 5 ))' 2>/dev/null; then
+      _TMUX_NOTIFY_REEXEC=1 exec "${_b5}" "$0" "$@"
+    fi
+  done
+fi
+unset _TMUX_NOTIFY_REEXEC
+
+#######################################
+# Splices ~/bin, /opt/homebrew/bin, and /usr/local/bin immediately ahead of
+# /usr/bin so user/Homebrew binaries (bat, modern less) take precedence over
+# macOS system /usr/bin/less without shadowing leading caller or test PATHs.
+#
+# Arguments:
+#   None
+# Returns:
+#   0 always.
+#
+# Usage Example:
+#   bootstrap_runtime_path
+#######################################
+bootstrap_runtime_path() {
+  [[ -n "${TMUX_NOTIFY_NO_PATH_BOOTSTRAP:-}" ]] && return 0
+
+  local -a current_entries=()
+  IFS=':' read -r -a current_entries <<< "${PATH:-}"
+
+  local usr_bin_idx=-1 idx
+  for idx in "${!current_entries[@]}"; do
+    if [[ "${current_entries[idx]}" == "/usr/bin" ]]; then
+      usr_bin_idx=${idx}
+      break
+    fi
+  done
+
+  local -a priority_dirs=(
+    "${HOME}/bin"
+    "/opt/homebrew/bin"
+    "/usr/local/bin"
+  )
+  local -a dirs_to_splice=()
+  local cand existing_idx
+  for cand in "${priority_dirs[@]}"; do
+    [[ -d "${cand}" ]] || continue
+    existing_idx=-1
+    for idx in "${!current_entries[@]}"; do
+      if [[ "${current_entries[idx]}" == "${cand}" ]]; then
+        existing_idx=${idx}
+        break
+      fi
+    done
+    if (( existing_idx == -1 )) \
+        || (( usr_bin_idx >= 0 && existing_idx > usr_bin_idx )); then
+      dirs_to_splice+=("${cand}")
+    fi
+  done
+
+  (( ${#dirs_to_splice[@]} == 0 )) && return 0
+
+  local -a rebuilt_entries=()
+  local entry skip_entry spliced=0 splice_dir
+  for entry in "${current_entries[@]}"; do
+    skip_entry=0
+    for splice_dir in "${dirs_to_splice[@]}"; do
+      if [[ "${entry}" == "${splice_dir}" ]]; then
+        skip_entry=1
+        break
+      fi
+    done
+    (( skip_entry == 1 )) && continue
+    if [[ "${entry}" == "/usr/bin" ]] && (( spliced == 0 )); then
+      rebuilt_entries+=("${dirs_to_splice[@]}")
+      spliced=1
+    fi
+    rebuilt_entries+=("${entry}")
+  done
+  if (( spliced == 0 )); then
+    rebuilt_entries+=("${dirs_to_splice[@]}")
+  fi
+
+  local IFS=':'
+  PATH="${rebuilt_entries[*]}"
+  export PATH
+}
+
+#######################################
+# Ensures multibyte UTF-8 character counting (${#var}) and word wrapping work
+# when launched from minimal non-UTF-8 environments (launchd, systemd-run, C),
+# suppressing setlocale stderr noise and restoring LC_ALL if all probes fail.
+#
+# Arguments:
+#   None
+# Returns:
+#   0 always.
+#
+# Usage Example:
+#   ensure_utf8_locale
+#######################################
+ensure_utf8_locale() {
+  local utf8_probe=$'\xc3\xa1'
+  (( ${#utf8_probe} == 1 )) && return 0
+
+  local had_lc_all="${LC_ALL+1}"
+  local orig_lc_all="${LC_ALL:-}"
+  local -a locale_candidates=()
+  if [[ "${_os_name}" == "Darwin" ]]; then
+    locale_candidates=(en_US.UTF-8 C.UTF-8 UTF-8)
+  else
+    locale_candidates=(C.UTF-8 en_US.UTF-8 UTF-8)
+  fi
+
+  local candidate_locale
+  for candidate_locale in "${locale_candidates[@]}"; do
+    { export LC_ALL="${candidate_locale}"; } 2>/dev/null
+    (( ${#utf8_probe} == 1 )) && return 0
+  done
+
+  if [[ -n "${had_lc_all}" ]]; then
+    { export LC_ALL="${orig_lc_all}"; } 2>/dev/null
+  else
+    unset LC_ALL
+  fi
+}
+
+bootstrap_runtime_path
+ensure_utf8_locale
 
 # shellcheck source=/dev/null
 [[ -f "${HOME}/lib/os_compat.sh" ]] && source "${HOME}/lib/os_compat.sh"
 
+# Fallbacks when os_compat.sh is unavailable in isolated environments.
+if ! declare -F os::runtime_dir >/dev/null 2>&1; then
+  os::runtime_dir() {
+    local uid="${UID:-$(id -u)}" dir
+    if [[ "${_os_name}" == "Darwin" ]]; then
+      dir="${TMPDIR:-/tmp}"
+      dir="${dir%/}/runtime-${uid}"
+    else
+      dir="${XDG_RUNTIME_DIR:-/run/user/${uid}}"
+      [[ -d "${dir}" && -w "${dir}" ]] || dir="/tmp/runtime-${uid}"
+    fi
+    mkdir -p "${dir}" 2>/dev/null || true
+    chmod 0700 "${dir}" 2>/dev/null || true
+    printf '%s\n' "${dir}"
+  }
+fi
+
+if ! declare -F os::timeout >/dev/null 2>&1; then
+  os::timeout() {
+    local duration="$1"
+    shift
+    if command -v timeout >/dev/null 2>&1; then
+      timeout "${duration}" "$@"
+      return $?
+    fi
+    local secs="${duration%s}"
+    "$@" <&0 &
+    local cmd_pid=$!
+    (
+      sleep "${secs}"
+      kill -TERM "${cmd_pid}" 2>/dev/null || true
+    ) </dev/null >/dev/null 2>&1 &
+    local watcher_pid=$!
+    local rc=0
+    wait "${cmd_pid}" 2>/dev/null || rc=$?
+    kill -TERM "${watcher_pid}" 2>/dev/null || true
+    wait "${watcher_pid}" 2>/dev/null || true
+    return "${rc}"
+  }
+fi
+
 readonly BORDER_COLS=2
 readonly BORDER_ROWS=2
 readonly PAD_COLS=1
-readonly CLIENT_MARGIN=4
 readonly MIN_POPUP_COLS=30
-readonly MAX_POPUP_COLS="${TMUX_NOTIFY_MAX_COLS:-80}"
 readonly TAB_SPACES="    "
+readonly LESS_DESIRED_OPTS=(
+  --status-line
+  --mouse
+  --incsearch
+  --quit-on-intr
+  --raw-control-chars
+)
 
-# Character counting (${#var}) and fold need a UTF-8 locale; systemd-run and
-# Knock may start this script without one.
-if [[ "$(locale charmap 2>/dev/null)" != "UTF-8" ]]; then
-  export LC_ALL=C.UTF-8
+#######################################
+# Returns the epoch modification timestamp of a file or directory, ordering
+# GNU `stat -c %Y` ahead of BSD `stat -f %m` so GNU `stat --file-system` never
+# pollutes stdout.
+#
+# Arguments:
+#   $1 - target_path: Path to stat.
+# Outputs:
+#   Numeric epoch seconds (or 0 on failure).
+#
+# Usage Example:
+#   mtime="$(stat_mtime_epoch "/tmp/popup_abc123")"
+#######################################
+stat_mtime_epoch() {
+  local target_path="$1" mtime=""
+  mtime="$(stat -c %Y "${target_path}" 2>/dev/null \
+    || stat -f %m "${target_path}" 2>/dev/null \
+    || printf '0')"
+  [[ "${mtime}" =~ ^[0-9]+$ ]] || mtime=0
+  printf '%s\n' "${mtime}"
+}
+
+#######################################
+# Terminates a process and all of its descendants bottom-up so grandchildren
+# (such as `less` spawned by `batcat` or `sleep` inside a timer subshell) do
+# not outlive the popup runner or hold test pipes open.
+#
+# Arguments:
+#   $1 - root_pid: Process ID at the root of the subtree.
+# Returns:
+#   0 always.
+#
+# Usage Example:
+#   kill_tree "${PAGER_PID}"
+#######################################
+kill_tree() {
+  local root_pid="${1:-}"
+  [[ -n "${root_pid}" && "${root_pid}" =~ ^[0-9]+$ ]] || return 0
+  local child_pid
+  while IFS= read -r child_pid; do
+    [[ -n "${child_pid}" ]] && kill_tree "${child_pid}"
+  done < <(pgrep -P "${root_pid}" 2>/dev/null || true)
+  kill -TERM "${root_pid}" 2>/dev/null || true
+}
+
+#######################################
+# Probes `less --help` with LESS cleared and populates `RESOLVED_LESS_OPTS`
+# with supported long options, falling back to `-R -K` on minimal builds.
+#
+# Arguments:
+#   None
+# Outputs:
+#   Sets global array RESOLVED_LESS_OPTS.
+#
+# Usage Example:
+#   resolve_less_opts
+#######################################
+resolve_less_opts() {
+  local help_text="" opt
+  help_text="$(env -u LESS less --help </dev/null 2>&1 || true)"
+  RESOLVED_LESS_OPTS=()
+  if [[ -n "${help_text}" ]]; then
+    for opt in "${LESS_DESIRED_OPTS[@]}"; do
+      if [[ "${help_text}" == *"${opt}"* ]]; then
+        RESOLVED_LESS_OPTS+=("${opt}")
+      fi
+    done
+  fi
+  if (( ${#RESOLVED_LESS_OPTS[@]} == 0 )); then
+    RESOLVED_LESS_OPTS=(-R -K)
+  fi
+}
+
+#######################################
+# Executes inside each client's `tmux display-popup -E` container. Coordinates
+# Dekker startup-vs-dismissal registration, sibling auto-dismissal, detached
+# client HUP isolation, interactive-only pane focus restoration, and atomic
+# `slots/`-only group directory teardown.
+#
+# Arguments:
+#   $1 - grp_dir: Shared notification popup group directory.
+#   $2 - slot_id: Per-client numeric slot identifier.
+#   $3 - layout_mode: 'inline' or 'pager'.
+#   $4 - popup_timeout: Auto-close timeout in seconds.
+#   $5 - target_pane: Optional tmux pane ID to focus on user dismissal.
+#   $6 - client_name: Optional tmux client name hosting this popup.
+# Returns:
+#   0 on clean dismissal or sibling cancellation, signal exit code otherwise.
+#
+# Usage Example:
+#   tmux-notify --internal-run /tmp/popup_123456 0 inline 7200 "%3" "/dev/pts/1"
+#######################################
+run_popup_member() {
+  local grp_dir="$1"
+  local slot_id="$2"
+  local layout_mode="$3"
+  local popup_timeout="$4"
+  local target_pane="${5:-}"
+  local client_name="${6:-}"
+
+  local _cleaned=""
+  local user_dismissed=0
+  local got_hup=0
+  local pager_pid=""
+  local timer_pid=""
+
+  # Invoked indirectly via `trap cleanup_member EXIT`.
+  # shellcheck disable=SC2329
+  cleanup_member() {
+    [[ -n "${_cleaned}" ]] && return 0
+    _cleaned=1
+    trap '' INT HUP TERM
+
+    [[ -n "${timer_pid}" ]] && kill_tree "${timer_pid}"
+    [[ -n "${pager_pid}" ]] && kill_tree "${pager_pid}"
+    [[ -n "${timer_pid}" ]] && wait "${timer_pid}" 2>/dev/null || true
+    [[ -n "${pager_pid}" ]] && wait "${pager_pid}" 2>/dev/null || true
+
+    if [[ "${layout_mode}" == "inline" && -t 1 ]]; then
+      tput cnorm 2>/dev/null || true
+    fi
+
+    if [[ -n "${grp_dir}" && -d "${grp_dir}" ]]; then
+      # Isolate client disconnects (SSH drop, laptop sleep) so detaching one
+      # client never dismisses unread popups on remaining active clients.
+      local client_detached=0
+      if (( got_hup == 1 )) && [[ -n "${client_name}" ]]; then
+        if ! tmux list-clients -F '#{client_name}' 2>/dev/null \
+            | grep -Fxq "${client_name}"; then
+          client_detached=1
+        fi
+      fi
+
+      if (( client_detached == 0 )); then
+        if mkdir "${grp_dir}/dismissed" 2>/dev/null; then
+          local pid_file sib_pid
+          for pid_file in "${grp_dir}/pids/"*; do
+            [[ -e "${pid_file}" ]] || continue
+            sib_pid="${pid_file##*/}"
+            [[ "${sib_pid}" == "$$" ]] && continue
+            if [[ "${sib_pid}" =~ ^[0-9]+$ ]]; then
+              kill -TERM "${sib_pid}" 2>/dev/null || true
+            fi
+          done
+          if (( user_dismissed == 1 )) && [[ -n "${target_pane}" ]]; then
+            tmux select-pane -t "${target_pane}" 2>/dev/null || true
+          fi
+        fi
+      fi
+
+      rm -f "${grp_dir}/pids/$$" "${grp_dir}/slots/${slot_id}" 2>/dev/null || true
+      # Delete the shared group directory only when the final client slot is
+      # removed so slower siblings and sequential stub tests still see state.
+      if rmdir "${grp_dir}/slots" 2>/dev/null; then
+        rm -rf "${grp_dir}" 2>/dev/null || true
+      fi
+    fi
+  }
+
+  # Install traps prior to claiming slots/pids so early signals still clean up.
+  trap cleanup_member EXIT
+  trap 'user_dismissed=1; exit 130' INT
+  trap 'got_hup=1; exit 129' HUP
+  trap 'exit 143' TERM
+
+  [[ -d "${grp_dir}/slots" && -d "${grp_dir}/pids" ]] || exit 0
+  printf '%s\n' "$$" > "${grp_dir}/slots/${slot_id}" 2>/dev/null || exit 0
+  : > "${grp_dir}/pids/$$" 2>/dev/null || exit 0
+
+  # Dekker check: abort immediately if a faster sibling already dismissed.
+  if [[ -d "${grp_dir}/dismissed" ]]; then
+    exit 0
+  fi
+
+  if [[ "${layout_mode}" == "inline" ]]; then
+    [[ -t 1 ]] && { tput civis 2>/dev/null || true; }
+    [[ -f "${grp_dir}/msg.txt" ]] && cat "${grp_dir}/msg.txt"
+
+    local deadline=$(( SECONDS + popup_timeout ))
+    local remaining key="" next_byte="" seq_byte=""
+    while :; do
+      remaining=$(( deadline - SECONDS ))
+      (( remaining <= 0 )) && break
+      key=""
+      if IFS= read -r -s -n 1 -t "${remaining}" key; then
+        if [[ "${key}" == $'\e' ]]; then
+          # Drain multi-byte CSI/SS3 escape sequences (arrow keys, mouse wheel,
+          # focus-events) without resetting deadline or dismissing the popup.
+          if IFS= read -r -s -n 1 -t 0.02 next_byte; then
+            if [[ "${next_byte}" == "[" ]]; then
+              while IFS= read -r -s -n 1 -t 0.01 seq_byte; do
+                [[ "${seq_byte}" =~ [@-~] ]] && break
+              done
+            elif [[ "${next_byte}" == "O" ]]; then
+              IFS= read -r -s -n 1 -t 0.01 seq_byte || true
+            else
+              while IFS= read -r -s -n 1 -t 0.005 seq_byte; do :; done
+            fi
+            continue
+          fi
+        fi
+        user_dismissed=1
+        break
+      else
+        break
+      fi
+    done
+    exit 0
+  fi
+
+  # Pager mode: enforce TMUX_NOTIFY_TIMEOUT via a closed-FD background timer so
+  # timeouts work even when callers wrap outer tmux-notify in `timeout 5s`.
+  (
+    sleep "${popup_timeout}"
+    kill -TERM "$$" 2>/dev/null || true
+  ) </dev/null >/dev/null 2>&1 &
+  timer_pid=$!
+
+  resolve_less_opts
+  local less_cmd_str="less ${RESOLVED_LESS_OPTS[*]}"
+  local pager_input="${grp_dir}/wrapped.txt"
+  local -a pager_cmd=()
+  if command -v batcat >/dev/null 2>&1; then
+    pager_cmd=(
+      batcat
+      --style=plain
+      --language=markdown
+      --paging=always
+      "--pager=${less_cmd_str}"
+      "${pager_input}"
+    )
+  elif command -v bat >/dev/null 2>&1; then
+    pager_cmd=(
+      bat
+      --style=plain
+      --language=markdown
+      --paging=always
+      "--pager=${less_cmd_str}"
+      "${pager_input}"
+    )
+  else
+    pager_cmd=(less "${RESOLVED_LESS_OPTS[@]}" "${pager_input}")
+  fi
+
+  # Launch pager asynchronously keeping foreground PTY group (set +m) so Bash
+  # `wait` interrupts immediately when a sibling sends SIGTERM.
+  env -u LESS "${pager_cmd[@]}" <&0 &
+  pager_pid=$!
+
+  if [[ -d "${grp_dir}/dismissed" ]]; then
+    exit 0
+  fi
+
+  local pager_rc=0
+  if wait "${pager_pid}"; then
+    user_dismissed=1
+  else
+    pager_rc=$?
+    if (( pager_rc < 128 || pager_rc == 130 )); then
+      user_dismissed=1
+    fi
+  fi
+  pager_pid=""
+  exit 0
+}
+
+#######################################
+# Prunes expired popup_* group directories older than (popup_timeout + 60)s
+# only when no registered runner PID inside pids/ remains alive.
+#
+# Arguments:
+#   $1 - state_dir: Parent directory containing popup_* group directories.
+#   $2 - max_age_secs: Expiration threshold in seconds.
+# Returns:
+#   0 always.
+#
+# Usage Example:
+#   prune_expired_popup_groups "/run/user/1000/tmux-notify" 7260
+#######################################
+prune_expired_popup_groups() {
+  local state_dir="$1"
+  local max_age_secs="$2"
+  [[ -d "${state_dir}" ]] || return 0
+
+  local now_s
+  now_s="$(date +%s)"
+  local popup_dir mtime has_live_pid pid_file cand_pid
+  for popup_dir in "${state_dir}"/popup_*; do
+    [[ -d "${popup_dir}" ]] || continue
+    mtime="$(stat_mtime_epoch "${popup_dir}")"
+    (( now_s - mtime > max_age_secs )) || continue
+
+    has_live_pid=0
+    for pid_file in "${popup_dir}/pids/"*; do
+      [[ -e "${pid_file}" ]] || continue
+      cand_pid="${pid_file##*/}"
+      if [[ "${cand_pid}" =~ ^[0-9]+$ ]] && kill -0 "${cand_pid}" 2>/dev/null; then
+        has_live_pid=1
+        break
+      fi
+    done
+    (( has_live_pid == 1 )) && continue
+    rm -rf "${popup_dir}" 2>/dev/null || true
+  done
+}
+
+if [[ "${1:-}" == "--internal-run" ]]; then
+  shift
+  run_popup_member "$@"
 fi
 
 print_layout="false"
-client_size=""
+client_sizes=()
+select_pane=""
+target_session=""
+
 while (( $# > 0 )); do
   case "$1" in
     --print-layout)
@@ -52,8 +538,32 @@ while (( $# > 0 )); do
       shift
       ;;
     --client-size)
-      client_size="$2"
+      if (( $# < 2 )); then
+        echo "tmux-notify: --client-size requires WxH" >&2
+        exit 2
+      fi
+      client_sizes+=("$2")
       shift 2
+      ;;
+    --select-pane)
+      if (( $# < 2 )); then
+        echo "tmux-notify: --select-pane requires a pane ID" >&2
+        exit 2
+      fi
+      select_pane="$2"
+      shift 2
+      ;;
+    --session)
+      if (( $# < 2 )); then
+        echo "tmux-notify: --session requires a session name" >&2
+        exit 2
+      fi
+      target_session="$2"
+      shift 2
+      ;;
+    --)
+      shift
+      break
       ;;
     *)
       break
@@ -61,34 +571,105 @@ while (( $# > 0 )); do
   esac
 done
 
-TITLE="$1"
-shift
-MESSAGE="$*"
-if [[ -z "${MESSAGE}" ]]; then
-  MESSAGE="${TITLE}"
+if (( $# == 0 )); then
   TITLE="NOTIFICATION"
-fi
-
-if [[ -n "${client_size}" ]]; then
-  if [[ ! "${client_size}" =~ ^([0-9]+)x([0-9]+)$ ]]; then
-    echo "tmux-notify: --client-size must be WxH, got '${client_size}'" >&2
-    exit 2
-  fi
-  client_w="${BASH_REMATCH[1]}"
-  client_h="${BASH_REMATCH[2]}"
+  MESSAGE=""
+elif (( $# == 1 )); then
+  MESSAGE="$1"
+  TITLE="NOTIFICATION"
 else
-  read -r client_w client_h < <(tmux display-message -p \
-    '#{client_width} #{client_height}' 2>/dev/null)
-  [[ "${client_w}" =~ ^[0-9]+$ ]] || client_w=80
-  [[ "${client_h}" =~ ^[0-9]+$ ]] || client_h=24
+  TITLE="$1"
+  shift
+  MESSAGE="$*"
 fi
 
-max_popup_w=$(( client_w - CLIENT_MARGIN ))
-(( max_popup_w > MAX_POPUP_COLS )) && max_popup_w=${MAX_POPUP_COLS}
+target_clients=()
+client_w=""
+client_h=""
+
+if (( ${#client_sizes[@]} > 0 )); then
+  for cs in "${client_sizes[@]}"; do
+    if [[ ! "${cs}" =~ ^([0-9]+)x([0-9]+)$ ]]; then
+      echo "tmux-notify: --client-size must be WxH, got '${cs}'" >&2
+      exit 2
+    fi
+    cw="${BASH_REMATCH[1]}"
+    ch="${BASH_REMATCH[2]}"
+    if [[ -z "${client_w}" ]] || (( cw < client_w )); then
+      client_w="${cw}"
+    fi
+    if [[ -z "${client_h}" ]] || (( ch < client_h )); then
+      client_h="${ch}"
+    fi
+  done
+else
+  # Discover attached clients, excluding internal detached-popup sessions (_*
+  # and scratch) and control-mode clients unless no outer clients are attached.
+  outer_entries=()
+  fallback_entries=()
+  list_args=()
+  [[ -n "${target_session}" ]] && list_args=(-t "${target_session}")
+  while IFS= read -r raw_line; do
+    [[ -n "${raw_line}" ]] || continue
+    read -r cname csess cw ch cctrl _ <<< "${raw_line}"
+    if [[ "${cw:-}" =~ ^[0-9]+$ && "${ch:-}" =~ ^[0-9]+$ ]] \
+        && (( cw > 0 && ch > 0 )); then
+      [[ "${cctrl:-0}" == "1" ]] && continue
+      fallback_entries+=("${cname} ${cw} ${ch}")
+      if [[ "${csess}" != _* && "${csess}" != "scratch" ]]; then
+        outer_entries+=("${cname} ${cw} ${ch}")
+      fi
+    fi
+  done < <(tmux list-clients "${list_args[@]}" \
+    -F '#{client_name} #{client_session} #{client_width} #{client_height} #{client_control_mode}' \
+    2>/dev/null || true)
+
+  selected_entries=("${outer_entries[@]}")
+  if (( ${#selected_entries[@]} == 0 )); then
+    selected_entries=("${fallback_entries[@]}")
+  fi
+
+  for item in "${selected_entries[@]}"; do
+    read -r cname cw ch <<< "${item}"
+    target_clients+=("${cname}")
+    if [[ -z "${client_w}" ]] || (( cw < client_w )); then
+      client_w="${cw}"
+    fi
+    if [[ -z "${client_h}" ]] || (( ch < client_h )); then
+      client_h="${ch}"
+    fi
+  done
+
+  if [[ -z "${client_w}" || -z "${client_h}" ]]; then
+    read -r client_w client_h < <(tmux display-message -p \
+      '#{client_width} #{client_height}' 2>/dev/null || true)
+    [[ "${client_w:-}" =~ ^[0-9]+$ ]] && (( client_w > 0 )) || client_w=80
+    [[ "${client_h:-}" =~ ^[0-9]+$ ]] && (( client_h > 0 )) || client_h=24
+  fi
+fi
+
+# Compute maximum 80% x 80% popup geometry across the smallest receiving client.
+max_popup_w=$(( (client_w * 80) / 100 ))
+if [[ -n "${TMUX_NOTIFY_MAX_COLS:-}" ]] \
+    && [[ "${TMUX_NOTIFY_MAX_COLS}" =~ ^[0-9]+$ ]] \
+    && (( max_popup_w > TMUX_NOTIFY_MAX_COLS )); then
+  max_popup_w=${TMUX_NOTIFY_MAX_COLS}
+fi
 (( max_popup_w < MIN_POPUP_COLS )) && max_popup_w=${MIN_POPUP_COLS}
+(( max_popup_w > client_w )) && max_popup_w=${client_w}
+min_box_cols=$(( BORDER_COLS + 2 * PAD_COLS + 1 ))
+(( max_popup_w < min_box_cols )) && max_popup_w=${min_box_cols}
 wrap_w=$(( max_popup_w - BORDER_COLS - 2 * PAD_COLS ))
 
-# Word-wrap each logical line to the interior width, keeping blank lines.
+max_popup_h=$(( (client_h * 80) / 100 ))
+(( max_popup_h < BORDER_ROWS + 1 )) && max_popup_h=$(( BORDER_ROWS + 1 ))
+if (( client_h >= BORDER_ROWS + 1 && max_popup_h > client_h )); then
+  max_popup_h=${client_h}
+fi
+max_rows=$(( max_popup_h - BORDER_ROWS ))
+(( max_rows < 1 )) && max_rows=1
+
+# Word-wrap each logical line to wrap_w, preserving blank lines and indentation.
 wrapped=()
 needs_wrap="false"
 while IFS= read -r line || [[ -n "${line}" ]]; do
@@ -103,42 +684,109 @@ while IFS= read -r line || [[ -n "${line}" ]]; do
     wrapped+=("${seg% }")
   done < <(printf '%s\n' "${line}" | fold -s -w "${wrap_w}")
 done <<< "${MESSAGE}"
+(( ${#wrapped[@]} == 0 )) && wrapped=("")
 
-# Wrapped messages use the full width; short ones shrink to fit, always
-# within [MIN_POPUP_COLS, max_popup_w].
-content_w=$(( ${#TITLE} + 4 ))
-if [[ "${needs_wrap}" == "true" ]]; then
-  content_w=${wrap_w}
-fi
-for seg in "${wrapped[@]}"; do
-  (( ${#seg} > content_w )) && content_w=${#seg}
-done
-popup_w=$(( content_w + BORDER_COLS + 2 * PAD_COLS ))
-(( popup_w > max_popup_w )) && popup_w=${max_popup_w}
-(( popup_w < MIN_POPUP_COLS )) && popup_w=${MIN_POPUP_COLS}
-
-# Truncate overflow at the end so the beginning of the message stays visible.
-max_rows=$(( client_h - CLIENT_MARGIN - BORDER_ROWS ))
-(( max_rows < 1 )) && max_rows=1
+# Switch to 80% x 80% interactive pager when wrapped lines exceed max_rows.
 if (( ${#wrapped[@]} > max_rows )); then
-  hidden=$(( ${#wrapped[@]} - max_rows + 1 ))
-  wrapped=("${wrapped[@]:0:max_rows-1}" "... (+${hidden} more lines)")
+  layout_mode="pager"
+  popup_w=${max_popup_w}
+  popup_h=${max_popup_h}
+else
+  layout_mode="inline"
+  content_w=$(( ${#TITLE} + 4 ))
+  if [[ "${needs_wrap}" == "true" ]]; then
+    content_w=${wrap_w}
+  fi
+  for seg in "${wrapped[@]}"; do
+    (( ${#seg} > content_w )) && content_w=${#seg}
+  done
+  popup_w=$(( content_w + BORDER_COLS + 2 * PAD_COLS ))
+  (( popup_w > max_popup_w )) && popup_w=${max_popup_w}
+  if (( client_w >= MIN_POPUP_COLS && popup_w < MIN_POPUP_COLS )); then
+    popup_w=${MIN_POPUP_COLS}
+  fi
+  (( popup_w > client_w )) && popup_w=${client_w}
+  popup_h=$(( ${#wrapped[@]} + BORDER_ROWS ))
 fi
-popup_h=$(( ${#wrapped[@]} + BORDER_ROWS ))
 
 pad="$(printf '%*s' "${PAD_COLS}" '')"
-body="$(printf "${pad}%s\n" "${wrapped[@]}")"
+inline_body="$(printf "${pad}%s\n" "${wrapped[@]}")"
+pager_body="$(printf '%s\n' "${wrapped[@]}")"
 
 if [[ "${print_layout}" == "true" ]]; then
-  printf '%s %s\n%s\n' "${popup_w}" "${popup_h}" "${body}"
+  if [[ "${layout_mode}" == "pager" ]]; then
+    printf '%s %s %s\n%s\n' "${popup_w}" "${popup_h}" "${layout_mode}" \
+      "${pager_body}"
+  else
+    printf '%s %s %s\n%s\n' "${popup_w}" "${popup_h}" "${layout_mode}" \
+      "${inline_body}"
+  fi
   exit 0
 fi
 
-# The body is printed without a trailing newline: a newline on the last
-# interior row would scroll the first row out of view.
-b64_msg=$(printf '%s' "${body}" | os::base64_nowrap)
 popup_timeout="${TMUX_NOTIFY_TIMEOUT:-7200}"
-outer_timeout=$((popup_timeout + 10))
-os::timeout "${outer_timeout}s" tmux display-popup \
-  -T "${TITLE//#/##}" -w "${popup_w}" -h "${popup_h}" -E \
-  "tput civis; echo \"${b64_msg}\" | base64 -d; read -s -n 1 -t ${popup_timeout} || true"
+[[ "${popup_timeout}" =~ ^[0-9]+$ ]] || popup_timeout=7200
+outer_timeout=$(( popup_timeout + 10 ))
+
+state_dir="$(os::runtime_dir)/tmux-notify"
+mkdir -p "${state_dir}" 2>/dev/null || true
+chmod 0700 "${state_dir}" 2>/dev/null || true
+prune_expired_popup_groups "${state_dir}" "$(( popup_timeout + 60 ))"
+
+grp_dir="$(mktemp -d "${state_dir}/popup_XXXXXX")"
+chmod 0700 "${grp_dir}" 2>/dev/null || true
+mkdir -p "${grp_dir}/slots" "${grp_dir}/pids"
+
+if [[ "${layout_mode}" == "pager" ]]; then
+  printf '%s\n' "${pager_body}" > "${grp_dir}/wrapped.txt"
+else
+  # Omit trailing newline so the final interior row never scrolls row 1 away.
+  printf '%s' "${inline_body}" > "${grp_dir}/msg.txt"
+fi
+
+if (( ${#target_clients[@]} == 0 )); then
+  target_clients=("")
+fi
+
+# Pre-allocate 0-byte per-client slots prior to spawning any popup processes.
+for slot_idx in "${!target_clients[@]}"; do
+  : > "${grp_dir}/slots/${slot_idx}"
+done
+
+self_script="$(cd "$(dirname "$0")" && pwd)/$(basename "$0")"
+escaped_title="${TITLE//#/##}"
+bg_pids=()
+
+for slot_idx in "${!target_clients[@]}"; do
+  target_client="${target_clients[slot_idx]}"
+  printf -v runner_cmd '%q ' \
+    "${BASH}" "${self_script}" --internal-run \
+    "${grp_dir}" "${slot_idx}" "${layout_mode}" "${popup_timeout}" \
+    "${select_pane}" "${target_client}"
+
+  (
+    popup_target_args=()
+    [[ -n "${target_client}" ]] && popup_target_args=(-c "${target_client}")
+    if ! os::timeout "${outer_timeout}s" tmux display-popup \
+        "${popup_target_args[@]}" \
+        -T "${escaped_title}" -w "${popup_w}" -h "${popup_h}" \
+        -E "${runner_cmd}" 2>/dev/null; then
+      # Reclaim slot only when still 0-byte (runner never started inside tmux).
+      if [[ -f "${grp_dir}/slots/${slot_idx}" \
+          && ! -s "${grp_dir}/slots/${slot_idx}" ]]; then
+        rm -f "${grp_dir}/slots/${slot_idx}" 2>/dev/null || true
+        if rmdir "${grp_dir}/slots" 2>/dev/null; then
+          rm -rf "${grp_dir}" 2>/dev/null || true
+        fi
+      fi
+    fi
+  ) &
+  bg_pids+=("$!")
+done
+
+if (( ${#bg_pids[@]} == 0 )); then
+  rm -rf "${grp_dir}" 2>/dev/null || true
+  exit 0
+fi
+
+wait "${bg_pids[@]}" 2>/dev/null || true
