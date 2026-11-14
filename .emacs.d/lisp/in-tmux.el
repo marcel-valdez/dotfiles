@@ -1,4 +1,4 @@
-
+;;; in-tmux.el --- Remap keys inside tmux  -*- lexical-binding: t; -*-
 ;;; Commentary:
 ;;; Remaps certain keys if we are inside a TMUX session
 ;;; Code:

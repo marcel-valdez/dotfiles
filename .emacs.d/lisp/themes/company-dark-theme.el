@@ -1,5 +1,4 @@
-
-;;; company-dark-theme -- Sets up dark theme for company-mode
+;;; company-dark-theme.el --- Sets up dark theme for company-mode  -*- lexical-binding: t; -*-
 
 ;;; Commentary:
 ;; Currently used solely for the Company tooltip

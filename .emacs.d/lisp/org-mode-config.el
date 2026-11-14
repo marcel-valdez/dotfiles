@@ -1,4 +1,4 @@
-;;; package --- org-mode-config
+;;; org-mode-config.el --- Personal org-mode config  -*- lexical-binding: t; -*-
 ;;; Commentary:
 ;;;    This package provides my personal org-mode config which implements
 ;;;    a customized GTD workflow for software engineering task management
