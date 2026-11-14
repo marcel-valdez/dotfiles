@@ -633,6 +633,102 @@ EOF
     grep -Fq -- "Log changed" "${desk_log}"
 }
 
+test_weird_inputs_control_chars_ansi_and_metachars_never_break() {
+  # 1. Dangerous non-SGR terminal escapes (\e[6n DSR query, \e[2J clear, OSC,
+  #    BEL, BS, mid-line CR) must be stripped while preserving normal text.
+  local weird_ctrl
+  weird_ctrl=$'Start\rOverwrite \e[6n\e[2J\e]0;InjectedTitle\aBell:\aBS:\bEnd'
+  layout 100x30 "WeirdCtrl" "${weird_ctrl}"
+  assert_eq "inline" "${LAYOUT_MODE}" "weird control input stays inline"
+  assert_eq " Start" "${BODY[0]:-}" "mid-line CR splits cleanly into rows"
+  assert_eq " Overwrite Bell:BS:End" "${BODY[1]:-}" \
+    "DSR query, clear-screen, OSC, BEL, and BS stripped safely"
+
+  # 2. Pre-existing ANSI SGR color sequences wrap by visible width without
+  #    splitting escape sequences or inflating popup_w on invisible bytes.
+  local ansi_short=$'\e[1;31mRED_ALERT\e[0m'
+  layout 192x50 "T" "${ansi_short}"
+  assert_eq "30" "${LAYOUT_W}" \
+    "short ANSI-colored string shrinks to 30 cols by visible width"
+
+  local ansi_long="" i
+  for (( i = 1; i <= 25; i++ )); do
+    ansi_long+=$'\e[38;2;0;255;128mtoken'"${i}"$'\e[0m '
+  done
+  local raw_out
+  raw_out="$(bash "${TMUX_NOTIFY}" --print-layout --client-size 100x30 \
+    "AnsiWrap" "${ansi_long}")"
+  local vis_max
+  vis_max="$(tail -n +2 <<< "${raw_out}" \
+    | sed -E $'s/\x1b\\[[0-9;:]*m//g' \
+    | awk '{ if (length($0) > m) m = length($0) } END { print m+0 }')"
+  assert_true "ANSI-colored long line wraps within <= 78 interior cols" \
+    test "${vis_max}" -le 78
+  # Verify no broken ESC sequence (every ESC is followed immediately by '[').
+  local broken_esc
+  broken_esc="$(tail -n +2 <<< "${raw_out}" \
+    | sed -E $'s/\x1b\\[[0-9;:]*m//g' \
+    | LC_ALL=C tr -cd '\033' | wc -c | tr -d ' ')"
+  assert_eq "0" "${broken_esc}" "zero split or orphaned ESC bytes after wrapping"
+
+  # 3. Unmatched quotes, unclosed Markdown fences/backticks, $(...), --flags,
+  #    and invalid UTF-8 bytes exit 0 and preserve content.
+  local hostile
+  hostile=$'--leading-flag $(evil_cmd) "unclosed \'quote `tick ```fence \xff\xfe ok'
+  bash "${TMUX_NOTIFY}" --print-layout --client-size 120x30 -- \
+    "--flag-title" "${hostile}" >/dev/null 2>&1
+  assert_eq "0" "$?" "hostile metacharacters and invalid UTF-8 exit 0"
+}
+
+test_inline_mode_renders_markdown_color_without_pager_in_tty() {
+  command -v tmux >/dev/null 2>&1 || return 0
+  if ! command -v batcat >/dev/null 2>&1 && ! command -v bat >/dev/null 2>&1; then
+    return 0
+  fi
+
+  local dir="${TEST_ROOT}/inline_color_e2e"
+  mkdir -p "${dir}/runtime"
+  local inner_sock="${dir}/inner.sock"
+  local outer_sock="${dir}/outer.sock"
+
+  TMUX='' tmux -S "${inner_sock}" -f /dev/null new-session -d -s main -x 120 -y 30
+  TMUX='' tmux -S "${outer_sock}" -f /dev/null new-session -d -s host -x 120 -y 30 \
+    "TERM=xterm-256color TMUX='' tmux -S '${inner_sock}' attach-session -t main"
+  wait_until 60 bash -c \
+    "[[ \$(tmux -S '${inner_sock}' list-clients 2>/dev/null | wc -l) -eq 1 ]]"
+
+  local inner_pid
+  inner_pid="$(tmux -S "${inner_sock}" display-message -p '#{pid}')"
+  local inner_tmux_env="${inner_sock},${inner_pid},0"
+
+  local inline_md=$'# HeadingRow1\n- **BoldItem** with `code_span`'
+  TMUX_NOTIFY_TIMEOUT=4 XDG_RUNTIME_DIR="${dir}/runtime" TMPDIR="${dir}/runtime" \
+    TMUX="${inner_tmux_env}" \
+    bash "${TMUX_NOTIFY}" "ColorInline" "${inline_md}" &
+  local notify_pid=$!
+
+  wait_until 80 bash -c \
+    "tmux -S '${outer_sock}' capture-pane -p -t host | grep -Fq 'HeadingRow1'"
+  assert_eq "0" "$?" "inline colored popup renders Row 1 without scrolling away"
+
+  local ansi_cap
+  ansi_cap="$(tmux -S "${outer_sock}" capture-pane -e -p -t host)"
+  # shellcheck disable=SC2016
+  assert_true "inline popup emits ANSI SGR color escapes via batcat/bat" \
+    bash -c '[[ "$1" == *$'\''\e['\''*38* || "$1" == *$'\''\e[1'\''* ]]' _ "${ansi_cap}"
+
+  # Must NOT be running `less` (Space dismisses immediately in inline mode!).
+  tmux -S "${outer_sock}" send-keys -t host Space
+  wait "${notify_pid}" 2>/dev/null || true
+  wait_until 60 bash -c \
+    "! tmux -S '${outer_sock}' capture-pane -p -t host | grep -Fq 'HeadingRow1'"
+  assert_eq "0" "$?" "Space key dismisses inline colored popup immediately (no pager)"
+
+  tmux -S "${outer_sock}" kill-server 2>/dev/null || true
+  tmux -S "${inner_sock}" kill-server 2>/dev/null || true
+  rm -f "${outer_sock}" "${inner_sock}" 2>/dev/null || true
+}
+
 wait_until() {
   local timeout_loops="$1"
   shift

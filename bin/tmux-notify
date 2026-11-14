@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # tmux-notify: Broadcasts a dynamically sized modal tmux notification popup
-# across attached outer clients and pages overflow via batcat, bat, or less.
+# across attached outer clients, rendering inline Markdown/ANSI colors without
+# a pager when content fits and switching to batcat/bat/less on overflow.
 #
 # Usage:
 #   tmux-notify [options] [--] <title> <message...>
@@ -216,18 +217,281 @@ readonly LESS_DESIRED_OPTS=(
 )
 
 #######################################
-# Returns the epoch modification timestamp of a file or directory, ordering
-# GNU `stat -c %Y` ahead of BSD `stat -f %m` so GNU `stat --file-system` never
-# pollutes stdout.
+# Sanitizes untrusted or noisy notification text so terminal control queries
+# (\e[6n DSR, \e[2J clear-screen, OSC sequences, BEL, BS, mid-line CR) cannot
+# corrupt the popup border or inject synthetic keystrokes into PTY stdin, while
+# preserving valid ANSI SGR color sequences (\e[[0-9;:]*m), UTF-8, and LF.
 #
 # Arguments:
-#   $1 - target_path: Path to stat.
+#   $1 - raw_text: Raw notification message body.
 # Outputs:
-#   Numeric epoch seconds (or 0 on failure).
+#   Writes sanitized text to global SANITIZED_TEXT.
 #
 # Usage Example:
-#   mtime="$(stat_mtime_epoch "/tmp/popup_abc123")"
+#   sanitize_notification_text "${MESSAGE}"
 #######################################
+match_ascii_prefix() {
+  local LC_ALL=C
+  [[ "$1" =~ $2 ]]
+}
+
+sanitize_notification_text() {
+  local raw="$1"
+  raw="${raw//$'\r\n'/$'\n'}"
+  raw="${raw//$'\r'/$'\n'}"
+  raw="${raw//$'\t'/${TAB_SPACES}}"
+
+  if [[ "${raw}" == *$'\e'* ]]; then
+    local -a esc_parts=()
+    IFS=$'\e' read -r -d '' -a esc_parts < <(printf '%s\0' "${raw}") || true
+    local rebuilt="${esc_parts[0]:-}"
+    local part skip_bs=0
+    local sgr_re='^\[[0-9;:]*m'
+    local csi_re='^\[[0-9;:?<=>!\"#$%&'\''()*+,-./]*[@-~]'
+    local vt_re='^(\([A-Z0-9]|\)[A-Z0-9]|[78cDEHMZ=>])'
+    local idx
+    for (( idx = 1; idx < ${#esc_parts[@]}; idx++ )); do
+      part="${esc_parts[idx]}"
+      if (( skip_bs == 1 )); then
+        skip_bs=0
+        part="${part#\\}"
+        rebuilt+="${part}"
+        continue
+      fi
+      if [[ "${part}" == \]* ]]; then
+        # Strip Operating System Command (\e]...\a or \e]...\e\\).
+        if [[ "${part}" == *$'\a'* ]]; then
+          rebuilt+="${part#*$'\a'}"
+        elif (( idx + 1 < ${#esc_parts[@]} )) \
+            && [[ "${esc_parts[idx + 1]}" == \\* ]]; then
+          skip_bs=1
+        elif [[ "${part}" == *$'\n'* ]]; then
+          rebuilt+=$'\n'"${part#*$'\n'}"
+        fi
+        continue
+      fi
+      if match_ascii_prefix "${part}" "${sgr_re}"; then
+        rebuilt+=$'\e'"${part}"
+      elif match_ascii_prefix "${part}" "${csi_re}"; then
+        rebuilt+="${part#"${BASH_REMATCH[0]}"}"
+      elif match_ascii_prefix "${part}" "${vt_re}"; then
+        rebuilt+="${part#"${BASH_REMATCH[0]}"}"
+      else
+        rebuilt+="${part}"
+      fi
+    done
+    raw="${rebuilt}"
+  fi
+
+  local cleaned
+  cleaned="$(printf '%sX' "${raw}" \
+    | LC_ALL=C tr -d '\000-\011\013-\032\034-\037\177')"
+  SANITIZED_TEXT="${cleaned%X}"
+}
+
+#######################################
+# Strips ANSI SGR sequences (\e[[0-9;:]*m) from a single line to measure its
+# true visible character width in UTF-8 columns.
+#
+# Arguments:
+#   $1 - text_line: Line potentially containing ANSI SGR sequences.
+# Outputs:
+#   Sets global VISIBLE_LINE.
+#
+# Usage Example:
+#   strip_ansi_sgr "${line}"
+#######################################
+strip_ansi_sgr() {
+  local line="$1"
+  if [[ "${line}" != *$'\e'* ]]; then
+    VISIBLE_LINE="${line}"
+    return 0
+  fi
+  local -a parts=()
+  IFS=$'\e' read -r -d '' -a parts < <(printf '%s\0' "${line}") || true
+  local out="${parts[0]:-}" part sgr_re='^\[[0-9;:]*m' i
+  for (( i = 1; i < ${#parts[@]}; i++ )); do
+    part="${parts[i]}"
+    if match_ascii_prefix "${part}" "${sgr_re}"; then
+      out+="${part#"${BASH_REMATCH[0]}"}"
+    else
+      out+="${part}"
+    fi
+  done
+  VISIBLE_LINE="${out}"
+}
+
+#######################################
+# Wraps a line containing ANSI SGR sequences at `wrap_w` visible columns without
+# splitting escape sequences across line breaks or bleeding unclosed colors.
+#
+# Arguments:
+#   $1 - line: Sanitized input line containing \e[...m SGR sequences.
+#   $2 - wrap_w: Maximum visible columns per wrapped row.
+# Outputs:
+#   Appends wrapped rows to global `wrapped` array and sets `needs_wrap`.
+#
+# Usage Example:
+#   wrap_ansi_line "${line}" 76
+#######################################
+wrap_ansi_line() {
+  local line="$1"
+  local wrap_w="$2"
+
+  strip_ansi_sgr "${line}"
+  if (( ${#VISIBLE_LINE} <= wrap_w )); then
+    wrapped+=("${line}")
+    return 0
+  fi
+  needs_wrap="true"
+
+  local rest="${line}" sp="" wd=""
+  local cur_line="" cur_vis=0 active_sgr=""
+  local sgr_re='^\[[0-9;:]*m'
+
+  update_active_sgr() {
+    local chunk="$1"
+    [[ "${chunk}" == *$'\e'* ]] || return 0
+    local -a sparts=()
+    IFS=$'\e' read -r -d '' -a sparts < <(printf '%s\0' "${chunk}") || true
+    local p seq j
+    for (( j = 1; j < ${#sparts[@]}; j++ )); do
+      p="${sparts[j]}"
+      if match_ascii_prefix "${p}" "${sgr_re}"; then
+        seq="${BASH_REMATCH[0]}"
+        if [[ "${seq}" == "[0m" || "${seq}" == "[m" ]]; then
+          active_sgr=""
+        else
+          active_sgr+=$'\e'"${seq}"
+        fi
+      fi
+    done
+  }
+
+  while [[ -n "${rest}" ]]; do
+    sp=""
+    while [[ "${rest}" == " "* ]]; do
+      sp+=" "
+      rest="${rest# }"
+    done
+    if [[ -z "${rest}" ]]; then
+      break
+    fi
+    if [[ "${rest}" == *" "* ]]; then
+      wd="${rest%% *}"
+      rest="${rest#* }"
+    else
+      wd="${rest}"
+      rest=""
+    fi
+
+    strip_ansi_sgr "${wd}"
+    local vis_wd_len=${#VISIBLE_LINE}
+
+    if (( cur_vis > 0 && cur_vis + ${#sp} + vis_wd_len > wrap_w )); then
+      [[ -n "${active_sgr}" ]] && cur_line+=$'\e[0m'
+      wrapped+=("${cur_line}")
+      cur_line="${active_sgr}"
+      cur_vis=0
+      sp=""
+    fi
+
+    if (( vis_wd_len <= wrap_w )); then
+      cur_line+="${sp}${wd}"
+      cur_vis=$(( cur_vis + ${#sp} + vis_wd_len ))
+      update_active_sgr "${wd}"
+    else
+      # Hard-split an overlong colored token character-by-character while
+      # keeping ANSI SGR escape sequences atomic.
+      [[ -n "${sp}" ]] && { cur_line+="${sp}"; cur_vis=$(( cur_vis + ${#sp} )); }
+      local idx=0 len=${#wd} ch tail_part
+      while (( idx < len )); do
+        ch="${wd:idx:1}"
+        if [[ "${ch}" == $'\e' ]]; then
+          tail_part="${wd:idx+1}"
+          if match_ascii_prefix "${tail_part}" "${sgr_re}"; then
+            local matched="${BASH_REMATCH[0]}"
+            cur_line+=$'\e'"${matched}"
+            if [[ "${matched}" == "[0m" || "${matched}" == "[m" ]]; then
+              active_sgr=""
+            else
+              active_sgr+=$'\e'"${matched}"
+            fi
+            idx=$(( idx + 1 + ${#matched} ))
+            continue
+          fi
+        fi
+        if (( cur_vis >= wrap_w )); then
+          [[ -n "${active_sgr}" ]] && cur_line+=$'\e[0m'
+          wrapped+=("${cur_line}")
+          cur_line="${active_sgr}"
+          cur_vis=0
+        fi
+        cur_line+="${ch}"
+        cur_vis=$(( cur_vis + 1 ))
+        idx=$(( idx + 1 ))
+      done
+    fi
+  done
+
+  if (( cur_vis > 0 )) || [[ -n "${cur_line}" ]]; then
+    [[ -n "${active_sgr}" ]] && cur_line+=$'\e[0m'
+    wrapped+=("${cur_line}")
+  fi
+}
+
+#######################################
+# Renders an inline popup body file with 1-column left padding and no trailing
+# newline (preventing last-row scroll). Uses `batcat`/`bat --paging=never
+# --color=always` when writing to a color-capable TTY, falling back safely to
+# plain text in dumb/non-TTY environments or if bat is unavailable.
+#
+# Arguments:
+#   $1 - msg_file: Path to the unpadded wrapped message file.
+# Returns:
+#   0 always.
+#
+# Usage Example:
+#   render_inline_message "/run/user/1000/tmux-notify/popup_abc/msg.txt"
+#######################################
+render_inline_message() {
+  local msg_file="$1"
+  [[ -f "${msg_file}" ]] || return 0
+  local pad
+  pad="$(printf '%*s' "${PAD_COLS}" '')"
+  local rendered="" color_bin=""
+
+  if [[ -t 1 && "${TERM:-}" != "dumb" ]]; then
+    if command -v batcat >/dev/null 2>&1; then
+      color_bin="batcat"
+    elif command -v bat >/dev/null 2>&1; then
+      color_bin="bat"
+    fi
+  fi
+
+  if [[ -n "${color_bin}" ]]; then
+    if rendered="$(env -u LESS "${color_bin}" \
+        --paging=never \
+        --color=always \
+        --style=plain \
+        --language=markdown \
+        --wrap=never \
+        -- "${msg_file}" 2>/dev/null; printf 'X')"; then
+      rendered="${rendered%X}"
+      rendered="${rendered%$'\n'}"
+      rendered="${pad}${rendered//$'\n'/$'\n'${pad}}"
+      printf '%s\e[0m' "${rendered}"
+      return 0
+    fi
+  fi
+
+  rendered="$(cat -- "${msg_file}"; printf 'X')"
+  rendered="${rendered%X}"
+  rendered="${rendered%$'\n'}"
+  rendered="${pad}${rendered//$'\n'/$'\n'${pad}}"
+  printf '%s' "${rendered}"
+}
+
 stat_mtime_epoch() {
   local target_path="$1" mtime=""
   mtime="$(stat -c %Y "${target_path}" 2>/dev/null \
@@ -237,19 +501,6 @@ stat_mtime_epoch() {
   printf '%s\n' "${mtime}"
 }
 
-#######################################
-# Terminates a process and all of its descendants bottom-up so grandchildren
-# (such as `less` spawned by `batcat` or `sleep` inside a timer subshell) do
-# not outlive the popup runner or hold test pipes open.
-#
-# Arguments:
-#   $1 - root_pid: Process ID at the root of the subtree.
-# Returns:
-#   0 always.
-#
-# Usage Example:
-#   kill_tree "${PAGER_PID}"
-#######################################
 kill_tree() {
   local root_pid="${1:-}"
   [[ -n "${root_pid}" && "${root_pid}" =~ ^[0-9]+$ ]] || return 0
@@ -260,18 +511,6 @@ kill_tree() {
   kill -TERM "${root_pid}" 2>/dev/null || true
 }
 
-#######################################
-# Probes `less --help` with LESS cleared and populates `RESOLVED_LESS_OPTS`
-# with supported long options, falling back to `-R -K` on minimal builds.
-#
-# Arguments:
-#   None
-# Outputs:
-#   Sets global array RESOLVED_LESS_OPTS.
-#
-# Usage Example:
-#   resolve_less_opts
-#######################################
 resolve_less_opts() {
   local help_text="" opt
   help_text="$(env -u LESS less --help </dev/null 2>&1 || true)"
@@ -288,25 +527,6 @@ resolve_less_opts() {
   fi
 }
 
-#######################################
-# Executes inside each client's `tmux display-popup -E` container. Coordinates
-# Dekker startup-vs-dismissal registration, sibling auto-dismissal, detached
-# client HUP isolation, interactive-only pane focus restoration, and atomic
-# `slots/`-only group directory teardown.
-#
-# Arguments:
-#   $1 - grp_dir: Shared notification popup group directory.
-#   $2 - slot_id: Per-client numeric slot identifier.
-#   $3 - layout_mode: 'inline' or 'pager'.
-#   $4 - popup_timeout: Auto-close timeout in seconds.
-#   $5 - target_pane: Optional tmux pane ID to focus on user dismissal.
-#   $6 - client_name: Optional tmux client name hosting this popup.
-# Returns:
-#   0 on clean dismissal or sibling cancellation, signal exit code otherwise.
-#
-# Usage Example:
-#   tmux-notify --internal-run /tmp/popup_123456 0 inline 7200 "%3" "/dev/pts/1"
-#######################################
 run_popup_member() {
   local grp_dir="$1"
   local slot_id="$2"
@@ -338,8 +558,6 @@ run_popup_member() {
     fi
 
     if [[ -n "${grp_dir}" && -d "${grp_dir}" ]]; then
-      # Isolate client disconnects (SSH drop, laptop sleep) so detaching one
-      # client never dismisses unread popups on remaining active clients.
       local client_detached=0
       if (( got_hup == 1 )) && [[ -n "${client_name}" ]]; then
         if ! tmux list-clients -F '#{client_name}' 2>/dev/null \
@@ -366,15 +584,12 @@ run_popup_member() {
       fi
 
       rm -f "${grp_dir}/pids/$$" "${grp_dir}/slots/${slot_id}" 2>/dev/null || true
-      # Delete the shared group directory only when the final client slot is
-      # removed so slower siblings and sequential stub tests still see state.
       if rmdir "${grp_dir}/slots" 2>/dev/null; then
         rm -rf "${grp_dir}" 2>/dev/null || true
       fi
     fi
   }
 
-  # Install traps prior to claiming slots/pids so early signals still clean up.
   trap cleanup_member EXIT
   trap 'user_dismissed=1; exit 130' INT
   trap 'got_hup=1; exit 129' HUP
@@ -384,14 +599,13 @@ run_popup_member() {
   printf '%s\n' "$$" > "${grp_dir}/slots/${slot_id}" 2>/dev/null || exit 0
   : > "${grp_dir}/pids/$$" 2>/dev/null || exit 0
 
-  # Dekker check: abort immediately if a faster sibling already dismissed.
   if [[ -d "${grp_dir}/dismissed" ]]; then
     exit 0
   fi
 
   if [[ "${layout_mode}" == "inline" ]]; then
     [[ -t 1 ]] && { tput civis 2>/dev/null || true; }
-    [[ -f "${grp_dir}/msg.txt" ]] && cat "${grp_dir}/msg.txt"
+    render_inline_message "${grp_dir}/msg.txt"
 
     local deadline=$(( SECONDS + popup_timeout ))
     local remaining key="" next_byte="" seq_byte=""
@@ -401,8 +615,6 @@ run_popup_member() {
       key=""
       if IFS= read -r -s -n 1 -t "${remaining}" key; then
         if [[ "${key}" == $'\e' ]]; then
-          # Drain multi-byte CSI/SS3 escape sequences (arrow keys, mouse wheel,
-          # focus-events) without resetting deadline or dismissing the popup.
           if IFS= read -r -s -n 1 -t 0.02 next_byte; then
             if [[ "${next_byte}" == "[" ]]; then
               local seq_ord=0
@@ -427,8 +639,6 @@ run_popup_member() {
     exit 0
   fi
 
-  # Pager mode: enforce TMUX_NOTIFY_TIMEOUT via a closed-FD background timer so
-  # timeouts work even when callers wrap outer tmux-notify in `timeout 5s`.
   (
     sleep "${popup_timeout}"
     kill -TERM "$$" 2>/dev/null || true
@@ -442,27 +652,29 @@ run_popup_member() {
   if command -v batcat >/dev/null 2>&1; then
     pager_cmd=(
       batcat
+      --wrap=never
       --style=plain
       --language=markdown
       --paging=always
       "--pager=${less_cmd_str}"
+      --
       "${pager_input}"
     )
   elif command -v bat >/dev/null 2>&1; then
     pager_cmd=(
       bat
+      --wrap=never
       --style=plain
       --language=markdown
       --paging=always
       "--pager=${less_cmd_str}"
+      --
       "${pager_input}"
     )
   else
-    pager_cmd=(less "${RESOLVED_LESS_OPTS[@]}" "${pager_input}")
+    pager_cmd=(less "${RESOLVED_LESS_OPTS[@]}" -- "${pager_input}")
   fi
 
-  # Launch pager asynchronously keeping foreground PTY group (set +m) so Bash
-  # `wait` interrupts immediately when a sibling sends SIGTERM.
   env -u LESS "${pager_cmd[@]}" <&0 &
   pager_pid=$!
 
@@ -483,19 +695,6 @@ run_popup_member() {
   exit 0
 }
 
-#######################################
-# Prunes expired popup_* group directories older than (popup_timeout + 60)s
-# only when no registered runner PID inside pids/ remains alive.
-#
-# Arguments:
-#   $1 - state_dir: Parent directory containing popup_* group directories.
-#   $2 - max_age_secs: Expiration threshold in seconds.
-# Returns:
-#   0 always.
-#
-# Usage Example:
-#   prune_expired_popup_groups "/run/user/1000/tmux-notify" 7260
-#######################################
 prune_expired_popup_groups() {
   local state_dir="$1"
   local max_age_secs="$2"
@@ -585,6 +784,12 @@ else
   MESSAGE="$*"
 fi
 
+SANITIZED_TEXT=""
+sanitize_notification_text "${TITLE}"
+TITLE="${SANITIZED_TEXT//$'\n'/ }"
+sanitize_notification_text "${MESSAGE}"
+MESSAGE="${SANITIZED_TEXT}"
+
 target_clients=()
 client_w=""
 client_h=""
@@ -605,8 +810,6 @@ if (( ${#client_sizes[@]} > 0 )); then
     fi
   done
 else
-  # Discover attached clients, excluding internal detached-popup sessions (_*
-  # and scratch) and control-mode clients unless no outer clients are attached.
   outer_entries=()
   fallback_entries=()
   list_args=()
@@ -650,7 +853,6 @@ else
   fi
 fi
 
-# Compute maximum 80% x 80% popup geometry across the smallest receiving client.
 max_popup_w=$(( (client_w * 80) / 100 ))
 if [[ -n "${TMUX_NOTIFY_MAX_COLS:-}" ]] \
     && [[ "${TMUX_NOTIFY_MAX_COLS}" =~ ^[0-9]+$ ]] \
@@ -671,36 +873,40 @@ fi
 max_rows=$(( max_popup_h - BORDER_ROWS ))
 (( max_rows < 1 )) && max_rows=1
 
-# Word-wrap each logical line to wrap_w, preserving blank lines and indentation.
+# Word-wrap each logical line to wrap_w visible columns.
 wrapped=()
 needs_wrap="false"
+VISIBLE_LINE=""
 while IFS= read -r line || [[ -n "${line}" ]]; do
-  line="${line%$'\r'}"
-  line="${line//$'\t'/${TAB_SPACES}}"
   if [[ -z "${line}" ]]; then
     wrapped+=("")
     continue
   fi
-  (( ${#line} > wrap_w )) && needs_wrap="true"
-  while IFS= read -r seg; do
-    wrapped+=("${seg% }")
-  done < <(printf '%s\n' "${line}" | fold -s -w "${wrap_w}")
+  if [[ "${line}" == *$'\e'* ]]; then
+    wrap_ansi_line "${line}" "${wrap_w}"
+  else
+    (( ${#line} > wrap_w )) && needs_wrap="true"
+    while IFS= read -r seg; do
+      wrapped+=("${seg% }")
+    done < <(printf '%s\n' "${line}" | fold -s -w "${wrap_w}")
+  fi
 done <<< "${MESSAGE}"
 (( ${#wrapped[@]} == 0 )) && wrapped=("")
 
-# Switch to 80% x 80% interactive pager when wrapped lines exceed max_rows.
 if (( ${#wrapped[@]} > max_rows )); then
   layout_mode="pager"
   popup_w=${max_popup_w}
   popup_h=${max_popup_h}
 else
   layout_mode="inline"
-  content_w=$(( ${#TITLE} + 4 ))
+  strip_ansi_sgr "${TITLE}"
+  content_w=$(( ${#VISIBLE_LINE} + 4 ))
   if [[ "${needs_wrap}" == "true" ]]; then
     content_w=${wrap_w}
   fi
   for seg in "${wrapped[@]}"; do
-    (( ${#seg} > content_w )) && content_w=${#seg}
+    strip_ansi_sgr "${seg}"
+    (( ${#VISIBLE_LINE} > content_w )) && content_w=${#VISIBLE_LINE}
   done
   popup_w=$(( content_w + BORDER_COLS + 2 * PAD_COLS ))
   (( popup_w > max_popup_w )) && popup_w=${max_popup_w}
@@ -713,12 +919,12 @@ fi
 
 pad="$(printf '%*s' "${PAD_COLS}" '')"
 inline_body="$(printf "${pad}%s\n" "${wrapped[@]}")"
-pager_body="$(printf '%s\n' "${wrapped[@]}")"
+unpadded_body="$(printf '%s\n' "${wrapped[@]}")"
 
 if [[ "${print_layout}" == "true" ]]; then
   if [[ "${layout_mode}" == "pager" ]]; then
     printf '%s %s %s\n%s\n' "${popup_w}" "${popup_h}" "${layout_mode}" \
-      "${pager_body}"
+      "${unpadded_body}"
   else
     printf '%s %s %s\n%s\n' "${popup_w}" "${popup_h}" "${layout_mode}" \
       "${inline_body}"
@@ -740,17 +946,17 @@ chmod 0700 "${grp_dir}" 2>/dev/null || true
 mkdir -p "${grp_dir}/slots" "${grp_dir}/pids"
 
 if [[ "${layout_mode}" == "pager" ]]; then
-  printf '%s\n' "${pager_body}" > "${grp_dir}/wrapped.txt"
+  printf '%s\n' "${unpadded_body}" > "${grp_dir}/wrapped.txt"
 else
-  # Omit trailing newline so the final interior row never scrolls row 1 away.
-  printf '%s' "${inline_body}" > "${grp_dir}/msg.txt"
+  # Store unpadded wrapped text so batcat/bat highlights column-0 Markdown
+  # syntax (# headings, lists, fences) before render_inline_message pads by 1.
+  printf '%s\n' "${unpadded_body}" > "${grp_dir}/msg.txt"
 fi
 
 if (( ${#target_clients[@]} == 0 )); then
   target_clients=("")
 fi
 
-# Pre-allocate 0-byte per-client slots prior to spawning any popup processes.
 for slot_idx in "${!target_clients[@]}"; do
   : > "${grp_dir}/slots/${slot_idx}"
 done
@@ -773,7 +979,6 @@ for slot_idx in "${!target_clients[@]}"; do
         "${popup_target_args[@]}" \
         -T "${escaped_title}" -w "${popup_w}" -h "${popup_h}" \
         -E "${runner_cmd}" 2>/dev/null; then
-      # Reclaim slot only when still 0-byte (runner never started inside tmux).
       if [[ -f "${grp_dir}/slots/${slot_idx}" \
           && ! -s "${grp_dir}/slots/${slot_idx}" ]]; then
         rm -f "${grp_dir}/slots/${slot_idx}" 2>/dev/null || true
