@@ -484,9 +484,9 @@ test_select_pane_and_escape_vs_csi_sequences() {
   local runner_cmd
   runner_cmd="$(< "${cmd_file}")"
   rm -f "${pane_log}"
-  printf '\e[A\e[I\e[Oq' | STUB_SELECT_PANE_FILE="${pane_log}" \
+  printf '\e[A\e[I\e[O\e' | LANG=en_US.UTF-8 STUB_SELECT_PANE_FILE="${pane_log}" \
     PATH="${dir}/bin:${PATH}" eval "${runner_cmd}" >/dev/null
-  assert_true "interactive dismiss after CSI sequences calls select-pane %42" \
+  assert_true "CSI sequences + standalone Escape under en_US.UTF-8 calls select-pane %42" \
     grep -Fq -- "-t %42" "${pane_log}"
 
   # 2. Standalone Escape (\e with no trailing byte) dismisses interactively.

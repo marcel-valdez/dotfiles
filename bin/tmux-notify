@@ -405,8 +405,10 @@ run_popup_member() {
           # focus-events) without resetting deadline or dismissing the popup.
           if IFS= read -r -s -n 1 -t 0.02 next_byte; then
             if [[ "${next_byte}" == "[" ]]; then
+              local seq_ord=0
               while IFS= read -r -s -n 1 -t 0.01 seq_byte; do
-                [[ "${seq_byte}" =~ [@-~] ]] && break
+                [[ -n "${seq_byte}" ]] && printf -v seq_ord '%d' "'${seq_byte}" 2>/dev/null || seq_ord=0
+                (( seq_ord >= 64 && seq_ord <= 126 )) && break
               done
             elif [[ "${next_byte}" == "O" ]]; then
               IFS= read -r -s -n 1 -t 0.01 seq_byte || true
