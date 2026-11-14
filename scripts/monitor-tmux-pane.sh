@@ -1,19 +1,28 @@
 #!/usr/bin/env bash
+# monitor-tmux-pane.sh: Polls a tmux window for output changes and dispatches
+# non-blocking notifications via ~/bin/tmux-notify and os::notify.
+#
+# Usage Example:
+#   monitor-tmux-pane.sh --window_name LOG_WINDOW --freq 2 -- true
 
-SCRIPT="$(basename $0)"
+# shellcheck source=/dev/null
+[[ -f "${HOME}/lib/os_compat.sh" ]] && source "${HOME}/lib/os_compat.sh"
+
+SCRIPT="$(basename "${BASH_SOURCE[0]}")"
 
 function debug {
-  if [[ "${DEBUG}" ]]; then
+  if [[ -n "${DEBUG:-}" ]]; then
     echo "$@"
   fi
 }
 
-window_name=
-poll_frequency_seq=
-declare -a refresh_script
+window_name=""
+poll_frequency_sec=5
+custom_message=""
+declare -a refresh_script=()
 
-function usage() {
-  cat<<EOF
+function usage {
+  cat <<EOF
 
 ${SCRIPT} [--help|-h] [--window_name|-w <name>] [--freq|-f <seconds>] [--custom_message|-m <message>] [--no_notify] -- refresh_script_args ...
 
@@ -34,12 +43,13 @@ That would monitor a window called LOG_WINDOW for changes and suppose this windo
 EOF
 }
 
-USE_DESKTOP_NOTIFY=
+USE_DESKTOP_NOTIFY="${USE_DESKTOP_NOTIFY:-}"
 notify_enabled=1
+
 function parse_args {
-  while [ $# -gt 0 ]; do
-    arg="$1"
-    case $arg in
+  while (( $# > 0 )); do
+    local arg="$1"
+    case "${arg}" in
       --help|-h)
         usage
         exit 0
@@ -57,7 +67,7 @@ function parse_args {
         shift
         ;;
       --no_notify)
-        notify_enabled=
+        notify_enabled=""
         ;;
       --)
         shift
@@ -76,45 +86,47 @@ function parse_args {
   echo "poll_frequency_sec=${poll_frequency_sec}" >&2
   echo "custom_message=${custom_message}" >&2
   echo "notify_enabled=${notify_enabled}" >&2
-  echo "refresh_script=${refresh_script[@]}" >&2
+  echo "refresh_script=${refresh_script[*]}" >&2
 }
 
 function get_pane_content {
-  tmux capture-pane -p -t "${window_name}" | tr --delete '\n' | sed 's|oh=..*\&||g' | sed 's|ohc=..*\&||g'
+  tmux capture-pane -p -t "${window_name}" \
+    | tr -d '\n' \
+    | sed 's|oh=..*&||g' \
+    | sed 's|ohc=..*&||g'
 }
 
 function refresh_pane {
-  "${refresh_script[@]}"
+  if (( ${#refresh_script[@]} > 0 )); then
+    "${refresh_script[@]}"
+  fi
 }
 
 function notify_new {
   local message="$1"
-  message_len="${#message}"
-  popup_width=$((message_len + 2))
-  popup_height=3
-
-  if [[ "${USE_DESKTOP_NOTIFY}" ]]; then
-    notify-send "tmux-monitor" "${message}"
+  if [[ -n "${USE_DESKTOP_NOTIFY:-}" ]]; then
+    if declare -F os::notify >/dev/null 2>&1; then
+      os::notify -- "tmux-monitor" "${message}" || true
+    elif command -v notify-send >/dev/null 2>&1; then
+      notify-send "tmux-monitor" "${message}" || true
+    fi
   fi
-  local b64_msg
-  b64_msg=$(printf "%s" "${message}" | base64 -w0)
-  tmux display-popup -y 1 -w "${popup_width}" -h "${popup_height}" \
-    "echo -ne '\e[1m\e[5m\033[1;93m'; echo '${b64_msg}' | base64 -d"
+  "${HOME}/bin/tmux-notify" -- "tmux-monitor: ${window_name:-pane}" \
+    "${message}" >/dev/null 2>&1 &
 }
-
 
 function remove_window_hook {
   tmux set-hook -t "${window_name}" -u "pane-focus-in[11]"
 }
 
 function set_window_hook {
-  # this will remove the 'changed' mark after the user focuses into the window
+  # Remove the 'changed' mark after the user focuses into the window.
   tmux set-hook -t "${window_name}" "pane-focus-in[11]" \
     "setw -t '${window_name}' window-status-style default"
 }
 
 function mark_window_changed {
-  # sets a green color on the window status when it changes
+  # Highlight the window status in green when its pane content changes.
   tmux setw -t "${window_name}" "window-status-style" "fg=#88c388"
 }
 
@@ -123,53 +135,56 @@ function remove_tmux_monitor {
 }
 
 function cleanup {
+  local exit_code="${1:-0}"
   remove_window_hook
-  exit $1
+  exit "${exit_code}"
 }
 
 function monitor_content {
-  local new_content=
-  local oppld_content="$(get_pane_content)"
+  local old_content new_content focused_window diff_str message
+  old_content="$(get_pane_content)"
   set_window_hook
-  trap cleanup 0 EXIT
-  trap cleanup 1 SIGINT
+  trap 'cleanup 0' EXIT
+  trap 'cleanup 130' INT
 
   while true; do
-    local focused_window="$(tmux display-message -p '#W')"
+    focused_window="$(tmux display-message -p '#W')"
     if [[ "${focused_window}" == "${window_name}" ]]; then
       sleep "${poll_frequency_sec}s"
       continue
     fi
     refresh_pane
     sleep "2s"
-    # looks like media links change each time the request is made
-    local new_content="$(get_pane_content)"
-    if ! diff  <(echo "${old_content}" ) <(echo "${new_content}") &>/dev/null; then
-      if [[ "${DEBUG}" ]]; then
-        local diff_str=$(diff <(echo "${old_content}") <(echo "${new_content}"))
+    # Normalize ephemeral media query tokens prior to comparing snapshots.
+    new_content="$(get_pane_content)"
+    if ! diff <(printf '%s\n' "${old_content}") \
+        <(printf '%s\n' "${new_content}") &>/dev/null; then
+      if [[ -n "${DEBUG:-}" ]]; then
+        diff_str="$(diff <(printf '%s\n' "${old_content}") \
+          <(printf '%s\n' "${new_content}") || true)"
         debug "--- diff start ---"
         debug "${diff_str}"
         debug "--- diff end ---"
       fi
-      local message="Window ${window_name} changed!"
-      if [[ "${custom_message}" ]]; then
-        local message="${custom_message}"
+      message="Window ${window_name} changed!"
+      if [[ -n "${custom_message}" ]]; then
+        message="${custom_message}"
       fi
       mark_window_changed
-      if [[ ${notify_enabled} ]]; then
+      if [[ -n "${notify_enabled}" ]]; then
         notify_new "${message}"
       fi
-      local old_content="${new_content}"
+      old_content="${new_content}"
     fi
     sleep "${poll_frequency_sec}s"
   done
 }
 
-
 function main {
   monitor_content
 }
 
-
-parse_args "$@"
-main
+if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then
+  parse_args "$@"
+  main
+fi

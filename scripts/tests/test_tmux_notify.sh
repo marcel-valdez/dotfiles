@@ -534,6 +534,105 @@ test_pruner_preserves_live_pid_popup_dir() {
     test -d "${state_dir}/popup_live00"
 }
 
+test_jetski_notify_delegates_to_real_tmux_notify() {
+  local dir="${TEST_ROOT}/jetski_notify"
+  setup_pager_test_env "${dir}"
+  cat << 'EOF' > "${dir}/bin/tmux"
+#!/usr/bin/env bash
+case "${1:-}" in
+  list-clients)
+    echo "/dev/pts/1 main 200 50 0"
+    ;;
+  display-popup)
+    printf '%s\n' "$*" > "${STUB_POPUP_META}"
+    shift
+    while (( $# > 0 )); do
+      if [[ "$1" == "-E" ]]; then
+        printf '%s\n' "$2" > "${STUB_CMD_FILE}"
+        exit 0
+      fi
+      shift
+    done
+    ;;
+  select-pane)
+    printf '%s\n' "$*" >> "${STUB_SELECT_PANE_FILE}"
+    ;;
+esac
+exit 0
+EOF
+  chmod +x "${dir}/bin/tmux"
+
+  local meta="${dir}/meta.txt"
+  local cmd_file="${dir}/cmd.txt"
+  local pane_log="${dir}/pane.log"
+  local long_msg
+  long_msg="$(printf 'word %.0s' {1..50})"
+
+  # 1. Single-arg defaults title to JETSKI NOTIFICATION, expands >80 cols,
+  #    and focuses TARGET_PANE on interactive dismissal.
+  TARGET_PANE="%15" STUB_POPUP_META="${meta}" STUB_CMD_FILE="${cmd_file}" \
+    XDG_RUNTIME_DIR="${dir}/runtime" TMPDIR="${dir}/runtime" \
+    PATH="${dir}/bin:${PATH}" \
+    bash "${HOME}/scripts/jetski-notify" "${long_msg}"
+  assert_true "single-arg jetski-notify uses JETSKI NOTIFICATION title" \
+    grep -Fq -- "-T JETSKI NOTIFICATION" "${meta}"
+  assert_true "jetski-notify expands width to 160 (80% of 200)" \
+    grep -Fq -- "-w 160" "${meta}"
+
+  local runner_cmd
+  runner_cmd="$(< "${cmd_file}")"
+  rm -f "${pane_log}"
+  printf '\n' | STUB_SELECT_PANE_FILE="${pane_log}" PATH="${dir}/bin:${PATH}" \
+    eval "${runner_cmd}" >/dev/null
+  assert_true "jetski-notify dismissal selects TARGET_PANE %15" \
+    grep -Fq -- "-t %15" "${pane_log}"
+
+  # 2. Leading-dash title with multi-word message via `--` handoff.
+  TARGET_PANE="%16" STUB_POPUP_META="${meta}" STUB_CMD_FILE="${cmd_file}" \
+    XDG_RUNTIME_DIR="${dir}/runtime" TMPDIR="${dir}/runtime" \
+    PATH="${dir}/bin:${PATH}" \
+    bash "${HOME}/scripts/jetski-notify" "--CustomDashTitle" "Part1" "Part2"
+  assert_true "jetski-notify preserves leading-dash title via --" \
+    grep -Fq -- "-T --CustomDashTitle" "${meta}"
+}
+
+test_monitor_tmux_pane_delegates_to_tmux_notify_and_os_notify() {
+  local dir="${TEST_ROOT}/monitor_pane"
+  mkdir -p "${dir}/home/bin" "${dir}/home/lib" "${dir}/mock_bin"
+  cp "${HOME}/lib/os_compat.sh" "${dir}/home/lib/os_compat.sh"
+
+  local tn_log="${dir}/tmux_notify.log"
+  local desk_log="${dir}/desktop_notify.log"
+  cat << EOF > "${dir}/home/bin/tmux-notify"
+#!/usr/bin/env bash
+printf '%s\n' "\$*" >> "${tn_log}"
+EOF
+  chmod +x "${dir}/home/bin/tmux-notify"
+
+  cat << EOF > "${dir}/mock_bin/terminal-notifier"
+#!/usr/bin/env bash
+printf '%s\n' "\$*" >> "${desk_log}"
+EOF
+  chmod +x "${dir}/mock_bin/terminal-notifier"
+
+  # Sourcing monitor-tmux-pane.sh must NOT enter infinite main loop.
+  # shellcheck disable=SC2016
+  timeout 3s env HOME="${dir}/home" OS_COMPAT_UNAME_S="Darwin" \
+    PATH="${dir}/mock_bin:${PATH}" \
+    bash -c '
+      source "$1"
+      window_name="LOG_WIN"
+      USE_DESKTOP_NOTIFY=1
+      notify_new "Log changed"
+      wait
+    ' _ "${HOME}/scripts/monitor-tmux-pane.sh"
+  assert_eq "0" "$?" "monitor-tmux-pane.sh can be sourced without hanging"
+  assert_true "monitor-tmux-pane.sh delegates popup to tmux-notify" \
+    grep -Fq -- "-- tmux-monitor: LOG_WIN Log changed" "${tn_log}"
+  assert_true "monitor-tmux-pane.sh delegates desktop alert via os::notify" \
+    grep -Fq -- "Log changed" "${desk_log}"
+}
+
 wait_until() {
   local timeout_loops="$1"
   shift
