@@ -21,9 +21,39 @@ from typing import Any, Dict, List, Optional, Set, Tuple
 
 DEFAULT_INPUT_DIR = os.path.expanduser("~/notes")
 DEFAULT_OUTPUT_DIR = (
-    "/google/src/cloud/marcelvaldez/personal_notes/company/users/marcelvaldez"
+    "/google/src/cloud/marcelvaldez/personal_notes/company/users/marcelvaldez/notes"
 )
+DEFAULT_NOTES_URL_PREFIX = "/company/users/marcelvaldez/notes"
 DEFAULT_STATE_DIR = os.path.expanduser("~/.config/sync_notes_to_company")
+
+SITE_ROOT_EXCLUDED_FILES: frozenset[str] = frozenset({
+    "METADATA",
+    "index.md",
+    "sitemap.md",
+    "navbar.md",
+    "jetski_cli_notify.md",
+})
+
+SITE_ROOT_EXCLUDED_DIRS: frozenset[str] = frozenset({
+    "asrf",
+    "archive",
+    "tools",
+})
+
+_UPPERCASE_WORDS: frozenset[str] = frozenset({
+    "AI",
+    "AP27",
+    "APP",
+    "ASCI",
+    "ASRF",
+    "AVID",
+    "CLI",
+    "GDM",
+    "IBA",
+    "NUMA",
+    "TDP",
+    "UDWS",
+})
 
 # Built-in fallback constants if no .syncnotesignore file is found
 DEFAULT_EXCLUDED_FILES = {
@@ -144,6 +174,8 @@ class IgnoreRules:
       dynamic_patterns: Optional[List[str]] = None,
       ignore_patterns: Optional[List[str]] = None,
       source_file: Optional[str] = None,
+      anchored_files: Optional[Set[str]] = None,
+      anchored_dirs: Optional[Set[str]] = None,
   ):
     self.excluded_files: Set[str] = (
         set(excluded_files) if excluded_files is not None else set(DEFAULT_EXCLUDED_FILES)
@@ -157,6 +189,8 @@ class IgnoreRules:
     self.ignore_patterns: List[str] = (
         list(ignore_patterns) if ignore_patterns is not None else list(DEFAULT_IGNORE_PATTERNS)
     )
+    self.anchored_files: Set[str] = set(anchored_files) if anchored_files is not None else set()
+    self.anchored_dirs: Set[str] = set(anchored_dirs) if anchored_dirs is not None else set()
     self.source_file = source_file
 
   @classmethod
@@ -169,11 +203,24 @@ class IgnoreRules:
     excluded_dirs: Set[str] = set()
     dynamic_patterns: List[str] = []
     ignore_patterns: List[str] = []
+    anchored_files: Set[str] = set()
+    anchored_dirs: Set[str] = set()
 
     with open(filepath, "r", encoding="utf-8", errors="ignore") as f:
       for raw_line in f:
         line = raw_line.strip()
         if not line or line.startswith("#"):
+          continue
+
+        # Root-anchored rule (starts with '/')
+        if line.startswith("/"):
+          trimmed = line.lstrip("/")
+          if not trimmed:
+            continue
+          if trimmed.endswith("/"):
+            anchored_dirs.add(trimmed.rstrip("/"))
+          else:
+            anchored_files.add(trimmed)
           continue
 
         # Directory syntax (ends with '/')
@@ -218,6 +265,8 @@ class IgnoreRules:
         dynamic_patterns=dynamic_patterns,
         ignore_patterns=ignore_patterns,
         source_file=filepath,
+        anchored_files=anchored_files,
+        anchored_dirs=anchored_dirs,
     )
 
   def is_ignored_file(self, filename: str) -> bool:
@@ -251,6 +300,12 @@ class IgnoreRules:
   def is_path_ignored(self, rel_path: str) -> bool:
     """Checks if any component of a relative path matches ignored dirs or files."""
     norm_path = os.path.normpath(rel_path)
+    posix_path = norm_path.replace(os.sep, "/")
+    if posix_path in self.anchored_files:
+      return True
+    for ad in self.anchored_dirs:
+      if posix_path == ad or posix_path.startswith(f"{ad}/"):
+        return True
     parts = norm_path.split(os.sep)
     for d in parts[:-1]:
       if not d or d == ".":
@@ -426,9 +481,33 @@ class SyncEngine:
       skip_submit: bool = False,
       ignore_file: Optional[str] = None,
       no_g3mark_ok: Optional[str] = None,
+      site_root_dir: Optional[str] = None,
+      sitemap_file: Optional[str] = None,
+      notes_url_prefix: Optional[str] = None,
+      allow_uninitialized_notes_dir: bool = False,
   ):
     self.input_dir = os.path.abspath(input_dir)
     self.output_dir = os.path.abspath(output_dir)
+    norm_out = os.path.normpath(self.output_dir)
+    if site_root_dir is not None:
+      self.site_root_dir = os.path.abspath(site_root_dir)
+    elif os.path.basename(norm_out) == "notes":
+      self.site_root_dir = os.path.dirname(norm_out)
+    else:
+      self.site_root_dir = self.output_dir
+    self.is_notes_subdir_mode = self.site_root_dir != self.output_dir
+    if sitemap_file is not None:
+      self.sitemap_file = os.path.abspath(sitemap_file) if sitemap_file else ""
+    elif self.is_notes_subdir_mode:
+      self.sitemap_file = os.path.join(self.site_root_dir, "sitemap.md")
+    else:
+      self.sitemap_file = ""
+    self.notes_url_prefix = (
+        notes_url_prefix.rstrip("/")
+        if notes_url_prefix
+        else self._infer_notes_url_prefix()
+    )
+    self.allow_uninitialized_notes_dir = allow_uninitialized_notes_dir
     self.state_dir = os.path.abspath(state_dir)
     self.base_cache_dir = os.path.join(self.state_dir, "base")
     self.state_file = os.path.join(self.state_dir, "state.json")
@@ -444,6 +523,27 @@ class SyncEngine:
 
     os.makedirs(self.base_cache_dir, exist_ok=True)
     self.state: Dict[str, Dict[str, str]] = self._load_state()
+
+  def _infer_notes_url_prefix(self) -> str:
+    """Infers the g3doc root-relative URL prefix for output_dir."""
+    norm = self.output_dir.replace(os.sep, "/")
+    if "/company/" in norm:
+      return "/company/" + norm.split("/company/", 1)[1].strip("/")
+    return DEFAULT_NOTES_URL_PREFIX
+
+  def _is_notes_mode_excluded(self, rel_path: str) -> bool:
+    """Checks whether rel_path belongs to site-root config or top-level portals."""
+    if not self.is_notes_subdir_mode:
+      return False
+    posix = os.path.normpath(rel_path).replace(os.sep, "/")
+    if posix in SITE_ROOT_EXCLUDED_FILES:
+      return True
+    top_dir = posix.split("/", 1)[0]
+    return "/" in posix and top_dir in SITE_ROOT_EXCLUDED_DIRS
+
+  def _is_path_ignored(self, rel_path: str) -> bool:
+    """Checks ignore rules plus notes-subdirectory site-root protections."""
+    return self.ignore_rules.is_path_ignored(rel_path) or self._is_notes_mode_excluded(rel_path)
 
   def _load_state(self) -> Dict[str, Dict[str, str]]:
     """Loads state.json mapping relative paths to hashes."""
@@ -463,21 +563,22 @@ class SyncEngine:
       json.dump(self.state, f, indent=2, sort_keys=True)
 
   def vcs_sync(self) -> None:
-    """Pulls latest changes in output_dir if inside Piper or Hg."""
+    """Pulls latest changes in site_root_dir if inside Piper or Hg."""
     if self.skip_vcs or self.dry_run:
       return
-    if not os.path.exists(self.output_dir):
-      log(f"Output directory does not exist: {self.output_dir}")
+    vcs_dir = self.site_root_dir if os.path.exists(self.site_root_dir) else self.output_dir
+    if not os.path.exists(vcs_dir):
+      log(f"Output directory does not exist: {vcs_dir}")
       return
 
     # Check if inside g4 client
     g4_check = subprocess.run(
-        ["g4", "info"], cwd=self.output_dir, capture_output=True
+        ["g4", "info"], cwd=vcs_dir, capture_output=True
     )
     if g4_check.returncode == 0:
       log("Running g4 sync in company docs directory...")
       res = subprocess.run(
-          ["g4", "sync"], cwd=self.output_dir, capture_output=True, text=True
+          ["g4", "sync"], cwd=vcs_dir, capture_output=True, text=True
       )
       if res.returncode != 0:
         log(f"Warning: g4 sync failed: {res.stderr}")
@@ -485,12 +586,12 @@ class SyncEngine:
 
     # Check if inside hg client
     hg_check = subprocess.run(
-        ["hg", "status"], cwd=self.output_dir, capture_output=True
+        ["hg", "status"], cwd=vcs_dir, capture_output=True
     )
     if hg_check.returncode == 0:
       log("Running hg sync in company docs directory...")
       subprocess.run(
-          ["hg", "sync"], cwd=self.output_dir, capture_output=True, text=True
+          ["hg", "sync"], cwd=vcs_dir, capture_output=True, text=True
       )
 
   def scan_local_files(
@@ -503,10 +604,12 @@ class SyncEngine:
 
     for root, dirs, files in os.walk(self.input_dir):
       # Filter out excluded directories in-place so os.walk does not traverse them
+      is_root = os.path.abspath(root) == self.input_dir
       dirs[:] = [
           d
           for d in dirs
           if not self.ignore_rules.is_ignored_dir(d)
+          and not (self.is_notes_subdir_mode and is_root and d in SITE_ROOT_EXCLUDED_DIRS)
       ]
 
       # Find all existing markdown/content files first
@@ -524,7 +627,7 @@ class SyncEngine:
           continue
         rel_path = os.path.relpath(full_path, self.input_dir)
 
-        if self.ignore_rules.is_path_ignored(rel_path):
+        if self._is_path_ignored(rel_path):
           continue
 
         base_name, ext = os.path.splitext(f)
@@ -540,7 +643,7 @@ class SyncEngine:
             continue
           rel_dir = os.path.dirname(rel_path)
           rel_md = os.path.normpath(os.path.join(rel_dir, f'{base_name}.md'))
-          if self.ignore_rules.is_path_ignored(rel_md):
+          if self._is_path_ignored(rel_md):
             continue
           staged_md = os.path.join(staging_dir, rel_md)
           os.makedirs(os.path.dirname(staged_md), exist_ok=True)
@@ -568,11 +671,13 @@ class SyncEngine:
       return remote_files
 
     for root, dirs, files in os.walk(self.output_dir):
+      is_root = os.path.abspath(root) == self.output_dir
       dirs[:] = [
           d
           for d in dirs
           if d not in {'.git', '.hg', '.citc', '.snapshot'}
           and not self.ignore_rules.is_ignored_dir(d)
+          and not (self.is_notes_subdir_mode and is_root and d in SITE_ROOT_EXCLUDED_DIRS)
       ]
 
       for f in sorted(files):
@@ -582,7 +687,7 @@ class SyncEngine:
         if os.path.islink(full_path) and not os.path.exists(full_path):
           continue
         rel_path = os.path.relpath(full_path, self.output_dir)
-        if self.ignore_rules.is_path_ignored(rel_path) or is_staging_only(rel_path):
+        if self._is_path_ignored(rel_path) or is_staging_only(rel_path):
           continue
         base_name, ext = os.path.splitext(f)
         if f != 'METADATA' and ext not in ALLOWED_EXTENSIONS:
@@ -641,11 +746,11 @@ class SyncEngine:
     clean = res.returncode == 0
     return clean, merged_content
 
-  def sync(self) -> Dict[str, int]:
+  def sync(self) -> Dict[str, int | bool]:
     """Executes bidirectional 3-way synchronization."""
     self.vcs_sync()
 
-    stats = {
+    stats: Dict[str, int | bool] = {
         'local_updated': 0,
         'remote_updated': 0,
         'merged_clean': 0,
@@ -654,6 +759,20 @@ class SyncEngine:
         'local_deleted': 0,
         'unchanged': 0,
     }
+
+    if (
+        self.is_notes_subdir_mode
+        and not self.allow_uninitialized_notes_dir
+        and os.path.isdir(self.site_root_dir)
+        and not os.path.isdir(self.output_dir)
+    ):
+      log(
+          "ERROR: Notes target directory does not exist yet at "
+          f"{self.output_dir}. Submit the CompanyDocs reorganization CL first "
+          "or pass --allow-uninitialized-notes-dir. Aborting safely."
+      )
+      stats["aborted"] = True
+      return stats
 
     with tempfile.TemporaryDirectory(prefix='notes_sync_') as staging_dir:
       local_files = self.scan_local_files(staging_dir)
@@ -666,7 +785,7 @@ class SyncEngine:
       )
 
       for rel_path in sorted(all_rel_paths):
-        if self.ignore_rules.is_path_ignored(rel_path):
+        if self._is_path_ignored(rel_path):
           if rel_path in self.state and not self.dry_run:
             self._remove_from_base(rel_path)
           continue
@@ -846,10 +965,212 @@ class SyncEngine:
         " unchanged"
     )
 
+    if self.is_notes_subdir_mode and not self.dry_run:
+      self.update_notes_index_and_sitemap()
+
     if not self.skip_vcs and not self.dry_run:
       self.vcs_commit_and_upload()
 
     return stats
+
+  def _humanize_name(self, name: str) -> str:
+    """Formats a filename or directory slug into a readable title."""
+    tokens = re.split(r"[_\-\s]+", name.strip())
+    formatted = []
+    for tok in tokens:
+      if not tok:
+        continue
+      upper = tok.upper()
+      if upper in _UPPERCASE_WORDS:
+        formatted.append("AViD" if upper == "AVID" else upper)
+      else:
+        formatted.append(tok.capitalize())
+    return " ".join(formatted) if formatted else name
+
+  def _extract_markdown_title(self, filepath: str, rel_path: str) -> str:
+    """Extracts the primary heading title from a markdown note."""
+    try:
+      with open(filepath, "r", encoding="utf-8", errors="replace") as f:
+        for raw_line in f:
+          line = raw_line.strip()
+          if line.startswith("# "):
+            title = re.sub(r"\s*\{#[^}]+\}\s*$", "", line[2:].strip())
+            title = re.sub(r"`([^`]+)`", r"\1", title)
+            if title and title.lower() not in {"goal", "overview", "readme"}:
+              return title
+            break
+    except OSError:
+      pass
+    return self._humanize_name(os.path.splitext(os.path.basename(rel_path))[0])
+
+  def _extract_existing_note_links(self, text: str) -> Dict[str, str]:
+    """Extracts {url: normalized_title} note links from markdown or sitemap."""
+    if not text:
+      return {}
+    pattern = re.compile(
+        rf"\[([^\]]+)\]\(({re.escape(self.notes_url_prefix)}/[^)\s]+\.md)\)"
+    )
+    links: Dict[str, str] = {}
+    index_url = f"{self.notes_url_prefix}/index.md"
+    for match in pattern.finditer(text):
+      title = re.sub(r"\s+", " ", match.group(1)).strip()
+      url = match.group(2).strip()
+      if url != index_url:
+        links[url] = title
+    return links
+
+  def _collect_notes_tree(
+      self,
+      existing_titles: Optional[Dict[str, str]] = None,
+  ) -> Tuple[List[Tuple[str, str]], Dict[str, List[Tuple[str, str]]]]:
+    """Collects sorted root notes and subfolder notes under output_dir."""
+    root_notes: List[Tuple[str, str]] = []
+    folder_notes: Dict[str, List[Tuple[str, str]]] = {}
+    if not os.path.isdir(self.output_dir):
+      return root_notes, folder_notes
+
+    title_overrides = existing_titles or {}
+    for dirpath, dirnames, filenames in os.walk(self.output_dir):
+      dirnames[:] = sorted(
+          d for d in dirnames
+          if d not in {".git", ".hg", ".citc", ".snapshot"}
+          and not self.ignore_rules.is_ignored_dir(d)
+      )
+      for fn in sorted(filenames):
+        if not fn.endswith(".md") or self.ignore_rules.is_ignored_file(fn):
+          continue
+        full_path = os.path.join(dirpath, fn)
+        rel_path = os.path.relpath(full_path, self.output_dir).replace(os.sep, "/")
+        if rel_path == "index.md" or self._is_path_ignored(rel_path):
+          continue
+        url = f"{self.notes_url_prefix}/{rel_path}"
+        title = title_overrides.get(url) or self._extract_markdown_title(full_path, rel_path)
+        if "/" not in rel_path:
+          root_notes.append((title, url))
+        else:
+          top_folder = rel_path.split("/", 1)[0]
+          folder_notes.setdefault(top_folder, []).append((title, url))
+
+    root_notes.sort(key=lambda item: (item[0].lower(), item[1]))
+    for folder in folder_notes:
+      folder_notes[folder].sort(key=lambda item: (item[0].lower(), item[1]))
+
+    return root_notes, folder_notes
+
+  def update_notes_index_and_sitemap(self) -> None:
+    """Regenerates notes/index.md and the Notes subtree in site_root/sitemap.md.
+
+    Preserves curated titles and formatting whenever the set of indexed note
+    URLs is unchanged.
+
+    Args:
+      None.
+
+    Returns:
+      None.
+
+    Usage Example:
+      >>> engine.update_notes_index_and_sitemap()
+    """
+    if not self.is_notes_subdir_mode or self.dry_run:
+      return
+
+    notes_index_path = os.path.join(self.output_dir, "index.md")
+    existing_index = ""
+    if os.path.exists(notes_index_path):
+      with open(notes_index_path, "r", encoding="utf-8", errors="replace") as f:
+        existing_index = f.read()
+
+    existing_sitemap = ""
+    has_sitemap = bool(self.sitemap_file and os.path.isfile(self.sitemap_file))
+    if has_sitemap:
+      with open(self.sitemap_file, "r", encoding="utf-8", errors="replace") as f:
+        existing_sitemap = f.read()
+
+    existing_index_links = self._extract_existing_note_links(existing_index)
+    existing_sitemap_links = self._extract_existing_note_links(existing_sitemap)
+    curated_titles = {**existing_index_links, **existing_sitemap_links}
+
+    root_notes, folder_notes = self._collect_notes_tree(existing_titles=curated_titles)
+    target_urls: Set[str] = {url for _, url in root_notes} | {
+        url for items in folder_notes.values() for _, url in items
+    }
+
+    # 1. Regenerate notes/index.md only when absent or the indexed note URL set changed
+    if not os.path.exists(notes_index_path) or set(existing_index_links.keys()) != target_urls:
+      index_lines: List[str] = [
+          "<!-- go/g3mark-in-g3doc -->",
+          "",
+          "# Engineering Notes",
+          "",
+          "<!--* freshness: { owner: 'marcelvaldez' reviewed: '2026-11-14' } *-->",
+          "",
+          "Working notes, project research logs, and troubleshooting guides synced from",
+          "`~/notes`. Historical pre-2025 notes remain in the",
+          "[Archive](/company/users/marcelvaldez/archive/index.md), and active ASRF project",
+          "documentation lives in the [ASRF Project Portal](/company/users/marcelvaldez/asrf/index.md).",
+          "",
+          "[TOC]",
+          "",
+          "## General Notes {#general-notes}",
+          "",
+      ]
+      for title, url in root_notes:
+        index_lines.append(f"*   [{title}]({url})")
+      index_lines.extend(["", "## Topic & Project Folders {#note-folders}", ""])
+      for folder in sorted(folder_notes):
+        index_lines.append(f"*   **{self._humanize_name(folder)}**")
+        for title, url in folder_notes[folder]:
+          index_lines.append(f"    *   [{title}]({url})")
+      index_content = "\n".join(index_lines) + "\n"
+
+      if existing_index != index_content:
+        os.makedirs(self.output_dir, exist_ok=True)
+        with open(notes_index_path, "w", encoding="utf-8") as f:
+          f.write(index_content)
+
+    # 2. Update the *   [Notes](...) subtree in site_root/sitemap.md when URLs change
+    if not has_sitemap:
+      return
+
+    sitemap_lines = existing_sitemap.splitlines()
+    notes_header_re = re.compile(r"^\*\s+(?:\[Notes\]\([^)]+\)|Notes)(?:\s|$)")
+    has_notes_section = any(notes_header_re.match(line) for line in sitemap_lines)
+    if has_notes_section and set(existing_sitemap_links.keys()) == target_urls:
+      return
+
+    notes_children: List[str] = []
+    for title, url in root_notes:
+      notes_children.append(f"    *   [{title}]({url})")
+    for folder in sorted(folder_notes):
+      notes_children.append(f"    *   {self._humanize_name(folder)}")
+      for title, url in folder_notes[folder]:
+        notes_children.append(f"        *   [{title}]({url})")
+
+    new_lines: List[str] = []
+    i = 0
+    replaced = False
+    while i < len(sitemap_lines):
+      line = sitemap_lines[i]
+      if not replaced and notes_header_re.match(line):
+        new_lines.append(f"*   [Notes]({self.notes_url_prefix}/index.md)")
+        new_lines.extend(notes_children)
+        i += 1
+        while i < len(sitemap_lines) and not sitemap_lines[i].startswith("*"):
+          i += 1
+        replaced = True
+        continue
+      new_lines.append(line)
+      i += 1
+
+    if not replaced:
+      new_lines.append(f"*   [Notes]({self.notes_url_prefix}/index.md)")
+      new_lines.extend(notes_children)
+
+    updated_sitemap = "\n".join(new_lines) + "\n"
+    if updated_sitemap != existing_sitemap:
+      with open(self.sitemap_file, "w", encoding="utf-8") as f:
+        f.write(updated_sitemap)
 
   def _publish_markdown(
       self, src_content_path: str, target_remote: str, target_local: str
@@ -879,19 +1200,42 @@ class SyncEngine:
       with open(target_local, "w", encoding="utf-8") as f:
         f.write(formatted)
 
+  def _extract_opened_rel_path(self, depot_path: str) -> Optional[str]:
+    """Maps a Piper depot path from g4 status to a relative path under output_dir."""
+    norm_depot = depot_path.strip()
+    norm_out = self.output_dir.replace(os.sep, "/").rstrip("/")
+    if "company/users/" in norm_depot and "company/users/" in norm_out:
+      depot_after = norm_depot.split("company/users/", 1)[1]
+      out_after = norm_out.split("company/users/", 1)[1].strip("/") + "/"
+      if depot_after.startswith(out_after):
+        return depot_after[len(out_after):]
+      return None
+    if "company/users/" in norm_depot:
+      parts = norm_depot.split("company/users/", 1)[1].split("/", 1)
+      rel_from_user = parts[1] if len(parts) > 1 else os.path.basename(norm_depot)
+      if self.is_notes_subdir_mode:
+        subdir_name = os.path.basename(norm_out) + "/"
+        if rel_from_user.startswith(subdir_name):
+          return rel_from_user[len(subdir_name):]
+        return None
+      return rel_from_user
+    return os.path.basename(norm_depot)
+
   def reconcile_opened_markdown_files(self) -> None:
     """Reconciles opened files in Piper client to guarantee g3mark compliance.
 
-    Inspects `g4 status` in output_dir, identifies opened markdown files that
-    are missing the required g3mark opt-in directive, formats them in-place,
-    and updates the local note and base cache to maintain hash parity.
+    Inspects `g4 status` in site_root_dir, identifies opened markdown files
+    under output_dir that are missing the required g3mark opt-in directive,
+    formats them in-place, and updates the local note and base cache to maintain
+    hash parity.
     """
     if not os.path.exists(self.output_dir):
       return
 
+    vcs_dir = self.site_root_dir if os.path.exists(self.site_root_dir) else self.output_dir
     g4_status = subprocess.run(
         ["g4", "status"],
-        cwd=self.output_dir,
+        cwd=vcs_dir,
         capture_output=True,
         text=True,
     )
@@ -905,12 +1249,20 @@ class SyncEngine:
       depot_path = line.split("#")[0].strip()
       if not depot_path.endswith(".md"):
         continue
+      if os.path.basename(depot_path) in {
+          "sitemap.md",
+          "navbar.md",
+          "README.md",
+          "SKILL.md",
+          "AGENTS.md",
+      }:
+        continue
 
-      if "company/users/" in depot_path:
-        parts = depot_path.split("company/users/")[-1].split("/", 1)
-        rel_path = parts[1] if len(parts) > 1 else os.path.basename(depot_path)
-      else:
-        rel_path = os.path.basename(depot_path)
+      rel_path = self._extract_opened_rel_path(depot_path)
+      if not rel_path:
+        continue
+      if self.is_notes_subdir_mode and rel_path == "index.md":
+        continue
 
       target_remote = os.path.join(self.output_dir, rel_path)
       if not os.path.exists(target_remote):
@@ -952,22 +1304,23 @@ class SyncEngine:
 
   def vcs_commit_and_upload(self) -> None:
     """Reconciles Piper files, creates CL description, uploads, and submits."""
-    if not os.path.exists(self.output_dir):
+    vcs_dir = self.site_root_dir if os.path.exists(self.site_root_dir) else self.output_dir
+    if not os.path.exists(vcs_dir):
       return
 
     # Check if g4 client
     g4_check = subprocess.run(
-        ["g4", "info"], cwd=self.output_dir, capture_output=True
+        ["g4", "info"], cwd=vcs_dir, capture_output=True
     )
     if g4_check.returncode == 0:
       log("Reconciling Piper files in company docs directory...")
       self.reconcile_opened_markdown_files()
-      subprocess.run(["g4", "fix"], cwd=self.output_dir, capture_output=True)
+      subprocess.run(["g4", "fix"], cwd=vcs_dir, capture_output=True)
 
       # Check if any files modified / added / deleted
       g4_status = subprocess.run(
           ["g4", "status"],
-          cwd=self.output_dir,
+          cwd=vcs_dir,
           capture_output=True,
           text=True,
       )
@@ -989,14 +1342,14 @@ class SyncEngine:
         env["NO_G3MARK_OK"] = self.no_g3mark_ok
 
       log("Creating/updating Piper change description...")
-      subprocess.run(["g4", "change"], cwd=self.output_dir, env=env)
-      subprocess.run(["g4", "fix"], cwd=self.output_dir)
+      subprocess.run(["g4", "change"], cwd=vcs_dir, env=env)
+      subprocess.run(["g4", "fix"], cwd=vcs_dir)
       log("Uploading CL to Critique...")
-      subprocess.run(["g4", "upload"], cwd=self.output_dir)
+      subprocess.run(["g4", "upload"], cwd=vcs_dir)
 
       if not self.skip_submit and "SKIP_SUBMIT" not in os.environ:
         log("Submitting CL...")
-        subprocess.run(["g4", "submit"], cwd=self.output_dir)
+        subprocess.run(["g4", "submit"], cwd=vcs_dir)
 
 
 def main():
@@ -1047,6 +1400,11 @@ def main():
       default=os.environ.get("NO_G3MARK_OK", None),
       help="Optional reason tag for NO_G3MARK_OK to disable g3mark presubmit check",
   )
+  parser.add_argument(
+      "--allow-uninitialized-notes-dir",
+      action="store_true",
+      help="Allow creating output_dir under site_root even if notes/ does not yet exist",
+  )
 
   args = parser.parse_args()
 
@@ -1059,6 +1417,7 @@ def main():
       skip_submit=args.skip_submit,
       ignore_file=args.ignore_file,
       no_g3mark_ok=args.no_g3mark_ok,
+      allow_uninitialized_notes_dir=args.allow_uninitialized_notes_dir,
   )
 
   stats = engine.sync()

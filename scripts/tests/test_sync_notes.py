@@ -6,6 +6,7 @@ import shutil
 import sys
 import tempfile
 import unittest
+from unittest import mock
 
 sys.path.insert(0, os.path.expanduser("~/scripts"))
 from sync_notes_engine import (
@@ -27,6 +28,16 @@ class TestSyncNotesEngine(unittest.TestCase):
     os.makedirs(self.input_dir, exist_ok=True)
     os.makedirs(self.output_dir, exist_ok=True)
     os.makedirs(self.state_dir, exist_ok=True)
+    orig_expanduser = os.path.expanduser
+
+    def _hermetic_expanduser(path: str) -> str:
+      if ".syncnotesignore" in path:
+        return os.path.join(self.test_dir, "nonexistent_host_syncnotesignore")
+      return orig_expanduser(path)
+
+    patcher = mock.patch("sync_notes_engine.os.path.expanduser", side_effect=_hermetic_expanduser)
+    patcher.start()
+    self.addCleanup(patcher.stop)
 
   def tearDown(self):
     shutil.rmtree(self.test_dir, ignore_errors=True)
@@ -937,6 +948,232 @@ class TestSyncNotesEngine(unittest.TestCase):
       desc = f.read()
 
     self.assertNotIn("NO_G3MARK_OK", desc)
+
+
+  # =========================================================================
+  # Notes Subdirectory, Sitemap, & Cron Safety Guard Tests
+  # =========================================================================
+
+  def test_ignore_rules_root_anchored_patterns(self):
+    """Verifies leading '/' rules exclude top-level files/dirs without hiding nested ones."""
+    from sync_notes_engine import IgnoreRules
+    ignore_file = os.path.join(self.test_dir, ".syncnotesignore")
+    with open(ignore_file, "w") as f:
+      f.write("/index.md\n/asrf/\n/archive/\n")
+
+    rules = IgnoreRules.from_file(ignore_file)
+    self.assertTrue(rules.is_path_ignored("index.md"))
+    self.assertFalse(rules.is_path_ignored("project/index.md"))
+    self.assertTrue(rules.is_path_ignored("asrf/DESIGN_DOC.md"))
+    self.assertFalse(rules.is_path_ignored("topic/asrf/notes.md"))
+    self.assertTrue(rules.is_path_ignored("archive/old.md"))
+
+  def test_notes_subdir_sync_updates_sitemap_and_notes_index(self):
+    """Verifies notes sync into notes/ and update sitemap.md Notes subsection + notes/index.md."""
+    company_root = os.path.join(self.test_dir, "company_root")
+    notes_remote = os.path.join(company_root, "notes")
+    os.makedirs(notes_remote, exist_ok=True)
+    os.makedirs(os.path.join(company_root, "asrf"), exist_ok=True)
+    os.makedirs(os.path.join(company_root, "tools"), exist_ok=True)
+    os.makedirs(os.path.join(company_root, "archive"), exist_ok=True)
+
+    sitemap_path = os.path.join(company_root, "sitemap.md")
+    with open(sitemap_path, "w") as f:
+      f.write(
+          "<!--* freshness: { exempt: true } *-->\n\n"
+          "*   [Home](/company/users/marcelvaldez/index.md)\n"
+          "*   [Tools](/company/users/marcelvaldez/tools/index.md) {.cnav-expanded-by-default}\n"
+          "    *   [Mule TUI](https://user.git.corp.google.com/marcelvaldez/mule-tui/+/refs/heads/main/README.md)\n"
+          "*   Active Projects\n"
+          "    *   [ASRF](/company/users/marcelvaldez/asrf/index.md)\n"
+          "*   [Notes](/company/users/marcelvaldez/notes/index.md)\n"
+          "    *   [Stale Note](/company/users/marcelvaldez/notes/stale.md)\n"
+          "*   [Archive](/company/users/marcelvaldez/archive/index.md)\n"
+      )
+
+    # Local notes plus stale root config/portal copies that should be ignored
+    with open(os.path.join(self.input_dir, "METADATA"), "w") as f:
+      f.write("name: 'root'\n")
+    with open(os.path.join(self.input_dir, "index.md"), "w") as f:
+      f.write("# Root Index\n")
+    os.makedirs(os.path.join(self.input_dir, "asrf"), exist_ok=True)
+    with open(os.path.join(self.input_dir, "asrf", "DESIGN_DOC.md"), "w") as f:
+      f.write("# ASRF\n")
+    with open(os.path.join(self.input_dir, "linux_tips.md"), "w") as f:
+      f.write("# Linux Tips\nHelpful commands.\n")
+    os.makedirs(os.path.join(self.input_dir, "prompts"), exist_ok=True)
+    with open(os.path.join(self.input_dir, "prompts", "review.md"), "w") as f:
+      f.write("# Review Prompt\nBody.\n")
+
+    engine = SyncEngine(
+        input_dir=self.input_dir,
+        output_dir=notes_remote,
+        state_dir=self.state_dir,
+        skip_vcs=True,
+        skip_submit=True,
+    )
+    stats = engine.sync()
+
+    self.assertEqual(stats["remote_updated"], 2)
+    self.assertTrue(os.path.exists(os.path.join(notes_remote, "linux_tips.md")))
+    self.assertTrue(os.path.exists(os.path.join(notes_remote, "prompts", "review.md")))
+    self.assertFalse(os.path.exists(os.path.join(notes_remote, "METADATA")))
+    self.assertFalse(os.path.exists(os.path.join(notes_remote, "asrf")))
+
+    with open(sitemap_path) as f:
+      updated_sitemap = f.read()
+    self.assertIn("*   [Tools](/company/users/marcelvaldez/tools/index.md)", updated_sitemap)
+    self.assertIn("*   [Mule TUI]", updated_sitemap)
+    self.assertIn("*   [ASRF](/company/users/marcelvaldez/asrf/index.md)", updated_sitemap)
+    self.assertIn("*   [Archive](/company/users/marcelvaldez/archive/index.md)", updated_sitemap)
+    self.assertIn("    *   [Linux Tips](/company/users/marcelvaldez/notes/linux_tips.md)", updated_sitemap)
+    self.assertIn("        *   [Review Prompt](/company/users/marcelvaldez/notes/prompts/review.md)", updated_sitemap)
+    self.assertNotIn("stale.md", updated_sitemap)
+
+    notes_index = os.path.join(notes_remote, "index.md")
+    self.assertTrue(os.path.exists(notes_index))
+    with open(notes_index) as f:
+      idx_text = f.read()
+    self.assertTrue(has_g3mark_optin(idx_text))
+    self.assertIn("[Linux Tips](/company/users/marcelvaldez/notes/linux_tips.md)", idx_text)
+
+  def test_reconcile_opened_markdown_files_in_notes_subdir(self):
+    """Verifies g4 status paths under company/users/.../notes/ do not double-nest notes/."""
+    company_root = os.path.join(self.test_dir, "company_root")
+    notes_remote = os.path.join(company_root, "notes")
+    os.makedirs(os.path.join(notes_remote, "prompts"), exist_ok=True)
+    os.makedirs(os.path.join(self.input_dir, "prompts"), exist_ok=True)
+
+    remote_file = os.path.join(notes_remote, "prompts", "test_prompt.md")
+    local_file = os.path.join(self.input_dir, "prompts", "test_prompt.md")
+    raw_content = "# Prompt Title\nBody."
+    with open(remote_file, "w") as f:
+      f.write(raw_content)
+    with open(local_file, "w") as f:
+      f.write(raw_content)
+    # sitemap.md at root should never get g3mark opt-in prepended
+    sitemap_path = os.path.join(company_root, "sitemap.md")
+    with open(sitemap_path, "w") as f:
+      f.write("*   [Home](/company/users/marcelvaldez/index.md)\n")
+
+    engine = SyncEngine(
+        input_dir=self.input_dir,
+        output_dir=notes_remote,
+        state_dir=self.state_dir,
+        skip_vcs=True,
+        skip_submit=True,
+    )
+
+    import subprocess
+    orig_run = subprocess.run
+
+    def mock_run(cmd, *args, **kwargs):
+      if cmd == ["g4", "status"]:
+        class MockResult:
+          returncode = 0
+          stdout = (
+              "//depot/company/users/marcelvaldez/notes/prompts/test_prompt.md#1"
+              " - add change 123 (text)\n"
+              "//depot/company/users/marcelvaldez/sitemap.md#2"
+              " - edit change 123 (text)\n"
+          )
+        return MockResult()
+      return orig_run(cmd, *args, **kwargs)
+
+    subprocess.run = mock_run
+    try:
+      engine.reconcile_opened_markdown_files()
+    finally:
+      subprocess.run = orig_run
+
+    with open(remote_file) as f:
+      self.assertTrue(has_g3mark_optin(f.read()))
+    with open(sitemap_path) as f:
+      self.assertFalse(has_g3mark_optin(f.read()))
+
+  def test_notes_mode_aborts_safely_when_notes_dir_missing(self):
+    """Verifies cron safety guard aborts if site_root exists but notes/ subdir does not."""
+    company_root = os.path.join(self.test_dir, "company_root")
+    os.makedirs(company_root, exist_ok=True)
+    notes_remote = os.path.join(company_root, "notes")  # intentionally absent
+
+    with open(os.path.join(self.input_dir, "linux_tips.md"), "w") as f:
+      f.write("# Linux Tips\nContent.\n")
+
+    engine = SyncEngine(
+        input_dir=self.input_dir,
+        output_dir=notes_remote,
+        state_dir=self.state_dir,
+        skip_vcs=True,
+        skip_submit=True,
+    )
+    stats = engine.sync()
+
+    self.assertEqual(stats["remote_updated"], 0)
+    self.assertTrue(stats.get("aborted"))
+    self.assertFalse(os.path.exists(notes_remote))
+
+  def test_update_notes_index_preserves_curated_titles_and_wrapping(self):
+    """Verifies unchanged URL sets keep curated titles and mdformat wrapping intact."""
+    company_root = os.path.join(self.test_dir, "company_root")
+    notes_remote = os.path.join(company_root, "notes")
+    os.makedirs(os.path.join(notes_remote, "prompts"), exist_ok=True)
+    os.makedirs(os.path.join(self.input_dir, "prompts"), exist_ok=True)
+
+    with open(os.path.join(notes_remote, "prompts", "GEMINI.md"), "w") as f:
+      f.write("<!-- go/g3mark-in-g3doc -->\n\n# Goal\nDetails.\n")
+    with open(os.path.join(self.input_dir, "prompts", "GEMINI.md"), "w") as f:
+      f.write("<!-- go/g3mark-in-g3doc -->\n\n# Goal\nDetails.\n")
+
+    curated_sitemap = (
+        "*   [Home](/company/users/marcelvaldez/index.md)\n"
+        "*   [Notes](/company/users/marcelvaldez/notes/index.md)\n"
+        "    *   Prompts\n"
+        "        *   [Project Goal](/company/users/marcelvaldez/notes/prompts/GEMINI.md)\n"
+    )
+    sitemap_path = os.path.join(company_root, "sitemap.md")
+    with open(sitemap_path, "w") as f:
+      f.write(curated_sitemap)
+
+    wrapped_index = (
+        "<!-- go/g3mark-in-g3doc -->\n\n# Engineering Notes\n\n"
+        "*   [Project\n"
+        "    Goal](/company/users/marcelvaldez/notes/prompts/GEMINI.md)\n"
+    )
+    notes_index = os.path.join(notes_remote, "index.md")
+    with open(notes_index, "w") as f:
+      f.write(wrapped_index)
+
+    engine = SyncEngine(
+        input_dir=self.input_dir,
+        output_dir=notes_remote,
+        state_dir=self.state_dir,
+        skip_vcs=True,
+        skip_submit=True,
+    )
+    engine.sync()
+
+    with open(sitemap_path) as f:
+      self.assertEqual(f.read(), curated_sitemap)
+    with open(notes_index) as f:
+      self.assertEqual(f.read(), wrapped_index)
+
+    # Adding a brand-new note updates sitemap and preserves existing curated title
+    with open(os.path.join(self.input_dir, "prompts", "new_guide.md"), "w") as f:
+      f.write("# New Guide Title\nHello.\n")
+    engine = SyncEngine(
+        input_dir=self.input_dir,
+        output_dir=notes_remote,
+        state_dir=self.state_dir,
+        skip_vcs=True,
+        skip_submit=True,
+    )
+    engine.sync()
+
+    with open(sitemap_path) as f:
+      updated_sitemap = f.read()
+    self.assertIn("[Project Goal](/company/users/marcelvaldez/notes/prompts/GEMINI.md)", updated_sitemap)
+    self.assertIn("[New Guide Title](/company/users/marcelvaldez/notes/prompts/new_guide.md)", updated_sitemap)
 
 
 if __name__ == "__main__":

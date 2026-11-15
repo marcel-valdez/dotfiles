@@ -19,7 +19,7 @@ function log {
 }
 
 INPUT_DIRECTORY="${INPUT_DIRECTORY:-${HOME}/notes}"
-OUTPUT_DIRECTORY="${OUTPUT_DIRECTORY:-/google/src/cloud/marcelvaldez/personal_notes/company/users/marcelvaldez}"
+OUTPUT_DIRECTORY="${OUTPUT_DIRECTORY:-/google/src/cloud/marcelvaldez/personal_notes/company/users/marcelvaldez/notes}"
 STATE_DIRECTORY="${SYNC_STATE_DIR:-${HOME}/.config/sync_notes_to_company}"
 SCRIPT_DIR="$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")" && pwd)"
 ENGINE="${SCRIPT_DIR}/sync_notes_engine.py"

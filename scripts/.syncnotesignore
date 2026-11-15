@@ -6,6 +6,9 @@
 personal/
 interviews/
 meetings/
+/asrf/
+/archive/
+/tools/
 .git/
 .hg/
 .citc/
@@ -14,6 +17,13 @@ meetings/
 .jetskicli/
 .lumbergh/
 .snapshot/
+
+# --- Site Root Config Files (managed outside ~/notes) ---
+/METADATA
+/index.md
+/sitemap.md
+/navbar.md
+/jetski_cli_notify.md
 
 # --- Dynamic Exclude Patterns (Directories & Files) ---
 meetings
