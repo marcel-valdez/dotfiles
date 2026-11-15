@@ -54,6 +54,18 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
+# airgradient-monitor is opt-in on macOS. An explicit ENABLE_AIRGRADIENT=0|1
+# always wins; otherwise the persistent per-machine flag file
+# ~/.config/airgradient-monitor/enabled (also honored by the SwiftBar plugin)
+# turns it on.
+if [[ -z "${ENABLE_AIRGRADIENT:-}" ]]; then
+  if [[ -f "${HOME}/.config/airgradient-monitor/enabled" ]]; then
+    ENABLE_AIRGRADIENT=1
+  else
+    ENABLE_AIRGRADIENT=0
+  fi
+fi
+
 run_cmd() {
   if (( DRY_RUN == 1 )); then
     printf '[DRY-RUN] %s\n' "$*"
@@ -510,7 +522,7 @@ if command -v go >/dev/null 2>&1 || (( DRY_RUN == 1 )); then
       run_cmd chmod 600 "${HOME}/.config/airgradient-monitor/config.json"
     fi
   else
-    echo "[INFO] airgradient-monitor is disabled by default on gMac (Santa binary policy); skipping build."
+    echo "[INFO] airgradient-monitor is disabled by default on gMac (Santa binary policy); skipping build. Enable with ENABLE_AIRGRADIENT=1 or: touch ~/.config/airgradient-monitor/enabled"
   fi
 else
   echo "[WARN] 'go' binary not found in PATH (/usr/local/go/bin/go); skipping Go daemon builds."

@@ -676,7 +676,7 @@ EOF
 # ------------------------------------------------------------------------------
 echo "[Test 12] bootstrap_macos.sh --dry-run (Mule-first), launchd plists, and JSON configs"
 {
-  dry_out="$(bash "${HOME}/.googlerc.d/scripts/bootstrap_macos.sh" --dry-run)"
+  dry_out="$(ENABLE_AIRGRADIENT=0 bash "${HOME}/.googlerc.d/scripts/bootstrap_macos.sh" --dry-run)"
   assert_contains "bootstrap_macos.sh --dry-run completes cleanly" \
     "Bootstrap complete!" "${dry_out}"
   assert_contains "bootstrap_macos.sh --dry-run uses /usr/local/bin/mule update" \
@@ -691,6 +691,13 @@ echo "[Test 12] bootstrap_macos.sh --dry-run (Mule-first), launchd plists, and J
     "airgradient-monitor is disabled by default on gMac" "${dry_out}"
   assert_contains "bootstrap_macos.sh --dry-run marks airgradient.10s.sh non-executable by default" \
     "chmod -x ${HOME}/.config/swiftbar/airgradient.10s.sh" "${dry_out}"
+  dry_out_ag="$(ENABLE_AIRGRADIENT=1 bash "${HOME}/.googlerc.d/scripts/bootstrap_macos.sh" --dry-run)"
+  assert_contains "bootstrap_macos.sh --dry-run with ENABLE_AIRGRADIENT=1 builds airgradient-monitor" \
+    "go build -trimpath -o airgradient-monitor ./cmd/airgradient-monitor" "${dry_out_ag}"
+  assert_contains "bootstrap_macos.sh --dry-run with ENABLE_AIRGRADIENT=1 marks airgradient.10s.sh executable" \
+    "chmod +x ${HOME}/.config/swiftbar/airgradient.10s.sh" "${dry_out_ag}"
+  assert_contains "bootstrap_macos.sh --dry-run with ENABLE_AIRGRADIENT=1 registers the airgradient LaunchAgent" \
+    "com.marcelvaldez.airgradient-monitor.plist" "${dry_out_ag}"
   assert_contains "bootstrap_macos.sh --dry-run runs go mod init/tidy before building whatsapp-notification" \
     "{ [[ -f go.mod ]] || go mod init whatsapp-notification; } && go mod tidy && CGO_ENABLED=1" "${dry_out}"
   assert_true "~/scripts/bootstrap_macos.sh and ~/.googlerc.d/scripts/bootstrap_macos.sh are identical" \
