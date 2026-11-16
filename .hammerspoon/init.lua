@@ -6,7 +6,8 @@
 --   1. Stateful 6-tier fractional window cycling (x-window-move port):
 --      {1.0, 0.75, 0.666, 0.5, 0.334, 0.25} on WM_MOD (Ctrl+Cmd) + Arrows/K.
 --   2. Cross-monitor window movement & dual-screen spanning (both-screens) on
---      both WFH (<Ctrl><Cmd>Page_Up) and MTV (<Alt><Cmd>Left/Right/Page_Up).
+--      both WFH (<Ctrl><Cmd>Page_Up) and MTV (<Alt><Cmd>Left/Right/Page_Up);
+--      Page_Up cycles previous size -> span -> 50% centered on the seam.
 --   3. 6-Space workspace navigation (<Ctrl><Alt>1..6, <Ctrl><Alt>Left/Right; left to
 --      macOS when its own shortcut uses the same keys) and window migration that
 --      follows the window (<Ctrl><Shift><Alt>Left/Right and <Ctrl><Shift><Alt>1..6).
@@ -180,17 +181,8 @@ local function moveWindowToScreenInDirection(dir)
   end
 end
 
-local function toggleSpanBothScreens()
-  local win = hs.window.focusedWindow()
-  if not win then return end
-  local winId = win:id()
-  local screens = hs.screen.allScreens()
-  if #screens < 2 then
-    win:maximize()
-    return
-  end
-
-  -- Compute bounding union box across all connected displays
+-- Bounding union box across all connected displays
+local function allScreensUnionFrame(screens)
   local minX, minY = math.huge, math.huge
   local maxX, maxY = -math.huge, -math.huge
   for _, scr in ipairs(screens) do
@@ -200,12 +192,64 @@ local function toggleSpanBothScreens()
     if (f.x + f.w) > maxX then maxX = f.x + f.w end
     if (f.y + f.h) > maxY then maxY = f.y + f.h end
   end
-  local unionFrame = {x = minX, y = minY, w = maxX - minX, h = maxY - minY}
+  return {x = minX, y = minY, w = maxX - minX, h = maxY - minY}
+end
+
+-- X of the monitor seam (a screen's right edge touching another's left edge)
+-- nearest the union's center; the union's center when no screens abut.
+local function screenSeamX(screens, unionFrame)
+  local centerX = unionFrame.x + unionFrame.w / 2
+  local bestX, bestDist = centerX, math.huge
+  for _, a in ipairs(screens) do
+    local right = a:frame().x + a:frame().w
+    for _, b in ipairs(screens) do
+      if a ~= b and math.abs(b:frame().x - right) <= 1 then
+        local dist = math.abs(right - centerX)
+        if dist < bestDist then bestX, bestDist = right, dist end
+      end
+    end
+  end
+  return bestX
+end
+
+-- Half the union's width, full height, centered on the monitor seam so the
+-- gap sits mid-window.
+local function seamCenteredHalfFrame(screens, unionFrame)
+  local w = math.floor(unionFrame.w / 2)
+  local x = math.floor(screenSeamX(screens, unionFrame) - w / 2)
+  x = math.max(unionFrame.x, math.min(x, unionFrame.x + unionFrame.w - w))
+  return {x = x, y = unionFrame.y, w = w, h = unionFrame.h}
+end
+
+local function framesMatch(a, b)
+  return math.abs(a.x - b.x) <= 40 and math.abs(a.w - b.w) <= 40
+end
+
+-- Cycle: previous size -> span all screens -> 50% centered on the seam ->
+-- previous size. Any other frame counts as "previous" and is saved.
+local function cycleSpanBothScreens()
+  local win = hs.window.focusedWindow()
+  if not win then return end
+  local winId = win:id()
+  local screens = hs.screen.allScreens()
+  if #screens < 2 then
+    win:maximize()
+    return
+  end
+
+  local unionFrame = allScreensUnionFrame(screens)
+  local halfFrame = seamCenteredHalfFrame(screens, unionFrame)
   local cur = win:frame()
 
-  if math.abs(cur.w - unionFrame.w) <= 40 and savedWindowFrames[winId] then
-    win:setFrame(savedWindowFrames[winId])
-    savedWindowFrames[winId] = nil
+  if framesMatch(cur, unionFrame) then
+    win:setFrame(halfFrame)
+  elseif framesMatch(cur, halfFrame) then
+    if savedWindowFrames[winId] then
+      win:setFrame(savedWindowFrames[winId])
+      savedWindowFrames[winId] = nil
+    else
+      win:setFrame(unionFrame)
+    end
   else
     savedWindowFrames[winId] = cur
     win:setFrame(unionFrame)
@@ -215,8 +259,8 @@ end
 -- MTV & WFH cross-monitor bindings (<Alt><Cmd>Left/Right/Page_Up and <Ctrl><Cmd>Page_Up/Page_Down)
 keepHotkey(ALT_SUPER,    "Left",     function() moveWindowToScreenInDirection("west") end)
 keepHotkey(ALT_SUPER,    "Right",    function() moveWindowToScreenInDirection("east") end)
-keepHotkey(ALT_SUPER,    "pageup",   toggleSpanBothScreens)
-keepHotkey(WM_MOD,       "pageup",   toggleSpanBothScreens)
+keepHotkey(ALT_SUPER,    "pageup",   cycleSpanBothScreens)
+keepHotkey(WM_MOD,       "pageup",   cycleSpanBothScreens)
 keepHotkey(WM_MOD_SHIFT, "pageup",   function()
   local win = hs.window.focusedWindow()
   if win then win:maximize() end
