@@ -4,7 +4,9 @@
 -- Replicates Marcel's MTV workstation and WFH laptop X11/XFCE4 window management
 -- workflows natively on macOS without hijacking standard macOS Cmd+Z/C/V/X/K/N:
 --   1. Stateful 6-tier fractional window cycling (x-window-move port):
---      {1.0, 0.75, 0.666, 0.5, 0.334, 0.25} on WM_MOD (Ctrl+Cmd) + Arrows/K.
+--      {1.0, 0.75, 0.666, 0.5, 0.334, 0.25} on WM_MOD (Ctrl+Cmd) + Arrows/K/I
+--      (K: centered width at full height; I: centered height at full width,
+--      for the rotated portrait monitor).
 --   2. Cross-monitor window movement & dual-screen spanning (both-screens) on
 --      both WFH (<Ctrl><Cmd>Page_Up) and MTV (<Alt><Cmd>Left/Right/Page_Up);
 --      Page_Up cycles previous size -> span -> 50% centered on the seam.
@@ -151,10 +153,24 @@ local function cycleWindowSnap(direction, reverseOrder)
       w = targetWidth,
       h = screenFrame.h,
     })
+  elseif direction == "vcenter" then
+    -- "center" on the vertical axis (for the rotated portrait monitor): full
+    -- width, height cycled and centered vertically.
+    local centerY = screenFrame.y + (screenFrame.h - winFrame.h) / 2
+    local alignedCenter = math.abs(winFrame.y - centerY) <= 25
+    local currentRatio = alignedCenter and (winFrame.h / screenFrame.h) or 0
+    local targetRatio = nextCycleRatio(currentRatio, reverseOrder)
+    local targetHeight = math.floor(screenFrame.h * targetRatio)
+    win:setFrame({
+      x = screenFrame.x,
+      y = math.floor(screenFrame.y + (screenFrame.h - targetHeight) / 2),
+      w = screenFrame.w,
+      h = targetHeight,
+    })
   end
 end
 
--- Bind WM_MOD (Ctrl+Cmd) + Arrows / K for 6-tier window cycling
+-- Bind WM_MOD (Ctrl+Cmd) + Arrows / K / I for 6-tier window cycling
 keepHotkey(WM_MOD,       "Left",  function() cycleWindowSnap("left",   false) end)
 keepHotkey(WM_MOD_SHIFT, "Left",  function() cycleWindowSnap("left",   true)  end)
 keepHotkey(WM_MOD,       "Right", function() cycleWindowSnap("right",  false) end)
@@ -165,6 +181,8 @@ keepHotkey(WM_MOD,       "Down",  function() cycleWindowSnap("down",   false) en
 keepHotkey(WM_MOD_SHIFT, "Down",  function() cycleWindowSnap("down",   true)  end)
 keepHotkey(WM_MOD,       "k",     function() cycleWindowSnap("center", false) end)
 keepHotkey(WM_MOD_SHIFT, "k",     function() cycleWindowSnap("center", true)  end)
+keepHotkey(WM_MOD,       "i",     function() cycleWindowSnap("vcenter", false) end)
+keepHotkey(WM_MOD_SHIFT, "i",     function() cycleWindowSnap("vcenter", true)  end)
 
 -- -----------------------------------------------------------------------------
 -- 2. Cross-Monitor Movement, Maximize, & Dual-Monitor Span (both-screens)
