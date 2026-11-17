@@ -1,0 +1,12 @@
+# ~/.bashrc.local  -*- mode: sh -*-
+#
+# Machine-local bash settings, NOT shared between machines. ~/.bashrc sources
+# this file near its end (after ble.sh, carapace and fzf are set up), so
+# anything here overrides the shared config.
+#
+# The repository only tracks this commented template (added with `git add -f`);
+# put real per-machine settings below it and never commit them.
+#
+# Once per clone, hide local edits from git:
+#   git -C ~ update-index --skip-worktree .bashrc.local
+# (undo with --no-skip-worktree, e.g. to update this template).

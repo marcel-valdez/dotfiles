@@ -1012,3 +1012,9 @@ function refresh_kitty {
     eval "$(tmux show-environment -s KITTY_WINDOW_ID)"
   fi
 }
+
+# Machine-local functions (~/.bash_functions.local; only a commented template
+# is committed). Sourced last so they win.
+if [ -r "${HOME}/.bash_functions.local" ]; then
+  . "${HOME}/.bash_functions.local"
+fi

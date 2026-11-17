@@ -1,0 +1,12 @@
+# ~/.profile.local  -*- mode: sh -*-
+#
+# Machine-local login-shell environment, NOT shared between machines.
+# ~/.profile sources this file at its end. Login shells other than bash (e.g.
+# dash on Linux) read ~/.profile too, so keep this file POSIX sh.
+#
+# The repository only tracks this commented template (added with `git add -f`);
+# put real per-machine settings below it and never commit them.
+#
+# Once per clone, hide local edits from git:
+#   git -C ~ update-index --skip-worktree .profile.local
+# (undo with --no-skip-worktree, e.g. to update this template).

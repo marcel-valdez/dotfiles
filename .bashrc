@@ -442,6 +442,13 @@ if [[ ${BLE_FIRST_LOAD:-} ]]; then
   [ -s "${HOME}/.fzf.bash" ] && . "${HOME}/.fzf.bash"
   log_debug "END: Load fzf keybindings and completions."
 fi
+
+# Machine-local overrides (~/.bashrc.local; only a commented template is
+# committed). Sourced late so its settings win.
+if [[ -r "${HOME}/.bashrc.local" ]]; then
+  source "${HOME}/.bashrc.local"
+fi
+
 unset POSIXLY_CORRECT
 set +o posix 2>/dev/null || true
 

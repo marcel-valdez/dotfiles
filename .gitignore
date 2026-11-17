@@ -10,6 +10,12 @@
 !.bash_profile
 !.profile
 !.bashrc
+# Machine-local shell settings: same scheme as .config/kitty/local.conf.
+.bashrc.local
+.bash_aliases.local
+.bash_functions.local
+.bash_profile.local
+.profile.local
 !.inputrc
 !.minttyrc
 !.nanorc
