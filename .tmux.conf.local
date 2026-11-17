@@ -1,0 +1,14 @@
+# ~/.tmux.conf.local: machine-local tmux settings, NOT shared between machines.
+#
+# ~/.tmux.conf sources this file last (`source-file -q`), so anything here
+# overrides the shared config. Plugin declarations (set -g @plugin ...) have no
+# effect here because TPM is initialized before this file is sourced.
+#
+# The repository only tracks this commented template (added with `git add -f`);
+# put real per-machine settings below it and never commit them.
+#
+# Once per clone, hide local edits from git:
+#   git -C ~ update-index --skip-worktree .tmux.conf.local
+# (undo with --no-skip-worktree, e.g. to update this template).
+#
+# vim: set ft=tmux:

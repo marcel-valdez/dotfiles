@@ -68,6 +68,15 @@
 ;; loads packages only available at the office
 ;; uses the 'google package by default.
 (with-library at-office)
+
+;; Machine-local settings that are never committed live in ~/.emacs.local (the
+;; repository only tracks a commented template of it).  It is loaded right after
+;; host-role detection so it can override the `at-office-is-*' flags; errors in
+;; it are reported without aborting the rest of this file.
+(let ((local-init (expand-file-name "~/.emacs.local")))
+  (when (file-readable-p local-init)
+    (with-demoted-errors "Error loading ~/.emacs.local: %S"
+      (load local-init nil t t))))
 (use-package flycheck
   :ensure t
   :config

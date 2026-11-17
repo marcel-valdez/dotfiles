@@ -14,6 +14,8 @@
 !.minttyrc
 !.nanorc
 !.tmux.conf
+# Machine-local tmux settings: same scheme as .config/kitty/local.conf.
+.tmux.conf.local
 !.gitignore
 !.XCompose
 !.Xmodmap
@@ -82,6 +84,8 @@ scripts/supermixer_cutover_constants.py
 scripts/tests/test_monitor_supermixer_asrf_cutover.py
 
 !.emacs
+# Machine-local Emacs settings: same scheme as .config/kitty/local.conf.
+.emacs.local
 !.emacs.d/
 !.emacs.d/lisp/
 !.emacs.d/lisp/*
@@ -124,7 +128,8 @@ scripts/tests/test_monitor_supermixer_asrf_cutover.py
 !.config/kitty/tab_bar.py
 !.config/kitty/macos_session.conf
 !.config/kitty/os-macos.conf
-# Machine-local kitty overrides: never commit (loaded via globinclude in kitty.conf)
+# Machine-local kitty overrides: only the commented template is tracked (added
+# with `git add -f`); local edits stay out of commits via --skip-worktree.
 .config/kitty/local.conf
 !.config/karabiner/
 !.config/karabiner/karabiner.json
