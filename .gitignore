@@ -124,6 +124,8 @@ scripts/tests/test_monitor_supermixer_asrf_cutover.py
 !.config/kitty/tab_bar.py
 !.config/kitty/macos_session.conf
 !.config/kitty/os-macos.conf
+# Machine-local kitty overrides: never commit (loaded via globinclude in kitty.conf)
+.config/kitty/local.conf
 !.config/karabiner/
 !.config/karabiner/karabiner.json
 !.config/linearmouse/
