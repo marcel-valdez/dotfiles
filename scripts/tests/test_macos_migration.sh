@@ -867,7 +867,17 @@ echo "[Test 15] ~/.hammerspoon/init.lua macOS 15+ space-moving & multi-workspace
   assert_true "init.lua presses the target Space only after Mission Control settles, then falls back" \
     bash -c "grep -q 'local MC_SETTLE_SEC' '${hs_init}' && grep -q 'local function followDroppedWindow' '${hs_init}' && grep -q 'local function switchToTargetSpaceDirectly' '${hs_init}'"
   assert_true "init.lua never leaves Mission Control open when a move finishes" \
-    grep -q "if op.mcOpen then pcall(hs.spaces.closeMissionControl) end" "${hs_init}"
+    grep -q "if op.mcOpen then pcall(closeMissionControl) end" "${hs_init}"
+  assert_true "init.lua finds Mission Control under WindowManager (macOS 27) as well as the Dock" \
+    bash -c "grep -q 'local function getMissionControlDisplays' '${hs_init}' && grep -q 'applicationsForBundleID(\"com.apple.WindowManager\")' '${hs_init}'"
+  assert_true "init.lua no longer uses hs.spaces' Dock-only Mission Control helpers (no-ops on macOS 27)" \
+    bash -c "! grep -v '^ *--' '${hs_init}' | grep -Eq 'hs\.spaces\.(openMissionControl|closeMissionControl|gotoSpace)\b'"
+  assert_true "init.lua nudges titlebars past Chrome's drag threshold before switching Spaces" \
+    bash -c "grep -q 'local TITLEBAR_DRAG_NUDGES_PX' '${hs_init}' && grep -q 'window drag engaged after %dpx' '${hs_init}'"
+  assert_true "init.lua aims at WindowManager's offset Space button frames and never drops after a re-layout" \
+    bash -c "grep -q 'owner == \"WindowManager\"' '${hs_init}' && grep -q 'local function abortDrop' '${hs_init}'"
+  assert_true "init.lua binds <WM_MOD>i/<WM_MOD_SHIFT>i to cycle the centered window height (portrait monitor)" \
+    bash -c "grep -q 'keepHotkey(WM_MOD,       \"i\",     function() cycleWindowSnap(\"vcenter\", false) end)' '${hs_init}' && grep -q 'keepHotkey(WM_MOD_SHIFT, \"i\",     function() cycleWindowSnap(\"vcenter\", true)  end)' '${hs_init}'"
   assert_true "init.lua unpins explicitly moved windows from stickyWindows" \
     grep -Fq "stickyWindows[op.winId] = false" "${hs_init}"
   assert_true "init.lua declares stickyWindows exactly once (shared by Sections 3, 4 and 6)" \
