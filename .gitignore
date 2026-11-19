@@ -93,6 +93,7 @@ scripts/tests/test_monitor_supermixer_asrf_cutover.py
 # Machine-local Emacs settings: same scheme as .config/kitty/local.conf.
 .emacs.local
 !.emacs.d/
+!.emacs.d/early-init.el
 !.emacs.d/lisp/
 !.emacs.d/lisp/*
 .emacs.d/lisp/at-office.el
