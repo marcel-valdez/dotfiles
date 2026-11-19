@@ -34,6 +34,9 @@
   (normal-top-level-add-subdirs-to-load-path))
 ;; add custom themes to themes load path
 (add-to-list 'custom-theme-load-path "~/.emacs.d/lisp/themes")
+;; A directory watch that fails (e.g. ~/.gcloud_home is a dead sshfs mount)
+;; logs a message instead of breaking C-x C-f; see the file's commentary.
+(require 'file-notify-resilient nil t)
 
 ;; Added by Package.el.  This must come before configurations of
 ;; installed packages.  Don't delete this line.  If you don't want it,
