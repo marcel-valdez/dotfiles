@@ -1,0 +1,844 @@
+#!/usr/bin/env bash
+# ==============================================================================
+# Unit & Nested-Tmux Integration Test Suite for ~/bin/tmux-notify
+# ==============================================================================
+# Exercises:
+#   1. Dynamic 80% x 80% layout sizing and multi-client min(W) / min(H)
+#   2. Overflow switching to batcat -> bat -> less with pre-wrapped Markdown
+#   3. UTF-8 locale probing and PATH splicing
+#   4. --select-pane, --session, -- end-of-options, and Escape vs CSI sequences
+#   5. PID-liveness-guarded popup_* pruning and atomic slots/-only cleanup
+#   6. Nested-tmux multi-client broadcast, sibling auto-close, HUP isolation,
+#      and closed-FD TIMER_PID pager timeout enforcement
+#
+# Usage Example:
+#   bash ~/scripts/tests/test_tmux_notify.sh
+# ==============================================================================
+
+set -uo pipefail
+
+TMUX_NOTIFY="${TMUX_NOTIFY:-${HOME}/bin/tmux-notify}"
+PASS_COUNT=0
+FAIL_COUNT=0
+
+TEST_ROOT="$(mktemp -d "${TMPDIR:-/tmp}/test_tmux_notify_XXXXXX")"
+cleanup_suite() {
+  rm -rf "${TEST_ROOT}" 2>/dev/null || true
+}
+trap cleanup_suite EXIT
+
+assert_eq() {
+  local expected="$1"
+  local actual="$2"
+  local msg="$3"
+  if [[ "${expected}" == "${actual}" ]]; then
+    PASS_COUNT=$((PASS_COUNT + 1))
+  else
+    echo "FAIL: ${msg} (expected='${expected}', actual='${actual}')" >&2
+    FAIL_COUNT=$((FAIL_COUNT + 1))
+  fi
+}
+
+assert_true() {
+  local msg="$1"
+  shift
+  if "$@"; then
+    PASS_COUNT=$((PASS_COUNT + 1))
+  else
+    echo "FAIL: ${msg}" >&2
+    FAIL_COUNT=$((FAIL_COUNT + 1))
+  fi
+}
+
+# Runs the layout engine. Sets LAYOUT_W, LAYOUT_H, LAYOUT_MODE, and BODY array.
+layout() {
+  local size="$1"
+  shift
+  local out
+  out="$(env -u TMUX_NOTIFY_MAX_COLS bash "${TMUX_NOTIFY}" --print-layout \
+    --client-size "${size}" "$@")"
+  read -r LAYOUT_W LAYOUT_H LAYOUT_MODE <<< "$(head -n 1 <<< "${out}")"
+  BODY=()
+  while IFS= read -r row; do
+    BODY+=("${row}")
+  done < <(tail -n +2 <<< "${out}")
+}
+
+# Asserts no body row is wider than the popup interior (width minus border).
+assert_rows_fit() {
+  local msg="$1"
+  local interior=$(( LAYOUT_W - 2 ))
+  local row
+  for row in "${BODY[@]}"; do
+    if (( ${#row} > interior )); then
+      echo "FAIL: ${msg}: row '${row}' (${#row}) > interior ${interior}" >&2
+      FAIL_COUNT=$((FAIL_COUNT + 1))
+      return
+    fi
+  done
+  PASS_COUNT=$((PASS_COUNT + 1))
+}
+
+# Joins body rows back into words to check that wrapping lost nothing.
+joined_words() {
+  local IFS=' '
+  # shellcheck disable=SC2048,SC2086 # word splitting is intended here.
+  echo ${BODY[*]}
+}
+
+test_short_single_line_uses_min_width() {
+  layout 192x50 "Build" "Done."
+  assert_eq "30" "${LAYOUT_W}" "short message clamps to minimum width"
+  assert_eq "3" "${LAYOUT_H}" "single row plus 2 border rows"
+  assert_eq "inline" "${LAYOUT_MODE}" "short message stays inline"
+  assert_eq " Done." "${BODY[0]}" "body row has 1 column left padding"
+}
+
+test_long_single_line_expands_up_to_80_pct_width() {
+  local msg
+  msg="Jetski Run Completed: Workspace [jetski-cli-notify]: This is a"
+  msg+=" deliberately long single-line notification message that should"
+  msg+=" clearly expand beyond the legacy 80-column limit all the way up to"
+  msg+=" eighty percent of the two-hundred-column client screen width END."
+  layout 200x50 "Knock" "${msg}"
+  assert_eq "160" "${LAYOUT_W}" "long message expands to 80% of 200 cols (160)"
+  assert_eq "inline" "${LAYOUT_MODE}" "fits vertically in inline mode"
+  assert_eq "$(( ${#BODY[@]} + 2 ))" "${LAYOUT_H}" \
+    "height counts every wrapped row plus border"
+  assert_true "long message wraps across >=2 rows" test "${#BODY[@]}" -ge 2
+  assert_rows_fit "long message rows fit the 160-col interior"
+  assert_eq "${msg}" "$(joined_words)" "wrapping keeps every word in order"
+}
+
+test_multi_client_uses_smallest_client_dimensions() {
+  local out w h mode
+  out="$(env -u TMUX_NOTIFY_MAX_COLS bash "${TMUX_NOTIFY}" --print-layout \
+    --client-size 284x71 --client-size 240x62 "Overflow" \
+    "$(seq -f 'row %g' 1 80)" | head -n 1)"
+  read -r w h mode <<< "${out}"
+  assert_eq "192" "${w}" "80% of smaller width 240 is 192"
+  assert_eq "49" "${h}" "80% of smaller height 62 is 49"
+  assert_eq "pager" "${mode}" "80 rows on 62-row client enters pager mode"
+
+  out="$(env -u TMUX_NOTIFY_MAX_COLS bash "${TMUX_NOTIFY}" --print-layout \
+    --client-size 200x40 --client-size 150x60 "Asym" \
+    "$(seq -f 'row %g' 1 80)" | head -n 1)"
+  read -r w h mode <<< "${out}"
+  assert_eq "120" "${w}" "asymmetric min width 150 -> 80% is 120"
+  assert_eq "32" "${h}" "asymmetric min height 40 -> 80% is 32"
+  assert_eq "pager" "${mode}" "asymmetric overflow enters pager mode"
+}
+
+test_first_line_is_first_row() {
+  layout 192x50 "Three Lines" "$(printf 'line one\nline two\nline three')"
+  assert_eq " line one" "${BODY[0]}" "first logical line is the first row"
+  assert_eq "5" "${LAYOUT_H}" "three rows plus 2 border rows"
+  assert_eq "inline" "${LAYOUT_MODE}" "three lines fit inline"
+}
+
+test_blank_lines_and_indentation_preserved() {
+  layout 100x30 "Knock" "$(printf 'Question?\n\nChoices:\n  1. One\n  2. Two')"
+  assert_eq "" "${BODY[1]// /}" "blank line is preserved"
+  assert_eq "   1. One" "${BODY[3]}" "indentation is preserved"
+  assert_eq "7" "${LAYOUT_H}" "five rows plus 2 border rows"
+}
+
+test_tabs_expand_and_carriage_returns_strip() {
+  layout 100x30 "T" "$(printf 'a\tb\r\nc')"
+  assert_eq " a    b" "${BODY[0]}" "tab expands to 4 spaces, CR stripped"
+  assert_eq " c" "${BODY[1]}" "second line follows"
+}
+
+test_overflow_switches_to_pager_at_80_pct_size() {
+  layout 100x25 "Overflow" "$(seq -f 'row %g' 1 60)"
+  assert_eq "80" "${LAYOUT_W}" "overflow width is 80% of 100 (80)"
+  assert_eq "20" "${LAYOUT_H}" "overflow height is 80% of 25 (20)"
+  assert_eq "pager" "${LAYOUT_MODE}" "overflow switches to pager mode"
+  assert_eq "60" "${#BODY[@]}" "pager preserves all 60 lines without truncation"
+  assert_eq "row 1" "${BODY[0]:-}" "first row unpadded for Markdown highlighting"
+  assert_eq "row 60" "${BODY[59]:-}" "last row preserved without +N marker"
+}
+
+test_exact_fit_has_no_marker() {
+  layout 80x20 "Fit" "$(seq -f 'row %g' 1 14)"
+  assert_eq "16" "${LAYOUT_H}" "14 rows + 2 border = 16 (80% of 20)"
+  assert_eq "inline" "${LAYOUT_MODE}" "exact fit stays inline"
+  assert_eq " row 14" "${BODY[-1]}" "no marker when everything fits"
+}
+
+test_narrow_client_scales_to_80_pct() {
+  layout 60x20 "Knock" "$(printf 'word %.0s' {1..40})"
+  assert_eq "48" "${LAYOUT_W}" "popup width is 80% of 60-col client (48)"
+  assert_rows_fit "rows fit a narrow popup"
+}
+
+test_small_client_floors_at_min_width_when_screen_allows() {
+  layout 35x20 "Knock" "Short"
+  assert_eq "30" "${LAYOUT_W}" "35-col client floors 80% (28) up to 30 cols"
+}
+
+test_tiny_client_clamps_to_screen_width() {
+  layout 20x10 "Knock" "$(printf 'word %.0s' {1..6})"
+  assert_eq "20" "${LAYOUT_W}" "20-col tiny client clamps width <= client_w"
+  assert_true "tiny client height <= client_h" test "${LAYOUT_H}" -le 10
+  assert_rows_fit "rows fit tiny popup"
+}
+
+test_long_word_is_hard_broken() {
+  layout 100x50 "Path" "$(printf 'x%.0s' {1..200})"
+  assert_rows_fit "unbreakable word is split across rows"
+  assert_eq "5" "${LAYOUT_H}" "200 chars at 76 per row is 3 rows + 2 border"
+}
+
+test_multibyte_wraps_by_characters() {
+  local msg
+  msg="$(printf 'á→ %.0s' {1..60})"
+  layout 100x50 "UTF-8" "${msg}"
+  assert_rows_fit "multibyte rows fit the interior by character count"
+  assert_true "multibyte rows are not split short" test "${#BODY[0]}" -ge 70
+}
+
+test_multibyte_under_c_locale() {
+  local err_file="${TEST_ROOT}/locale_stderr"
+  local out
+  out="$(LANG=C LC_ALL='' bash "${TMUX_NOTIFY}" --print-layout \
+    --client-size 100x50 "UTF-8" "$(printf 'á→ %.0s' {1..60})" \
+    2>"${err_file}" | sed -n 2p)"
+  assert_true "C locale still counts characters" test "${#out}" -ge 70
+  assert_eq "" "$(< "${err_file}")" "Linux locale probe emits zero stderr"
+}
+
+test_path_bootstrap_splices_before_usr_bin() {
+  local stub_dir="${TEST_ROOT}/path_stub"
+  mkdir -p "${stub_dir}"
+  cat << 'EOF' > "${stub_dir}/tmux"
+#!/usr/bin/env bash
+if [[ "${1:-}" == "list-clients" ]]; then
+  echo "/dev/pts/0 main 100 30 0"
+  exit 0
+fi
+if [[ "${1:-}" == "display-popup" ]]; then
+  printf '%s\n' "${PATH}" > "${PATH_RECORD_FILE}"
+  exit 0
+fi
+exit 0
+EOF
+  chmod +x "${stub_dir}/tmux"
+
+  local rec="${TEST_ROOT}/recorded_path.txt"
+  PATH_RECORD_FILE="${rec}" PATH="${stub_dir}:/usr/bin:/bin" \
+    bash "${TMUX_NOTIFY}" "Title" "Hello"
+  local got_path
+  got_path="$(< "${rec}")"
+  # Leading stub_dir must still precede ~/bin and /usr/bin.
+  assert_eq "${stub_dir}" "${got_path%%:*}" \
+    "leading stub dir stays first in PATH"
+  if [[ -d "${HOME}/bin" ]]; then
+    local before_usr="${got_path%%/usr/bin*}"
+    assert_true "HOME/bin is spliced before /usr/bin" \
+      grep -Fq "${HOME}/bin:" <<< "${before_usr}"
+  fi
+}
+
+test_title_only_and_end_of_options() {
+  layout 192x50 "Just a message"
+  assert_eq " Just a message" "${BODY[0]}" "single arg becomes the message"
+
+  local out
+  out="$(bash "${TMUX_NOTIFY}" --print-layout --client-size 100x30 -- \
+    "--dash-title" "--dash-message" | sed -n 2p)"
+  assert_eq " --dash-message" "${out}" "-- allows leading-dash title/message"
+
+  local stub_dir="${TEST_ROOT}/empty_msg_stub"
+  mkdir -p "${stub_dir}"
+  cat << 'EOF' > "${stub_dir}/tmux"
+#!/usr/bin/env bash
+if [[ "${1:-}" == "list-clients" ]]; then
+  echo "/dev/pts/0 main 100 30 0"
+  exit 0
+fi
+if [[ "${1:-}" == "display-popup" ]]; then
+  printf '%s\n' "$*" > "${POPUP_ARGS_FILE}"
+  exit 0
+fi
+exit 0
+EOF
+  chmod +x "${stub_dir}/tmux"
+  local args_file="${TEST_ROOT}/empty_msg_args.txt"
+  POPUP_ARGS_FILE="${args_file}" PATH="${stub_dir}:${PATH}" \
+    bash "${TMUX_NOTIFY}" -- "ExplicitTitle" ""
+  assert_true "explicit title preserved when 2nd arg is empty" \
+    grep -Fq -- "-T ExplicitTitle" "${args_file}"
+}
+
+test_invalid_client_size_fails() {
+  bash "${TMUX_NOTIFY}" --print-layout --client-size 80by24 "T" "M" \
+    >/dev/null 2>&1
+  assert_eq "2" "$?" "malformed --client-size exits with status 2"
+}
+
+test_max_cols_override() {
+  local out
+  out="$(TMUX_NOTIFY_MAX_COLS=50 bash "${TMUX_NOTIFY}" --print-layout \
+    --client-size 192x50 "T" "$(printf 'word %.0s' {1..40})" | head -n 1)"
+  assert_eq "50" "${out%% *}" "TMUX_NOTIFY_MAX_COLS caps the width"
+}
+
+# Helper to build an isolated pager test directory with stub tmux & pagers.
+setup_pager_test_env() {
+  local dir="$1"
+  mkdir -p "${dir}/bin" "${dir}/runtime"
+  cat << 'EOF' > "${dir}/bin/tmux"
+#!/usr/bin/env bash
+case "${1:-}" in
+  list-clients)
+    echo "/dev/pts/1 main 100 25 0"
+    ;;
+  display-popup)
+    shift
+    while (( $# > 0 )); do
+      if [[ "$1" == "-E" ]]; then
+        printf '%s\n' "$2" > "${STUB_CMD_FILE}"
+        exit 0
+      fi
+      shift
+    done
+    ;;
+  select-pane)
+    printf '%s\n' "$*" >> "${STUB_SELECT_PANE_FILE}"
+    ;;
+esac
+exit 0
+EOF
+  chmod +x "${dir}/bin/tmux"
+
+  cat << 'EOF' > "${dir}/bin/less"
+#!/usr/bin/env bash
+if [[ "${1:-}" == "--help" ]]; then
+  echo "--status-line --mouse --incsearch --quit-on-intr --raw-control-chars"
+  exit 0
+fi
+input_tmp="${PAGER_LOG}.in"
+if (( $# > 0 )) && [[ -f "${!#}" ]]; then
+  cat "${!#}" > "${input_tmp}"
+else
+  cat > "${input_tmp}"
+fi
+sed -E $'s/\x1b\\[[0-9;]*m//g' "${input_tmp}" > "${input_tmp}.plain"
+printf 'LESS_ENV=%s\n' "${LESS-<unset>}" > "${PAGER_LOG}"
+printf 'BIN=less\n' >> "${PAGER_LOG}"
+printf 'ARGS=%s\n' "$*" >> "${PAGER_LOG}"
+printf 'FIRST_LINE=%s\n' "$(head -n 1 "${input_tmp}.plain")" >> "${PAGER_LOG}"
+printf 'MAX_LEN=%s\n' "$(awk '{ if (length($0) > m) m = length($0) } END { print m+0 }' "${input_tmp}.plain")" >> "${PAGER_LOG}"
+exit 0
+EOF
+  chmod +x "${dir}/bin/less"
+}
+
+test_pager_prefers_batcat_over_bat_and_less() {
+  local dir="${TEST_ROOT}/pager_batcat"
+  setup_pager_test_env "${dir}"
+  for b in batcat bat; do
+    cat << EOF > "${dir}/bin/${b}"
+#!/usr/bin/env bash
+printf 'LESS_ENV=%s\n' "\${LESS-<unset>}" > "\${PAGER_LOG}"
+printf 'BIN=${b}\n' >> "\${PAGER_LOG}"
+printf 'ARGS=%s\n' "\$*" >> "\${PAGER_LOG}"
+printf 'FIRST_LINE=%s\n' "\$(head -n 1 "\${!#}")" >> "\${PAGER_LOG}"
+exit 0
+EOF
+    chmod +x "${dir}/bin/${b}"
+  done
+
+  local cmd_file="${dir}/cmd.txt"
+  local pager_log="${dir}/pager.log"
+  STUB_CMD_FILE="${cmd_file}" XDG_RUNTIME_DIR="${dir}/runtime" \
+    PATH="${dir}/bin:${PATH}" \
+    bash "${TMUX_NOTIFY}" "Overflow" "$(seq -f '## Item %g' 1 40)"
+  local runner_cmd
+  runner_cmd="$(< "${cmd_file}")"
+  LESS="-F" PAGER_LOG="${pager_log}" XDG_RUNTIME_DIR="${dir}/runtime" \
+    PATH="${dir}/bin:${PATH}" \
+    eval "${runner_cmd}" </dev/null
+
+  assert_true "LESS env var is cleared" grep -Fxq "LESS_ENV=<unset>" "${pager_log}"
+  assert_true "batcat preferred over bat and less" \
+    grep -Fxq "BIN=batcat" "${pager_log}"
+  assert_true "batcat receives plain markdown paging flags and less opts" \
+    grep -Fq -- "--style=plain --language=markdown --paging=always --pager=less --status-line --mouse --incsearch --quit-on-intr --raw-control-chars" "${pager_log}"
+  assert_true "wrapped.txt preserves Markdown heading at col 0" \
+    grep -Fxq "FIRST_LINE=## Item 1" "${pager_log}"
+}
+
+test_pager_falls_back_to_bat_when_batcat_absent() {
+  local dir="${TEST_ROOT}/pager_bat"
+  setup_pager_test_env "${dir}"
+  # Symlink core utilities needed without exposing /usr/bin/batcat.
+  local util
+  for util in bash env fold head tail wc tr sed awk grep cat mkdir rmdir rm mktemp sleep kill pgrep stat date id basename dirname chmod timeout; do
+    local p
+    p="$(command -v "${util}" 2>/dev/null || true)"
+    [[ -n "${p}" ]] && ln -sf "${p}" "${dir}/bin/${util}"
+  done
+  cat << 'EOF' > "${dir}/bin/bat"
+#!/usr/bin/env bash
+printf 'LESS_ENV=%s\n' "${LESS-<unset>}" > "${PAGER_LOG}"
+printf 'BIN=bat\n' >> "${PAGER_LOG}"
+printf 'ARGS=%s\n' "$*" >> "${PAGER_LOG}"
+exit 0
+EOF
+  chmod +x "${dir}/bin/bat"
+
+  local cmd_file="${dir}/cmd.txt"
+  local pager_log="${dir}/pager.log"
+  TMUX_NOTIFY_NO_PATH_BOOTSTRAP=1 \
+    STUB_CMD_FILE="${cmd_file}" XDG_RUNTIME_DIR="${dir}/runtime" \
+    PATH="${dir}/bin" \
+    bash "${TMUX_NOTIFY}" "BatOverflow" "$(seq -f 'row %g' 1 40)"
+  local runner_cmd
+  runner_cmd="$(< "${cmd_file}")"
+  TMUX_NOTIFY_NO_PATH_BOOTSTRAP=1 LESS="-F" \
+    PAGER_LOG="${pager_log}" XDG_RUNTIME_DIR="${dir}/runtime" PATH="${dir}/bin" \
+    eval "${runner_cmd}" </dev/null
+
+  assert_true "fallback selects bat when batcat absent" \
+    grep -Fxq "BIN=bat" "${pager_log}"
+  assert_true "bat receives desired less flags" \
+    grep -Fq -- "--pager=less --status-line --mouse --incsearch --quit-on-intr --raw-control-chars" "${pager_log}"
+}
+
+test_pager_falls_back_to_less_when_bat_absent() {
+  local dir="${TEST_ROOT}/pager_less"
+  setup_pager_test_env "${dir}"
+  local util
+  for util in bash env fold head tail wc tr sed awk grep cat mkdir rmdir rm mktemp sleep kill pgrep stat date id basename dirname chmod timeout; do
+    local p
+    p="$(command -v "${util}" 2>/dev/null || true)"
+    [[ -n "${p}" ]] && ln -sf "${p}" "${dir}/bin/${util}"
+  done
+
+  local cmd_file="${dir}/cmd.txt"
+  local pager_log="${dir}/pager.log"
+  TMUX_NOTIFY_NO_PATH_BOOTSTRAP=1 STUB_CMD_FILE="${cmd_file}" \
+    XDG_RUNTIME_DIR="${dir}/runtime" PATH="${dir}/bin" \
+    bash "${TMUX_NOTIFY}" "LessOverflow" "$(seq -f 'row %g' 1 40)"
+  local runner_cmd
+  runner_cmd="$(< "${cmd_file}")"
+  TMUX_NOTIFY_NO_PATH_BOOTSTRAP=1 LESS="-F" PAGER_LOG="${pager_log}" \
+    XDG_RUNTIME_DIR="${dir}/runtime" PATH="${dir}/bin" \
+    eval "${runner_cmd}" </dev/null
+
+  assert_true "falls back to less when batcat/bat absent" \
+    grep -Fxq "BIN=less" "${pager_log}"
+  assert_true "less receives exact 5 long options" \
+    grep -Fq -- "--status-line --mouse --incsearch --quit-on-intr --raw-control-chars" "${pager_log}"
+}
+
+test_pager_long_markdown_line_preserves_leading_text() {
+  local dir="${TEST_ROOT}/pager_long_md"
+  setup_pager_test_env "${dir}"
+  local long_md
+  long_md="OPENING_MARKER $(printf 'markdownword %.0s' {1..25})"
+  long_md+=$'\n'"$(seq -f '- bullet %g' 1 35)"
+
+  local cmd_file="${dir}/cmd.txt"
+  local pager_log="${dir}/pager.log"
+  TMUX_NOTIFY_NO_PATH_BOOTSTRAP=1 STUB_CMD_FILE="${cmd_file}" \
+    XDG_RUNTIME_DIR="${dir}/runtime" PATH="${dir}/bin:${PATH}" \
+    bash "${TMUX_NOTIFY}" "MD" "${long_md}"
+  local runner_cmd
+  runner_cmd="$(< "${cmd_file}")"
+  LESS="-F" PAGER_LOG="${pager_log}" XDG_RUNTIME_DIR="${dir}/runtime" \
+    PATH="${dir}/bin:${PATH}" \
+    eval "${runner_cmd}" </dev/null
+
+  assert_true "opening text remains on line 1 of wrapped.txt" \
+    grep -Fq "FIRST_LINE=OPENING_MARKER " "${pager_log}"
+  local max_len
+  max_len="$(sed -n 's/^MAX_LEN=//p' "${pager_log}")"
+  # Client 100x25 -> popup_w=80 -> wrap_w = 80 - 4 = 76.
+  assert_true "all wrapped lines fit <= popup_w - 4 (76)" \
+    test "${max_len}" -le 76
+}
+
+test_select_pane_and_escape_vs_csi_sequences() {
+  local dir="${TEST_ROOT}/select_pane"
+  setup_pager_test_env "${dir}"
+  local cmd_file="${dir}/cmd.txt"
+  local pane_log="${dir}/select_pane.log"
+
+  # 1. Arrow key + focus sequences (\e[A, \e[I, \e[O) must NOT dismiss early,
+  #    followed by \e which dismisses interactively and runs select-pane.
+  STUB_CMD_FILE="${cmd_file}" STUB_SELECT_PANE_FILE="${pane_log}" \
+    XDG_RUNTIME_DIR="${dir}/runtime" PATH="${dir}/bin:${PATH}" \
+    bash "${TMUX_NOTIFY}" --select-pane "%42" -- "Focus" "Short body"
+  local runner_cmd
+  runner_cmd="$(< "${cmd_file}")"
+  rm -f "${pane_log}"
+  printf '\e[A\e[I\e[O\e' | LANG=en_US.UTF-8 STUB_SELECT_PANE_FILE="${pane_log}" \
+    PATH="${dir}/bin:${PATH}" eval "${runner_cmd}" >/dev/null
+  assert_true "CSI sequences + standalone Escape under en_US.UTF-8 calls select-pane %42" \
+    grep -Fq -- "-t %42" "${pane_log}"
+
+  # 2. Standalone Escape (\e with no trailing byte) dismisses interactively.
+  STUB_CMD_FILE="${cmd_file}" XDG_RUNTIME_DIR="${dir}/runtime" \
+    PATH="${dir}/bin:${PATH}" \
+    bash "${TMUX_NOTIFY}" --select-pane "%77" -- "Esc" "Short body"
+  runner_cmd="$(< "${cmd_file}")"
+  rm -f "${pane_log}"
+  printf '\e' | STUB_SELECT_PANE_FILE="${pane_log}" \
+    PATH="${dir}/bin:${PATH}" eval "${runner_cmd}" >/dev/null
+  assert_true "standalone Escape calls select-pane %77" \
+    grep -Fq -- "-t %77" "${pane_log}"
+
+  # 3. Timeout expiration does NOT steal pane focus.
+  TMUX_NOTIFY_TIMEOUT=1 STUB_CMD_FILE="${cmd_file}" \
+    XDG_RUNTIME_DIR="${dir}/runtime" PATH="${dir}/bin:${PATH}" \
+    bash "${TMUX_NOTIFY}" --select-pane "%99" -- "Timeout" "Short body"
+  runner_cmd="$(< "${cmd_file}")"
+  rm -f "${pane_log}"
+  ( sleep 2 ) | STUB_SELECT_PANE_FILE="${pane_log}" \
+    PATH="${dir}/bin:${PATH}" eval "${runner_cmd}" >/dev/null
+  assert_true "timeout does NOT call select-pane" test ! -e "${pane_log}"
+}
+
+test_pruner_preserves_live_pid_popup_dir() {
+  local dir="${TEST_ROOT}/pruner"
+  setup_pager_test_env "${dir}"
+  local state_dir="${dir}/runtime/tmux-notify"
+  mkdir -p "${state_dir}/popup_dead00/pids" "${state_dir}/popup_live00/pids"
+  : > "${state_dir}/popup_dead00/pids/999999"
+  : > "${state_dir}/popup_live00/pids/$$"
+  touch -t 202001010000 "${state_dir}/popup_dead00" "${state_dir}/popup_live00"
+
+  local cmd_file="${dir}/cmd.txt"
+  TMUX_NOTIFY_TIMEOUT=10 STUB_CMD_FILE="${cmd_file}" \
+    XDG_RUNTIME_DIR="${dir}/runtime" \
+    PATH="${dir}/bin:${PATH}" \
+    bash "${TMUX_NOTIFY}" "PruneCheck" "Hi"
+
+  assert_true "expired popup dir with dead PID is pruned" \
+    test ! -d "${state_dir}/popup_dead00"
+  assert_true "expired popup dir with live PID is preserved" \
+    test -d "${state_dir}/popup_live00"
+}
+
+test_jetski_notify_delegates_to_real_tmux_notify() {
+  local dir="${TEST_ROOT}/jetski_notify"
+  setup_pager_test_env "${dir}"
+  cat << 'EOF' > "${dir}/bin/tmux"
+#!/usr/bin/env bash
+case "${1:-}" in
+  list-clients)
+    echo "/dev/pts/1 main 200 50 0"
+    ;;
+  display-popup)
+    printf '%s\n' "$*" > "${STUB_POPUP_META}"
+    shift
+    while (( $# > 0 )); do
+      if [[ "$1" == "-E" ]]; then
+        printf '%s\n' "$2" > "${STUB_CMD_FILE}"
+        exit 0
+      fi
+      shift
+    done
+    ;;
+  select-pane)
+    printf '%s\n' "$*" >> "${STUB_SELECT_PANE_FILE}"
+    ;;
+esac
+exit 0
+EOF
+  chmod +x "${dir}/bin/tmux"
+
+  local meta="${dir}/meta.txt"
+  local cmd_file="${dir}/cmd.txt"
+  local pane_log="${dir}/pane.log"
+  local long_msg
+  long_msg="$(printf 'word %.0s' {1..50})"
+
+  # 1. Single-arg defaults title to JETSKI NOTIFICATION, expands >80 cols,
+  #    and focuses TARGET_PANE on interactive dismissal.
+  TARGET_PANE="%15" STUB_POPUP_META="${meta}" STUB_CMD_FILE="${cmd_file}" \
+    XDG_RUNTIME_DIR="${dir}/runtime" \
+    PATH="${dir}/bin:${PATH}" \
+    bash "${HOME}/scripts/jetski-notify" "${long_msg}"
+  assert_true "single-arg jetski-notify uses JETSKI NOTIFICATION title" \
+    grep -Fq -- "-T JETSKI NOTIFICATION" "${meta}"
+  assert_true "jetski-notify expands width to 160 (80% of 200)" \
+    grep -Fq -- "-w 160" "${meta}"
+
+  local runner_cmd
+  runner_cmd="$(< "${cmd_file}")"
+  rm -f "${pane_log}"
+  printf '\n' | STUB_SELECT_PANE_FILE="${pane_log}" PATH="${dir}/bin:${PATH}" \
+    eval "${runner_cmd}" >/dev/null
+  assert_true "jetski-notify dismissal selects TARGET_PANE %15" \
+    grep -Fq -- "-t %15" "${pane_log}"
+
+  # 2. Leading-dash title with multi-word message via `--` handoff.
+  TARGET_PANE="%16" STUB_POPUP_META="${meta}" STUB_CMD_FILE="${cmd_file}" \
+    XDG_RUNTIME_DIR="${dir}/runtime" \
+    PATH="${dir}/bin:${PATH}" \
+    bash "${HOME}/scripts/jetski-notify" "--CustomDashTitle" "Part1" "Part2"
+  assert_true "jetski-notify preserves leading-dash title via --" \
+    grep -Fq -- "-T --CustomDashTitle" "${meta}"
+}
+
+test_monitor_tmux_pane_delegates_to_tmux_notify_and_notify_send() {
+  local dir="${TEST_ROOT}/monitor_pane"
+  mkdir -p "${dir}/home/bin" "${dir}/mock_bin"
+
+  local tn_log="${dir}/tmux_notify.log"
+  local desk_log="${dir}/desktop_notify.log"
+  cat << EOF > "${dir}/home/bin/tmux-notify"
+#!/usr/bin/env bash
+printf '%s\n' "\$*" >> "${tn_log}"
+EOF
+  chmod +x "${dir}/home/bin/tmux-notify"
+
+  cat << EOF > "${dir}/mock_bin/notify-send"
+#!/usr/bin/env bash
+printf '%s\n' "\$*" >> "${desk_log}"
+EOF
+  chmod +x "${dir}/mock_bin/notify-send"
+
+  # Sourcing monitor-tmux-pane.sh must NOT enter infinite main loop.
+  # shellcheck disable=SC2016
+  timeout 3s env HOME="${dir}/home" DISPLAY=":0" \
+    PATH="${dir}/mock_bin:${PATH}" \
+    bash -c '
+      source "$1"
+      window_name="LOG_WIN"
+      USE_DESKTOP_NOTIFY=1
+      notify_new "Log changed"
+      wait
+    ' _ "${HOME}/scripts/monitor-tmux-pane.sh"
+  assert_eq "0" "$?" "monitor-tmux-pane.sh can be sourced without hanging"
+  assert_true "monitor-tmux-pane.sh delegates popup to tmux-notify" \
+    grep -Fq -- "-- tmux-monitor: LOG_WIN Log changed" "${tn_log}"
+  assert_true "monitor-tmux-pane.sh delegates desktop alert via notify-send" \
+    grep -Fq -- "Log changed" "${desk_log}"
+}
+
+test_weird_inputs_control_chars_ansi_and_metachars_never_break() {
+  # 1. Dangerous non-SGR terminal escapes (\e[6n DSR query, \e[2J clear, OSC,
+  #    BEL, BS, mid-line CR) must be stripped while preserving normal text.
+  local weird_ctrl
+  weird_ctrl=$'Start\rOverwrite \e[6n\e[2J\e]0;InjectedTitle\aBell:\aBS:\bEnd'
+  layout 100x30 "WeirdCtrl" "${weird_ctrl}"
+  assert_eq "inline" "${LAYOUT_MODE}" "weird control input stays inline"
+  assert_eq " Start" "${BODY[0]:-}" "mid-line CR splits cleanly into rows"
+  assert_eq " Overwrite Bell:BS:End" "${BODY[1]:-}" \
+    "DSR query, clear-screen, OSC, BEL, and BS stripped safely"
+
+  # 2. Pre-existing ANSI SGR color sequences wrap by visible width without
+  #    splitting escape sequences or inflating popup_w on invisible bytes.
+  local ansi_short=$'\e[1;31mRED_ALERT\e[0m'
+  layout 192x50 "T" "${ansi_short}"
+  assert_eq "30" "${LAYOUT_W}" \
+    "short ANSI-colored string shrinks to 30 cols by visible width"
+
+  local ansi_long="" i
+  for (( i = 1; i <= 25; i++ )); do
+    ansi_long+=$'\e[38;2;0;255;128mtoken'"${i}"$'\e[0m '
+  done
+  local raw_out
+  raw_out="$(bash "${TMUX_NOTIFY}" --print-layout --client-size 100x30 \
+    "AnsiWrap" "${ansi_long}")"
+  local vis_max
+  vis_max="$(tail -n +2 <<< "${raw_out}" \
+    | sed -E $'s/\x1b\\[[0-9;:]*m//g' \
+    | awk '{ if (length($0) > m) m = length($0) } END { print m+0 }')"
+  assert_true "ANSI-colored long line wraps within <= 78 interior cols" \
+    test "${vis_max}" -le 78
+  # Verify no broken ESC sequence (every ESC is followed immediately by '[').
+  local broken_esc
+  broken_esc="$(tail -n +2 <<< "${raw_out}" \
+    | sed -E $'s/\x1b\\[[0-9;:]*m//g' \
+    | LC_ALL=C tr -cd '\033' | wc -c | tr -d ' ')"
+  assert_eq "0" "${broken_esc}" "zero split or orphaned ESC bytes after wrapping"
+
+  # 3. Unmatched quotes, unclosed Markdown fences/backticks, $(...), --flags,
+  #    and invalid UTF-8 bytes exit 0 and preserve content.
+  local hostile
+  hostile=$'--leading-flag $(evil_cmd) "unclosed \'quote `tick ```fence \xff\xfe ok'
+  bash "${TMUX_NOTIFY}" --print-layout --client-size 120x30 -- \
+    "--flag-title" "${hostile}" >/dev/null 2>&1
+  assert_eq "0" "$?" "hostile metacharacters and invalid UTF-8 exit 0"
+}
+
+test_inline_mode_renders_markdown_color_without_pager_in_tty() {
+  command -v tmux >/dev/null 2>&1 || return 0
+  if ! command -v batcat >/dev/null 2>&1 && ! command -v bat >/dev/null 2>&1; then
+    return 0
+  fi
+
+  local dir="${TEST_ROOT}/inline_color_e2e"
+  mkdir -p "${dir}/runtime"
+  local inner_sock="${dir}/inner.sock"
+  local outer_sock="${dir}/outer.sock"
+
+  TMUX='' tmux -S "${inner_sock}" -f /dev/null new-session -d -s main -x 120 -y 30
+  TMUX='' tmux -S "${outer_sock}" -f /dev/null new-session -d -s host -x 120 -y 30 \
+    "TERM=xterm-256color TMUX='' tmux -S '${inner_sock}' attach-session -t main"
+  wait_until 60 bash -c \
+    "[[ \$(tmux -S '${inner_sock}' list-clients 2>/dev/null | wc -l) -eq 1 ]]"
+
+  local inner_pid
+  inner_pid="$(tmux -S "${inner_sock}" display-message -p '#{pid}')"
+  local inner_tmux_env="${inner_sock},${inner_pid},0"
+
+  local inline_md=$'# HeadingRow1\n- **BoldItem** with `code_span`'
+  TMUX_NOTIFY_TIMEOUT=4 XDG_RUNTIME_DIR="${dir}/runtime" \
+    TMUX="${inner_tmux_env}" \
+    bash "${TMUX_NOTIFY}" "ColorInline" "${inline_md}" &
+  local notify_pid=$!
+
+  wait_until 80 bash -c \
+    "tmux -S '${outer_sock}' capture-pane -p -t host | grep -Fq 'HeadingRow1'"
+  assert_eq "0" "$?" "inline colored popup renders Row 1 without scrolling away"
+
+  local ansi_cap
+  ansi_cap="$(tmux -S "${outer_sock}" capture-pane -e -p -t host)"
+  # shellcheck disable=SC2016
+  assert_true "inline popup emits ANSI SGR color escapes via batcat/bat" \
+    bash -c '[[ "$1" == *$'\''\e['\''*38* || "$1" == *$'\''\e[1'\''* ]]' _ "${ansi_cap}"
+
+  # Must NOT be running `less` (Space dismisses immediately in inline mode!).
+  tmux -S "${outer_sock}" send-keys -t host Space
+  wait "${notify_pid}" 2>/dev/null || true
+  wait_until 60 bash -c \
+    "! tmux -S '${outer_sock}' capture-pane -p -t host | grep -Fq 'HeadingRow1'"
+  assert_eq "0" "$?" "Space key dismisses inline colored popup immediately (no pager)"
+
+  tmux -S "${outer_sock}" kill-server 2>/dev/null || true
+  tmux -S "${inner_sock}" kill-server 2>/dev/null || true
+  rm -f "${outer_sock}" "${inner_sock}" 2>/dev/null || true
+}
+
+wait_until() {
+  local timeout_loops="$1"
+  shift
+  local i
+  for (( i = 0; i < timeout_loops; i++ )); do
+    if "$@"; then
+      return 0
+    fi
+    sleep 0.05
+  done
+  return 1
+}
+
+test_e2e_multi_client_broadcast_and_sibling_autoclose() {
+  command -v tmux >/dev/null 2>&1 || return 0
+
+  local dir="${TEST_ROOT}/e2e"
+  mkdir -p "${dir}/runtime"
+  local inner_sock="${dir}/inner.sock"
+  local outer1_sock="${dir}/outer1.sock"
+  local outer2_sock="${dir}/outer2.sock"
+  local outer_sc_sock="${dir}/outer_sc.sock"
+
+  cleanup_e2e_tmux() {
+    local s
+    for s in "${outer1_sock}" "${outer2_sock}" "${outer_sc_sock}" "${inner_sock}"; do
+      tmux -S "${s}" kill-server 2>/dev/null || true
+      rm -f "${s}" 2>/dev/null || true
+    done
+  }
+
+  # Start inner tmux server with 'main' and 'scratch' sessions.
+  TMUX='' tmux -S "${inner_sock}" -f /dev/null new-session -d -s main -x 200 -y 50
+  TMUX='' tmux -S "${inner_sock}" -f /dev/null new-session -d -s scratch -x 80 -y 20
+
+  # Attach 2 outer clients to 'main' (200x50 and 120x30) and 1 to 'scratch' (80x20).
+  TMUX='' tmux -S "${outer1_sock}" -f /dev/null new-session -d -s host1 -x 200 -y 50 \
+    "TMUX='' tmux -S '${inner_sock}' attach-session -t main"
+  TMUX='' tmux -S "${outer2_sock}" -f /dev/null new-session -d -s host2 -x 120 -y 30 \
+    "TMUX='' tmux -S '${inner_sock}' attach-session -t main"
+  TMUX='' tmux -S "${outer_sc_sock}" -f /dev/null new-session -d -s host_sc -x 80 -y 20 \
+    "TMUX='' tmux -S '${inner_sock}' attach-session -t scratch"
+
+  wait_until 60 bash -c \
+    "[[ \$(tmux -S '${inner_sock}' list-clients 2>/dev/null | wc -l) -eq 3 ]]"
+
+  local inner_pid
+  inner_pid="$(tmux -S "${inner_sock}" display-message -p '#{pid}')"
+  local inner_tmux_env="${inner_sock},${inner_pid},0"
+
+  local e2e_state_dir="${dir}/runtime/tmux-notify"
+
+  # 1. Overflow pager broadcast + synchronized sibling auto-close on 'q'.
+  TMUX_NOTIFY_TIMEOUT=4 XDG_RUNTIME_DIR="${dir}/runtime" \
+    TMUX="${inner_tmux_env}" \
+    bash "${TMUX_NOTIFY}" "E2EPager" "$(seq -f '## Line %g' 1 60)" &
+  local notify_pid=$!
+
+  wait_until 80 bash -c \
+    "tmux -S '${outer1_sock}' capture-pane -p -t host1 | grep -Fq 'E2EPager' && \
+     tmux -S '${outer2_sock}' capture-pane -p -t host2 | grep -Fq 'E2EPager'"
+  assert_eq "0" "$?" "both outer clients render E2EPager popup"
+
+  local scratch_cap
+  scratch_cap="$(tmux -S "${outer_sc_sock}" capture-pane -p -t host_sc)"
+  assert_true "scratch popup session client excluded from broadcast" \
+    test "${scratch_cap#*E2EPager}" == "${scratch_cap}"
+
+  # Dismiss on outer1 via 'q'; both outer1 and outer2 must close and clean grp_dir.
+  tmux -S "${outer1_sock}" send-keys -t host1 q
+  wait "${notify_pid}" 2>/dev/null || true
+  wait_until 80 bash -c \
+    "! tmux -S '${outer1_sock}' capture-pane -p -t host1 | grep -Fq 'E2EPager' && \
+     ! tmux -S '${outer2_sock}' capture-pane -p -t host2 | grep -Fq 'E2EPager'"
+  assert_eq "0" "$?" "dismissing Client 1 auto-closes Client 2 pager popup"
+
+  wait_until 40 bash -c \
+    "[[ -z \"\$(ls -A '${e2e_state_dir}' 2>/dev/null)\" ]]"
+  assert_eq "0" "$?" "popup group directory deleted after all slots finish"
+
+  # 2. Client detach (HUP) isolation: detaching Client 2 keeps Client 1 open.
+  TMUX_NOTIFY_TIMEOUT=4 XDG_RUNTIME_DIR="${dir}/runtime" \
+    TMUX="${inner_tmux_env}" \
+    bash "${TMUX_NOTIFY}" "HupTest" "Stay open on client 1" &
+  notify_pid=$!
+  wait_until 80 bash -c \
+    "tmux -S '${outer1_sock}' capture-pane -p -t host1 | grep -Fq 'HupTest' && \
+     tmux -S '${outer2_sock}' capture-pane -p -t host2 | grep -Fq 'HupTest'"
+
+  tmux -S "${outer2_sock}" kill-server 2>/dev/null || true
+  sleep 0.25
+  assert_true "Client 1 popup remains open after Client 2 disconnects (HUP)" \
+    bash -c "tmux -S '${outer1_sock}' capture-pane -p -t host1 | grep -Fq 'HupTest'"
+
+  tmux -S "${outer1_sock}" send-keys -t host1 Enter
+  wait "${notify_pid}" 2>/dev/null || true
+  wait_until 60 bash -c \
+    "[[ -z \"\$(ls -A '${e2e_state_dir}' 2>/dev/null)\" ]]"
+  assert_eq "0" "$?" "group directory cleaned after remaining client dismisses"
+
+  # 3. TIMER_PID enforces TMUX_NOTIFY_TIMEOUT in pager mode after outer timeout.
+  TMUX_NOTIFY_TIMEOUT=2 XDG_RUNTIME_DIR="${dir}/runtime" \
+    TMUX="${inner_tmux_env}" \
+    timeout 1s bash "${TMUX_NOTIFY}" "TimerTest" "$(seq -f 'row %g' 1 60)" \
+    2>/dev/null || true
+  assert_true "TimerTest popup still open right after 1s outer caller timeout" \
+    bash -c "tmux -S '${outer1_sock}' capture-pane -p -t host1 | grep -Fq 'TimerTest'"
+  wait_until 80 bash -c \
+    "! tmux -S '${outer1_sock}' capture-pane -p -t host1 | grep -Fq 'TimerTest' && \
+     [[ -z \"\$(ls -A '${e2e_state_dir}' 2>/dev/null)\" ]]"
+  assert_eq "0" "$?" "TIMER_PID closes pager popup at 2s and removes grp_dir"
+
+  cleanup_e2e_tmux
+}
+
+main() {
+  local fn
+  for fn in $(declare -F | awk '{print $3}' | grep '^test_'); do
+    "${fn}"
+  done
+  echo "tmux-notify tests: ${PASS_COUNT} passed, ${FAIL_COUNT} failed"
+  (( FAIL_COUNT == 0 ))
+}
+
+main "$@"

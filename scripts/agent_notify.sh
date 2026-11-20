@@ -41,31 +41,18 @@ Tmux Session: ${TMUX_SESSION:-UNKNOWN} Window: ${TMUX_WINDOW:-UNKNOWN}
 $*
 EOF
     )
-FULL_MSG=$(cat<<EOF
 
-${TITLE}
-${BODY}
-EOF
-        )
+# 1. Send in-tmux modal popup notification if available
+if run type tmux-notify &>/dev/null; then
+  dispatch tmux-notify "${TITLE}" "${BODY}"
+fi
 
-# Attempt to use knock to notify
-if [[ -e /google/bin/releases/knock/knock.sh ]]; then
-  log::debug "source /google/bin/releases/knock/knock.sh"
-  source /google/bin/releases/knock/knock.sh &>/dev/null
-  dispatch knock "${FULL_MSG}"
-else
-  log::debug "Notifying on terminal."
-  # Otherwise use local notifications on terminal & desktop.
-  notified=
-  if run type tmux-notify &>/dev/null; then
-    dispatch tmux-notify "${TITLE}" "${BODY}"
-    notified=1
-  fi
-  if [[ -n "${DISPLAY}" ]] && run type notify-send &>/dev/null; then
-    dispatch notify-send "${TITLE}" "${BODY}"
-    notified=1
-  fi
-  if [[ -z "${notified}" ]]; then
-    log::error "neither tmux-notify nor notify-send where available to notify the user."
-  fi
+# 2. Send desktop notification if local X11/Wayland display is available
+if [[ -n "${DISPLAY:-}" ]] && run type notify-send &>/dev/null; then
+  dispatch notify-send "${TITLE}" "${BODY}"
+fi
+
+# 3. Send OSC 99 terminal notification (Kitty, etc.) if enabled
+if [[ "${JETSKI_ENABLE_OSC99:-true}" == "true" && -f "${HOME}/scripts/osc99_notify.sh" ]]; then
+  dispatch "${HOME}/scripts/osc99_notify.sh" "${TITLE}" "${BODY}"
 fi

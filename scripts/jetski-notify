@@ -1,32 +1,23 @@
 #!/usr/bin/env bash
+# jetski-notify: Displays a dynamically sized tmux popup notification via
+# ~/bin/tmux-notify and restores focus to the originating pane on dismissal.
+#
+# Usage:
+#   jetski-notify [title] <message...>
+#
+# Usage Example:
+#   TARGET_PANE="%3" jetski-notify "Build Finished" "All targets passed."
 
-# jetski-notify: Displays a tmux popup notification and focuses the target pane upon dismissal.
-# Usage: jetski-notify [title] message
-
-TARGET_PANE="${TARGET_PANE:-${TMUX_PANE}}"
-TITLE="$1"
-shift
-MESSAGE="$*"
-
-if [[ -z "${MESSAGE}" ]]; then
+TARGET_PANE="${TARGET_PANE:-${TMUX_PANE:-}}"
+TITLE="${1:-}"
+if (( $# > 1 )); then
+  shift
+  MESSAGE="$*"
+else
   MESSAGE="${TITLE}"
   TITLE="JETSKI NOTIFICATION"
 fi
 
-line_count=$(echo -e "${MESSAGE}" | wc -l)
-line_count=$((line_count+5))
-
-SCRIPT=$(cat<<EOF
-tput civis;
-echo -e "${MESSAGE}";
-echo "";
-echo "--------------------------------------------------";
-echo "Press any key to dismiss and jump to Jetski pane...";
-read -n 1 -s;
-if [[ -n "${TARGET_PANE}" ]]; then
-  tmux select-pane -t "${TARGET_PANE}" 2>/dev/null || true
-fi
-EOF
-      )
-
-tmux display-popup -T " ${TITLE} " -w 80 -h "${line_count}" -E "${SCRIPT}"
+notify_args=()
+[[ -n "${TARGET_PANE}" ]] && notify_args+=(--select-pane "${TARGET_PANE}")
+exec "${HOME}/bin/tmux-notify" "${notify_args[@]}" -- "${TITLE}" "${MESSAGE}"
