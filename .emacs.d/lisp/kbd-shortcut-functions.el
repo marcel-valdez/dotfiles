@@ -1,6 +1,5 @@
-
+;;; kbd-shortcut-functions.el --- Keyboard shortcut helpers  -*- lexical-binding: t; -*-
 ;;; Code:
-(setq lexical-binding t)
 
 (defun rotate-windows (arg)
   "Rotate your windows; use the prefix argument to rotate the other direction.
@@ -58,9 +57,9 @@ ARG number of lines to move the text"
    (interactive "*p")
    (move-text-internal (- arg)))
 
-(setq exec-temp-bind:temp-fn nil)
-(setq exec-temp-bind:kbd-mapping nil)
-(setq exec-temp-bind:repeat-fn nil)
+(defvar exec-temp-bind:temp-fn nil)
+(defvar exec-temp-bind:kbd-mapping nil)
+(defvar exec-temp-bind:repeat-fn nil)
 
 (defun exec-temp-bind (repeat-fn kbd-mapping)
   "Execute REPEAT-FN and temporarily map KBD-MAPPING to REPEAT-FN."

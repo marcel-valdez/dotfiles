@@ -3,6 +3,7 @@
 # for examples
 
 export EMACS_TTY_SERVER="tty-server"
+export EMACS_SOCKET_NAME="${EMACS_TTY_SERVER}"
 # enable 24-bit colors
 export COLORTERM=truecolor
 # PROMPT_COMMAND names shell functions, which child processes never inherit, so
@@ -287,12 +288,24 @@ if [[ "$(uname)" =~ "Linux" ]]; then
   fi
 fi
 
-if ! pgrep -af '.*emacs.*'"--daemon=${EMACS_TTY_SERVER}"'.*' &>/dev/null; then
-  if type at &>/dev/null; then
-    echo "emacs --daemon=${EMACS_TTY_SERVER}" | at NOW
-  else
-    (emacs --daemon=${EMACS_TTY_SERVER} &)
+if ! pgrep -if "emacs.*--(bg-|fg-)?daemon=${EMACS_TTY_SERVER}" &>/dev/null; then
+  log_debug "No emacs daemon running. Starting one."
+  _emacs_bin=""
+  for _cand in "${HOME}/.local/bin/emacs" "/snap/bin/emacs" "$(type -P emacs 2>/dev/null || true)" "/usr/bin/emacs"; do
+    if [[ -n "${_cand}" && -x "${_cand}" ]]; then
+      _emacs_bin="${_cand}"
+      break
+    fi
+  done
+  unset _cand
+  if [[ -n "${_emacs_bin}" ]]; then
+    if type at &>/dev/null; then
+      echo "${_emacs_bin} --daemon=${EMACS_TTY_SERVER}" | at NOW
+    else
+      (nohup "${_emacs_bin}" --daemon="${EMACS_TTY_SERVER}" &> "/tmp/emacs-${EMACS_TTY_SERVER}-server.log") & disown
+    fi
   fi
+  unset _emacs_bin
 fi
 
 if [[ -z "${MONO_PATH}" ]]; then

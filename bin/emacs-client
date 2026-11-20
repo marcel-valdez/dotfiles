@@ -1,0 +1,61 @@
+#!/usr/bin/env bash
+# emacs-client: Launch emacsclient on the default tty server, starting and
+# waiting for the daemon socket if needed.
+
+[[ -z "${EMACS_TTY_SERVER:-}" ]] && EMACS_TTY_SERVER="tty-server"
+export EMACS_TTY_SERVER
+export EMACS_SOCKET_NAME="${EMACS_TTY_SERVER}"
+
+_emacsclient_bin=""
+for _cand in \
+  "${HOME}/.local/bin/emacsclient" \
+  "/snap/bin/emacsclient" \
+  "$(type -P emacsclient 2>/dev/null || true)" \
+  "/usr/bin/emacsclient"; do
+  if [[ -n "${_cand}" && -x "${_cand}" ]]; then
+    _emacsclient_bin="${_cand}"
+    break
+  fi
+done
+unset _cand
+
+if [[ -z "${_emacsclient_bin}" ]]; then
+  echo "emacs-client: emacsclient binary not found" >&2
+  exit 1
+fi
+
+declare -a editor_cmd
+editor_cmd=("${_emacsclient_bin}" --create-frame --tty --socket-name="${EMACS_TTY_SERVER}")
+
+if ! "${_emacsclient_bin}" --socket-name="${EMACS_TTY_SERVER}" --eval 't' &>/dev/null; then
+  _emacs_bin=""
+  for _cand in \
+    "${HOME}/.local/bin/emacs" \
+    "/snap/bin/emacs" \
+    "$(type -P emacs 2>/dev/null || true)" \
+    "/usr/bin/emacs"; do
+    if [[ -n "${_cand}" && -x "${_cand}" ]]; then
+      _emacs_bin="${_cand}"
+      break
+    fi
+  done
+  unset _cand
+
+  if [[ -z "${_emacs_bin}" ]]; then
+    echo "emacs-client: emacs binary not found" >&2
+    exit 1
+  fi
+
+  _log_file="/tmp/emacs-${EMACS_TTY_SERVER}-server.log"
+  if ! pgrep -if "emacs.*--(bg-|fg-)?daemon=${EMACS_TTY_SERVER}" &>/dev/null; then
+    (nohup "${_emacs_bin}" --daemon="${EMACS_TTY_SERVER}" &> "${_log_file}") & disown
+  fi
+
+  for _ in {1..100}; do
+    "${_emacsclient_bin}" --socket-name="${EMACS_TTY_SERVER}" --eval 't' &>/dev/null && break
+    sleep 0.1
+  done
+  unset _log_file
+fi
+
+EDITOR="'""${editor_cmd[*]}""'" exec "${editor_cmd[@]}" "$@"

@@ -71,7 +71,21 @@ fi
 #   run exec emacs "${ORIGINAL_ARGS[@]}"
 if [[ -f "${HOME}/.bash_functions" ]]; then
   run source "${HOME}/.bash_functions"
-  run exec emacs "${ORIGINAL_ARGS[@]}"
-else
-  run exec emacs "${ORIGINAL_ARGS[@]}"
 fi
+
+# Resolve the real emacs binary (bypassing function emacs() from .bash_functions)
+EMACS_BIN=""
+for _cand in \
+  "${HOME}/.local/bin/emacs" \
+  "/snap/bin/emacs" \
+  "$(type -P emacs 2>/dev/null || true)" \
+  "/usr/bin/emacs"; do
+  if [[ -n "${_cand}" && -x "${_cand}" ]]; then
+    EMACS_BIN="${_cand}"
+    break
+  fi
+done
+unset _cand
+: "${EMACS_BIN:=emacs}"
+
+run exec "${EMACS_BIN}" "${ORIGINAL_ARGS[@]}"

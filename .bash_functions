@@ -296,8 +296,8 @@ function ps-nice() {
 }
 
 function emacs() {
-    local emacs_bin
-    emacs_bin="$(which emacs)"
+    local emacs_bin=""
+    emacs_bin="$(type -P emacs 2>/dev/null || true)"
     # prioritize the snap installation of emacs
     if [[ -x "/snap/bin/emacs" ]]; then
         emacs_bin="/snap/bin/emacs"
@@ -306,39 +306,55 @@ function emacs() {
     if [[ -x "${HOME}/.local/bin/emacs" ]]; then
         emacs_bin="${HOME}/.local/bin/emacs"
     fi
+    if [[ -z "${emacs_bin}" && -x "/usr/bin/emacs" ]]; then
+        emacs_bin="/usr/bin/emacs"
+    fi
 
-    if [[ "${EMACS_VERSION}" != "" ]]; then
+    if [[ -n "${EMACS_VERSION:-}" ]]; then
         if [[ -x "/usr/local/bin/emacs-${EMACS_VERSION}" ]]; then
             emacs_bin="/usr/local/bin/emacs-${EMACS_VERSION}"
-        elif [[ -x "/usr/snap/bin/emacs-${EMACS_VERSION}" ]]; then
+        elif [[ -x "/snap/bin/emacs-${EMACS_VERSION}" ]]; then
             emacs_bin="/snap/bin/emacs-${EMACS_VERSION}"
         else
             echo "Emacs binary for version ${EMACS_VERSION} not found. Using ${emacs_bin} instead." >&2
         fi
     fi
-    "${emacs_bin}" -nw "$@"
+    if [[ "${TERM:-}" =~ "eterm" ]]; then
+        emacs-client "$@"
+    else
+        "${emacs_bin}" --no-window-system "$@" 2>"/tmp/emacs-${USER}-${RANDOM}.log"
+    fi
 }
 
 function emacs-client() {
-  local _emacs_client_bin
-  local _emacs_client_candidates=("/usr/bin/emacsclient" "/snap/bin/emacsclient" "${HOME}/.local/bin/emacsclient")
-  for _emacs_client_candidate in "${_emacs_client_candidates[@]}"; do
-      if [[ -x "${_emacs_client_candidate}"  ]]; then
-          _emacs_client_bin="${_emacs_client_candidate}"
-      fi
+  local socket_name="${EMACS_TTY_SERVER:-tty-server}"
+  local _emacs_client_bin="" _emacs_bin="" _cand=""
+  for _cand in "${HOME}/.local/bin/emacsclient" "/snap/bin/emacsclient" "$(type -P emacsclient 2>/dev/null || true)" "/usr/bin/emacsclient"; do
+    if [[ -n "${_cand}" && -x "${_cand}" ]]; then
+      _emacs_client_bin="${_cand}"
+      break
+    fi
   done
-  local editor_cmd=("${_emacs_client_bin}" --create-frame --tty --socket-name="${EMACS_TTY_SERVER}")
-  if ! EDITOR="'""${editor_cmd[@]}""'" "${editor_cmd[@]}" "$@"; then
-    #if type at &>/dev/null; then
-    #  echo "emacs --daemon=${EMACS_TTY_SERVER}" | at NOW
-    #else
-    nohup emacs --bg-daemon=${EMACS_TTY_SERVER} >/tmp/${EMACS_TTY_SERVER}.log 2>&1 &
-    disown
-    #fi
-    # Give the server 125ms to start listening for connections.
-    sleep 0.125
-    EDITOR="'""${editor_cmd[@]}""'" "${editor_cmd[@]}" "$@"
+  for _cand in "${HOME}/.local/bin/emacs" "/snap/bin/emacs" "$(type -P emacs 2>/dev/null || true)" "/usr/bin/emacs"; do
+    if [[ -n "${_cand}" && -x "${_cand}" ]]; then
+      _emacs_bin="${_cand}"
+      break
+    fi
+  done
+
+  local editor_cmd=("${_emacs_client_bin}" --create-frame --tty --socket-name="${socket_name}")
+  if ! "${_emacs_client_bin}" --socket-name="${socket_name}" --eval 't' &>/dev/null; then
+    if ! pgrep -if "emacs.*--(bg-|fg-)?daemon=${socket_name}" &>/dev/null; then
+      (nohup "${_emacs_bin}" --daemon="${socket_name}" &> "/tmp/emacs-${socket_name}-server.log") & disown
+    fi
+    local _attempt=0
+    while ! "${_emacs_client_bin}" --socket-name="${socket_name}" --eval 't' &>/dev/null; do
+      (( _attempt >= 100 )) && break
+      sleep 0.1
+      ((_attempt++))
+    done
   fi
+  EDITOR="'""${editor_cmd[*]}""'" "${editor_cmd[@]}" "$@"
 }
 
 # force myself to use emacs, not nano
@@ -736,7 +752,7 @@ function fzf-edit {
         --delimiter : \
         --preview 'batcat --color=always {1} --highlight-line {2} --line-range {2}:-5 --line-range {2}:+5' \
         --preview-window 'up,60%,border-bottom,+{2}+3/3,~3' \
-        --bind 'enter:become(emacsclient --socket-name='"${EMACS_TTY_SERVER}"' --tty --create-frame {1} +{2})'
+        --bind 'enter:become(emacs-client {1} +{2})'
 }
 
 function fzf-edit-deep {
@@ -767,7 +783,7 @@ function fzf-edit-deep {
     --delimiter : \
     --preview 'batcat --color=always {1} --highlight-line {2}' \
     --preview-window 'up,60%,border-bottom,+{2}+3/3,~3' \
-    --bind 'enter:become(/usr/bin/emacsclient --socket-name='"${EMACS_TTY_SERVER}"' --create-frame --tty {1} +{2})'
+    --bind 'enter:become(emacs-client {1} +{2})'
 }
 
 function fzf-preview {

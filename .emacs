@@ -8,6 +8,9 @@
 ;;; package installer settings
 (add-to-list 'load-path (concat (getenv "HOME") "/.emacs.d/lisp/"))
 (add-to-list 'load-path (concat (getenv "HOME") "/.emacs.d/lisp/external/emacs-jedi/"))
+;; A directory watch that fails (e.g. a dead sshfs mount) logs a message
+;; instead of breaking C-x C-f; see file-notify-resilient.el commentary.
+(require 'file-notify-resilient nil t)
 
 (package-initialize)
 (add-to-list 'package-archives
@@ -23,6 +26,10 @@
 (with-library action-logger
   (with-eval-after-load 'action-logger
     (action-logger-start)))
+;; Ensure host-role flags are always bound even when office helpers are absent.
+(defvar at-office-is-work-laptop nil)
+(defvar at-office-is-workstation nil)
+(defvar at-office-is-gcloud nil)
 ;; Loads office-only helpers when available; effectively a no-op here since
 ;; the corp-only bits it used to configure have been stripped out of it.
 (with-library at-office)
@@ -84,6 +91,9 @@
     (unless (frame-focus-state)
       (garbage-collect))))
 
+;; Enable recentf mode so we can easily open recently closed files
+(recentf-mode)
+
 (if window-system
     (progn
       ;; These are all undesirable wasted space.
@@ -126,6 +136,8 @@
           "Keymap for tab-related actions.")
         (define-key tab-bar-key-map (kbd "M-<right>") 'custom/switch-to-next-tab)
         (define-key tab-bar-key-map (kbd "M-<left>") 'tab-bar-switch-to-prev-tab)
+        (define-key tab-bar-key-map (kbd "C-n") 'custom/switch-to-next-tab)
+        (define-key tab-bar-key-map (kbd "C-p") 'tab-bar-switch-to-prev-tab)
         (define-key tab-bar-key-map (kbd "C-<right>") 'custom/move-tab-right)
         (define-key tab-bar-key-map (kbd "C-<left>") 'custom/move-tab-left)
         (define-key tab-bar-key-map (kbd "M-q") 'tab-bar-close-tab)
@@ -605,13 +617,21 @@
       "Helm buffer list filtered through Beframe."
       (interactive)
       (require 'helm-buffers)
-      (helm
-       :sources
-       (helm-build-sync-source "Beframe Buffers"
-         :candidates (lambda () (beframe--buffer-names))
-         :coerce     #'get-buffer
-         :action     helm-type-buffer-actions)
-       :buffer "*Helm Beframe buffers*"))
+      ;; Capture the frame up front so the candidates are always the
+      ;; buffers of the frame Helm was invoked from.
+      (let ((frame (selected-frame)))
+        (helm
+         :sources
+         (helm-build-sync-source "Beframe Buffers"
+           ;; `beframe-buffer-names' is the public API (beframe >= 1.x);
+           ;; fall back to the old private helper on older versions.
+           :candidates (lambda ()
+                         (if (fboundp 'beframe-buffer-names)
+                             (beframe-buffer-names frame)
+                           (beframe--buffer-names frame)))
+           :coerce     #'get-buffer
+           :action     helm-type-buffer-actions)
+         :buffer "*Helm Beframe buffers*")))
 
     ;; 2️⃣ Global buffer list (ignores Beframe)
     (defun custom-helm-global-buffers ()

@@ -1,5 +1,4 @@
-;; *-* lexical-binding: t -*-
-;;; package --- at-office
+;;; at-office.el --- Host/office-specific config  -*- lexical-binding: t; -*-
 ;;; Commentary:
 ;;;   This package originally provided functions to interact with the
 ;;;   corp-only Goose LLM and Google3 tooling, and to configure the Emacs
@@ -77,12 +76,13 @@
 ;; (setq google3-eglot-compose 't)
 ;; (google3-eglot-setup)
 
+;; NOTE: Use `string=' (not `eq') to compare strings.
 (defvar at-office-is-work-laptop)
-(setq at-office-is-work-laptop (eq (system-name) "marcelvaldez-glaptop"))
+(setq at-office-is-work-laptop (string= (system-name) "marcelvaldez-glaptop"))
 (defvar at-office-is-workstation)
-(setq at-office-is-workstation (eq (system-name) "marcelvaldez.mtv.corp.google.com"))
+(setq at-office-is-workstation (string= (system-name) "marcelvaldez.mtv.corp.google.com"))
 (defvar at-office-is-gcloud)
-(setq at-office-is-gcloud (eq (system-name) "marcelvaldez.c.googlers.com"))
+(setq at-office-is-gcloud (string= (system-name) "marcelvaldez.c.googlers.com"))
 
 ;; Corp-only: desktop-saving keyed off the /google/src/cloud/ client layout.
 ;; Left defined (in case it's useful as a template) but not hooked up, since
