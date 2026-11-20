@@ -7,27 +7,97 @@ already made.
 
 ## Last synced
 
-- **google_office commit:** `4c2e54b2543730c74b6ee1a5121db0a05fe8101f`
-  (2026-08-21, ".config/kitty/kitty.conf: Add special launcher to create an
-  SSH session in a new window.")
-- **Merged into main_ubuntu via commits:** `b631026`..`2030534` (9 commits,
-  listed at the bottom), applied on top of main_ubuntu `5bcde07`.
+- **google_office commit:** `9b078b46fa1d1f9599468b9588443e0ae77569cd`
+  (2026-11-19, "test(emacs): regression tests for failed file watches (dead sshfs mount)")
+- **Merged into main_ubuntu via commits:** `60bedc9`..`cd6d85c` (7 feature
+  commits, listed at the bottom, followed by the tracking-file commit),
+  applied on top of main_ubuntu `21397ea` (local dotfile tweaks commit).
 - **Merge-base at time of this merge:** `f217ad257f5aa382bc4ac9beb2dee5ba35dec73b`
 
 ## How to re-merge next time
 
 1. `git fetch origin google_office`
-2. `git log 4c2e54b2543730c74b6ee1a5121db0a05fe8101f..origin/google_office --oneline`
+2. `git log 9b078b46fa1d1f9599468b9588443e0ae77569cd..origin/google_office --oneline`
    to see exactly what's new since this sync.
 3. Branch from `main_ubuntu`, work cluster-by-cluster as before (see decisions
    below for what each cluster covers and why some things were skipped —
    re-check skipped items in case they've since become fixes worth taking).
-4. Verify each cluster before committing: `bash -n` / `ruby -c` new scripts,
-   `check-parens` + a batch emacs load for `.el` changes, load kitty/tmux/rofi
-   configs live (`kitty --config`, `tmux -f .tmux.conf new-session -d`,
-   `rofi -config ... -dump-config`).
+4. Verify each cluster before committing: `bash -n` / `ruby -c` /
+   `python3 -m py_compile` new/modified scripts, `check-parens` + a batch
+   emacs load for `.el` changes, run `scripts/tests/test_*.sh` where
+   applicable, and load kitty/tmux/rofi configs live (`kitty +runpy 'from kitty.config import load_config; load_config(".config/kitty/kitty.conf")'` — note kitty 0.45+ removed `--debug-config`, `tmux -f .tmux.conf new-session -d`, `rofi -config ... -dump-config`).
 5. Update the "Last synced" section above with the new google_office tip SHA
    and date, and append a dated entry under "Decisions" for anything new.
+
+## Decisions by cluster (2026-11-20 sync)
+
+Reviewed all 136 commits in `4c2e54b..9b078b4`; ported Linux-applicable changes
+across 43 source commits (39 recommended + 4 approved optional commits) cleanly
+without `lib/os_compat.sh`, Darwin/macOS code, or Google-corp-only code:
+
+- **Cluster 1 (`60bedc9`) — Security redaction, notification hardening, standalone utilities:**
+  Redacted hardcoded Bearer token in `lib/curl-helper` to `${CURL_HELPER_BEARER_TOKEN:-}`;
+  hardened `bin/notify` & `bin/remind-me` (preserving `-s/--start`); guarded
+  `/sys/class/thermal` reads in `.config/kitty/tab_bar.py`; fixed `$DISPLAY`
+  parsing in `bin/alt-google-chrome`; added `bin/top-ram-usage` and
+  `bin/tmux-detach-other-clients`.
+- **Cluster 2 (`7b33a84`) — tmux fixes, status daemon hardening, OSC 52 mosh fix:**
+  Updated `.tmux.conf` (`@zoom_fmt` native `#{P:...}`, `default`-socket daemon
+  gate, `allow-passthrough all`, idempotent `KITTY_*` `update-environment`,
+  mosh-compatible `Ms` OSC 52 override, 24h idle-client detach hook; preserved
+  `xterm-kitty` and `xclip`), pure-Linux `scripts/tmux_status_daemon.sh`,
+  `.gitignore` (`!scripts/tests/`, `!scripts/tests/*.sh`), and
+  `scripts/tests/test_tmux_osc52.sh`.
+- **Cluster 3 (`4afa9e3`) — `tmux-notify` rewrite & notification delegation:**
+  Pure-Linux `bin/tmux-notify` (80%×80% dynamic popup, `batcat` Markdown/ANSI
+  rendering, overflow pager, multi-client broadcast, escape sanitization,
+  ASCII ordinal CSI drain; no `os_compat.sh`/Darwin code), decoupled
+  `scripts/agent_notify.sh`, delegated `scripts/jetski-notify` &
+  `scripts/monitor-tmux-pane.sh`, and Linux-adapted `scripts/tests/test_tmux_notify.sh`.
+- **Cluster 4 (`60f4495`) — Jetski hooks, Kitty OSC 99, status line fixes:**
+  Added `scripts/osc99_notify.sh`, pure-Linux `scripts/jetski_hook_utils.sh`,
+  updated all 5 `scripts/jetski_*_hook.sh` scripts, fixed
+  `scripts/jetski_status_line.sh` (`jq @sh` glob fix, removed `/tmp` dump leak,
+  git branch/dirty display, 60%/85% context notifications; omitted CitC & GTD
+  blocks), and added Linux-adapted `scripts/tests/test_jetski_hooks.sh`.
+- **Cluster 5 (`b12bfdd`) — Shell, fzf/ble.sh `dsr0` fix, `batcat` alias, kitty launcher fix:**
+  Added `alias cat='batcat -p'` (`54dfc24`), updated `.profile`, `.bashrc`,
+  `.tmux.conf` (`PROMPT_COMMAND` unexport), `.fzf.bash` (`ble/function#push bind :`,
+  `_ble_attached` `dsr0` guard, deduplicated `fzf --bash`, preserved `xclip` &
+  `~/modules/fzf`), `.config/kitty/kitty.conf` (`--env TMUX=`), and added
+  `scripts/tests/test_blesh_fzf_completion.sh`.
+- **Cluster 6 (`3d9d522`) — Emacs 31 lexical-binding, `beframe`, `file-notify-resilient`, daemon/client:**
+  Added `lexical-binding: t` + `defvar` fixes to `in-tmux.el`,
+  `kbd-shortcut-functions.el`, `themes/company-dark-theme.el`, and
+  `at-office.el` (also fixed `string=` host checks); added
+  `.emacs.d/lisp/file-notify-resilient.el` + `scripts/tests/test_emacs_file_notify.sh`;
+  updated `.emacs` (`file-notify-resilient`, `at-office-is-*` `defvar`s,
+  `recentf-mode`, `tab-bar` `C-n`/`C-p`, public `beframe-buffer-names`);
+  created single Linux `bin/emacs-client` + wired `.blerc` (`bleopt editor`);
+  updated `.bash_functions`, `.bashrc`, and `bin/emacs_resurrect.sh` for
+  `/snap/bin` + `~/.local/bin` + `type -P`.
+- **Cluster 7 (`cd6d85c`) — Per-machine `.local` override templates:**
+  Added `.local` sourcing hooks and 8 tracked commented templates
+  (`.config/kitty/local.conf`, `.emacs.local`, `.tmux.conf.local`,
+  `.bashrc.local`, `.bash_aliases.local`, `.bash_functions.local`,
+  `.bash_profile.local`, `.profile.local`) with `.gitignore` entries.
+
+### Explicitly skipped in the 2026-11-20 sync (93 of 136 commits)
+
+- **59 pure macOS/Darwin commits:** 27 Hammerspoon, 10 Karabiner/LinearMouse,
+  22 `lib/os_compat.sh` / `bootstrap_macos.sh` / SwiftBar / launchd /
+  `native-comp-darwin` / Mac keyboard bindings.
+- **15 Google-corp-only commits:** Knock, Companydocs, Google Chat bridge,
+  CitC/Fig/g4 status/functions, `~/.googlerc.d`.
+- **15 declined optional commits:** 12 remote-clipboard reverse-SSH tunnel daemon
+  commits (`ba42327`..`a7ba54b`, `57845b4`, `d606c46`, `cfdc221`, `0bd3130`,
+  `93a71ba`), tmux `M-w` remote clip (`7cbd1d4`), and 2 `ssh_keep_alive.sh`
+  gmosh/gcert commits (`d169f69`, `5cb9600`).
+- **4 already-present / office-preference commits**, plus the 2 Linux systemd
+  user units (`airgradient-monitor.service`, `whatsapp-notification.service`)
+  from `855807d`.
+- Pre-`4c2e54b` skipped items (`org-mode-config.el`, legacy `bin/` scripts)
+  remain skipped.
 
 ## Decisions by cluster (2026-08-23 merge)
 
@@ -159,7 +229,21 @@ four new mp3 resources it references.
   even though kitty is primary — termit itself isn't installed on this
   machine, so beyond being copied faithfully it's unverified.
 
-## Commits that implemented this merge
+## Commits that implemented these merges
+
+### 2026-11-20 sync (on top of `21397ea`)
+
+```
+60bedc9 Port security redaction, notification hardening, and standalone utilities from google_office
+7b33a84 Port tmux fixes, status daemon hardening, and OSC 52 mosh fix from google_office
+4afa9e3 Port tmux-notify rewrite and notification delegation from google_office
+60f4495 Port Jetski hooks, Kitty OSC 99 notifications, and status line fixes from google_office
+b12bfdd Port shell, fzf/ble.sh dsr0 fix, batcat alias, and kitty launcher fix from google_office
+3d9d522 Port Emacs 31 lexical-binding, beframe, file-notify-resilient, and daemon fixes from google_office
+cd6d85c Add per-machine .local override templates from google_office
+```
+
+### 2026-08-23 merge (on top of `5bcde07`)
 
 ```
 b631026 Add AI-agent tooling & logging scripts from google_office
