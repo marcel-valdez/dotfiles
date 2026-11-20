@@ -1,6 +1,6 @@
 #!/usr/bin/env ruby
 
-require 'shellwords'
+require 'fileutils'
 
 if ARGV.size < 2
   puts 'Title and message must be specified. Usage:'
@@ -13,11 +13,14 @@ time = "#{'%02d' % now.hour}:#{'%02d' % now.min}"
 title = "#{time} #{ARGV[0]}"
 message = ARGV[1]
 
-cmd = "notify-send \"#{title}\" \"#{message}\""
-# favor GNTP over notify-send
-if File.exists?("/usr/bin/gntp-send")
-  cmd = "gntp-send -s localhost \"#{title}\" \"#{message}\""
+log_dir = File.join(Dir.home, '.logs')
+FileUtils.mkdir_p(log_dir)
+File.open(File.join(log_dir, 'notify.log'), 'a') do |f|
+  f.puts("#{title} #{message}")
 end
 
-`echo #{Shellwords.escape(title)} #{Shellwords.escape(message)} >> $HOME/.logs/notify.log`
-`#{cmd}`
+if File.exist?('/usr/bin/gntp-send')
+  system('gntp-send', '-s', 'localhost', title, message)
+else
+  system('notify-send', title, message)
+end

@@ -2,6 +2,8 @@
 
 require 'optparse'
 require 'optparse/time'
+require 'base64'
+require 'shellwords'
 
 options = {}
 
@@ -42,15 +44,17 @@ if !options[:alarm].nil?
   alarm_snd = "#{Dir.home}/bin/beep 5"
 end
 
-DISPLAY_ID=ENV['DISPLAY'] or ":0.0"
+DISPLAY_ID = ENV['DISPLAY'] || ':0.0'
 # Keep the notification open for 4 hours
-sticky_duration_ms = 1000*4*60*60
-escaped_msg_cmd = %Q{"DISPLAY=#{DISPLAY_ID} /usr/bin/notify-send \
-  --expire-time=#{sticky_duration_ms} \
-  '"'#{options[:title]}'"' \
-  '"'#{options[:message]}'"'; \
-#{alarm_snd}"}
-task_cmd = %Q{echo #{escaped_msg_cmd} | /usr/bin/at #{options[:start_time]}}
+sticky_duration_ms = 1000 * 4 * 60 * 60
+
+b64_title = Base64.strict_encode64(options[:title].to_s)
+b64_msg = Base64.strict_encode64(options[:message].to_s)
+
+cmd = "DISPLAY=#{DISPLAY_ID} /usr/bin/notify-send --expire-time=#{sticky_duration_ms} \"$(echo '#{b64_title}' | base64 -d)\" \"$(echo '#{b64_msg}' | base64 -d)\""
+cmd += "; #{alarm_snd}" unless alarm_snd.empty?
+
+task_cmd = "echo #{Shellwords.escape(cmd)} | /usr/bin/at #{options[:start_time]}"
 
 result = `#{task_cmd}`
 if $?.success?
