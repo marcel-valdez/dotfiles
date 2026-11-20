@@ -20,30 +20,8 @@ function dispatch {
 NOTIFICATION_THRESHOLD_SECS=300
 TMUX_SESSION="Unknown"
 TMUX_WINDOW="Unknown"
-# https://g3doc.corp.google.com/devtools/jetski/g3doc/features/agent/agent-hooks.md
-#  {"toolHookArgs":{"stepIdx":11}}
 read -r -d '' PAYLOAD
 log::info "PAYLOAD: $(echo "${PAYLOAD}" | run jq --monochrome-output)"
-# Example:
-# {
-#   "artifactDirectoryPath":"/usr/local/google/home/marcelvaldez/.gemini/jetski/brain/f13b6cc2-f2a7-4aac-8590-aa1a8db311b6",
-#   "conversationId":"f13b6cc2-f2a7-4aac-8590-aa1a8db311b6",
-#   "error":"",
-#   "executionId":"992720db-22af-44df-a982-192a45415ad4",
-#   "modelName":"auto",
-#   "stepIdx":56,
-#   "toolCall":{
-#     "args":{
-#       "Message":"<message contents>",
-#       "Recipient":"fbb2007e-2f15-4db3-a828-0ef66400b785",
-#       "toolAction":"Sending review report to parent agent",
-#       "toolSummary":"Send code review report to parent"
-#     },
-#     "name":"send_message"
-#   },
-#   "transcriptPath":"/usr/local/google/home/marcelvaldez/.gemini/jetski/brain/f13b6cc2-f2a7-4aac-8590-aa1a8db311b6/.system_generated/logs/transcript_full.jsonl",
-#   "workspacePaths":["/google/src/cloud/marcelvaldez/avid_tdp_datastore_monitoring"]
-# }
 
 conversation_id="$(echo "${PAYLOAD}" | run jq -r '.conversationId')"
 log::info "conversation_id: ${conversation_id}"
@@ -95,30 +73,28 @@ if [[ -f "${TOOL_TRACKER_FILE}" ]]; then
     populate_tmux_info
     msg=$(cat<<EOF
 
-Jestki CLI Tool ${tool_name} on ${workspace_dir} Done.
+Jetski CLI Tool ${tool_name} on ${workspace_dir} Done.
 Tmux Session: ${TMUX_SESSION} Window: ${TMUX_WINDOW}
 ${body}
 EOF
        )
 
-    # Attempt to use knock to notify
-    if [[ -e /google/bin/releases/knock/knock.sh ]]; then
-      source /google/bin/releases/knock/knock.sh &>/dev/null
-      dispatch knock "${msg}"
-    else
-      # Otherwise use local notifications on terminal & desktop.
-      notified=
-      if run type tmux-notify &>/dev/null; then
-        dispatch tmux-notify "${title}" "${msg}"
-        notified=1
-      fi
-      if [[ -n "${DISPLAY}" ]] && run type notify-send &>/dev/null; then
-        dispatch notify-send "${title}" "${msg}"
-        notified=1
-      fi
-      if [[ -z "${notified}" ]]; then
-        log::error "neither tmux-notify nor notify-send where available to notify the user."
-      fi
+    notified=
+    if run type tmux-notify &>/dev/null; then
+      dispatch tmux-notify "${title}" "${msg}"
+      notified=1
+    fi
+    if [[ -n "${DISPLAY}" ]] && run type notify-send &>/dev/null; then
+      dispatch notify-send "${title}" "${msg}"
+      notified=1
+    fi
+    if [[ -z "${notified}" ]]; then
+      log::error "neither tmux-notify nor notify-send were available to notify the user."
+    fi
+
+    # Send OSC 99 terminal notification (Kitty, etc.) if enabled
+    if [[ "${JETSKI_ENABLE_OSC99:-true}" == "true" ]]; then
+      dispatch "${HOME}/scripts/osc99_notify.sh" "${title}" "${msg}"
     fi
   fi
 fi
