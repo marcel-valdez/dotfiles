@@ -38,6 +38,8 @@
 # include the scripts folder
 !scripts/
 !scripts/*
+!scripts/tests/
+!scripts/tests/*.sh
 # with the exception of these binaries
 bin/dex
 
