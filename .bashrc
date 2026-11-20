@@ -405,3 +405,9 @@ fi
 export BAT_CONFIG_PATH="${HOME}/.bat.conf"
 export OPENAI_API_KEY="$(cat "${HOME}/.openaikey")"
 export ANTHROPIC_API_KEY="$(cat "${HOME}/.anthropic_api_key")"
+
+# Machine-local overrides (~/.bashrc.local; only a commented template is
+# committed). Sourced late so its settings win.
+if [[ -r "${HOME}/.bashrc.local" ]]; then
+  source "${HOME}/.bashrc.local"
+fi

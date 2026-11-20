@@ -33,6 +33,15 @@
 ;; Loads office-only helpers when available; effectively a no-op here since
 ;; the corp-only bits it used to configure have been stripped out of it.
 (with-library at-office)
+
+;; Machine-local settings that are never committed live in ~/.emacs.local (the
+;; repository only tracks a commented template of it).  It is loaded right after
+;; host-role detection so it can override the `at-office-is-*' flags; errors in
+;; it are reported without aborting the rest of this file.
+(let ((local-init (expand-file-name "~/.emacs.local")))
+  (when (file-readable-p local-init)
+    (with-demoted-errors "Error loading ~/.emacs.local: %S"
+      (load local-init nil t t))))
 ;; initialize use-package
 (unless (package-installed-p 'use-package)
   (package-refresh-contents)

@@ -1,0 +1,20 @@
+;;; .emacs.local --- Machine-local Emacs settings  -*- mode: emacs-lisp; lexical-binding: t; -*-
+
+;;; Commentary:
+
+;; Machine-local Emacs settings, NOT shared between machines.
+;;
+;; ~/.emacs loads this file right after host-role detection (`at-office'), so
+;; `setq' the `at-office-is-*' flags here to override it.  Settings that must
+;; run after the rest of ~/.emacs belong in a hook, e.g.:
+;;   (add-hook 'after-init-hook (lambda () (set-face-attribute ...)))
+;;
+;; The repository only tracks this commented template (added with
+;; `git add -f'); put real per-machine settings below and never commit them.
+;; Once per clone, hide local edits from git:
+;;   git -C ~ update-index --skip-worktree .emacs.local
+;; (undo with --no-skip-worktree, e.g. to update this template).
+
+;;; Code:
+
+;;; .emacs.local ends here

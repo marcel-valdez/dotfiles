@@ -1,0 +1,12 @@
+# ~/.bash_profile.local  -*- mode: sh -*-
+#
+# Machine-local settings for bash login shells, NOT shared between machines.
+# ~/.bash_profile sources this file last, after ~/.profile (and through it
+# ~/.bashrc) has run.
+#
+# The repository only tracks this commented template (added with `git add -f`);
+# put real per-machine settings below it and never commit them.
+#
+# Once per clone, hide local edits from git:
+#   git -C ~ update-index --skip-worktree .bash_profile.local
+# (undo with --no-skip-worktree, e.g. to update this template).

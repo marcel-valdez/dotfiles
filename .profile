@@ -52,6 +52,12 @@ if [ -d "${HOME}/.local/bin" ]; then
   esac
 fi
 
+# Machine-local overrides (~/.profile.local; POSIX sh; only a commented template
+# is committed).
+if [ -r "${HOME}/.profile.local" ]; then
+  . "${HOME}/.profile.local"
+fi
+
 # Finish with a successful command: the prompt's [Exit: ...] shows PIPESTATUS,
 # which at the first prompt still holds the last startup test above (1 when
 # ~/.cargo/env is absent).

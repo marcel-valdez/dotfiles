@@ -1,0 +1,12 @@
+# ~/.bash_functions.local  -*- mode: sh -*-
+#
+# Machine-local shell functions, NOT shared between machines.
+# ~/.bash_functions (loaded from ~/.bashrc) sources this file at its end, so
+# functions here override the shared ones.
+#
+# The repository only tracks this commented template (added with `git add -f`);
+# put real per-machine functions below it and never commit them.
+#
+# Once per clone, hide local edits from git:
+#   git -C ~ update-index --skip-worktree .bash_functions.local
+# (undo with --no-skip-worktree, e.g. to update this template).

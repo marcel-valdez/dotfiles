@@ -3,6 +3,12 @@
 
 [[ -s "${HOME}/.rvm/scripts/rvm" ]] && source "${HOME}/.rvm/scripts/rvm" # Load RVM into a shell session *as a function*
 
+# Machine-local overrides (~/.bash_profile.local; only a commented template is
+# committed).
+if [ -r "${HOME}/.bash_profile.local" ]; then
+  . "${HOME}/.bash_profile.local"
+fi
 
-# Added by Antigravity CLI installer
-export PATH="/home/marcel/.local/bin:$PATH"
+# Finish with a successful command so the first prompt's [Exit: ...]
+# (PIPESTATUS) does not show the status of the test above.
+true

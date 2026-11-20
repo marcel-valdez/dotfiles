@@ -65,3 +65,9 @@ alias g-receive-pack='git-receive-pack'
 alias g-upload-pack='git-load-pack'
 
 # end git commands
+
+# Machine-local aliases (~/.bash_aliases.local; only a commented template is
+# committed). Sourced last so they win.
+if [ -r "${HOME}/.bash_aliases.local" ]; then
+  . "${HOME}/.bash_aliases.local"
+fi

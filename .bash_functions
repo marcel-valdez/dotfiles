@@ -1028,3 +1028,9 @@ function tmux-send-to-bash-panes {
   # Sends keys to all panes whose foreground command is bash.
   tmux list-panes -a -F "#{pane_id} #{pane_current_command}" | grep bash$ | cut -d' ' -f1 | xargs -Ipaneid tmux send-keys -t'paneid' "$@"
 }
+
+# Machine-local functions (~/.bash_functions.local; only a commented template
+# is committed). Sourced last so they win.
+if [ -r "${HOME}/.bash_functions.local" ]; then
+  . "${HOME}/.bash_functions.local"
+fi

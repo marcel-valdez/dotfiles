@@ -8,15 +8,25 @@
 !.bash_aliases
 !.bash_profile
 !.profile
+# Machine-local shell settings: same scheme as .config/kitty/local.conf.
+.bashrc.local
+.bash_aliases.local
+.bash_functions.local
+.bash_profile.local
+.profile.local
 !.inputrc
 !.minttyrc
 !.nanorc
 !.tmux.conf
+# Machine-local tmux settings: same scheme as .config/kitty/local.conf.
+.tmux.conf.local
 !.viminfo
 !.vimrc
 !.gitignore
 !GOOGLE_OFFICE_MERGE.md
 !.emacs
+# Machine-local Emacs settings: same scheme as .config/kitty/local.conf.
+.emacs.local
 !.xbindkeysrc.scm
 !.XCompose
 !.Xmodmap
@@ -72,6 +82,9 @@ bin/dex
 !.config/
 !.config/kitty/
 !.config/kitty/*
+# Machine-local kitty overrides: only the commented template is tracked (added
+# with `git add -f`); local edits stay out of commits via --skip-worktree.
+.config/kitty/local.conf
 !.config/termit/
 !.config/termit/*
 !.config/rofi/
