@@ -96,6 +96,12 @@ without `lib/os_compat.sh`, Darwin/macOS code, or Google-corp-only code:
 - **4 already-present / office-preference commits**, plus the 2 Linux systemd
   user units (`airgradient-monitor.service`, `whatsapp-notification.service`)
   from `855807d`.
+  *(Update 2026-11-20 follow-up: subsequently installed
+  `.config/systemd/user/airgradient-monitor.service` using
+  `marcel-valdez/air_gradient_alarm_daemon`'s upstream Linux `Type=notify` unit,
+  superseding `origin/google_office`'s older `Type=simple` unit from `855807d`
+  and omitting `scripts/airgradient-notify-hook.sh` because the Go daemon now
+  dispatches native Linux `notify-send` + `pw-play`/`paplay` bell alerts.)*
 - Pre-`4c2e54b` skipped items (`org-mode-config.el`, legacy `bin/` scripts)
   remain skipped.
 

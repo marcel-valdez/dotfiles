@@ -80,6 +80,9 @@ bin/dex
 !.fluxbox/startup
 
 !.config/
+!.config/systemd/
+!.config/systemd/user/
+!.config/systemd/user/airgradient-monitor.service
 !.config/kitty/
 !.config/kitty/*
 # Machine-local kitty overrides: only the commented template is tracked (added

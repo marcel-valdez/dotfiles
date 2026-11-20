@@ -1,0 +1,37 @@
+# systemd *user* unit for airgradient-monitor.
+#
+#   install:  make install            (binary -> ~/.local/bin, unit -> ~/.config/systemd/user/)
+#   enable:   systemctl --user daemon-reload && systemctl --user enable --now airgradient-monitor
+#   logs:     journalctl --user -u airgradient-monitor -f
+#   status:   systemctl --user status airgradient-monitor    (shows live readings / alerts)
+
+[Unit]
+Description=AirGradient air-quality monitor and alert daemon
+Documentation=https://api.airgradient.com/public/docs/api/v1/
+# Never give up restarting: a monitor that silently stops is worse than log noise.
+StartLimitIntervalSec=0
+
+[Service]
+# The daemon reports READY=1, a live STATUS= line and WATCHDOG=1 pings via sd_notify.
+Type=notify
+NotifyAccess=main
+ExecStart=%h/.local/bin/airgradient-monitor -config %h/.config/airgradient-monitor/config.json
+Restart=on-failure
+RestartSec=30s
+# Exit status 2 means "invalid configuration": fix the config instead of restart-looping.
+RestartPreventExitStatus=2
+# A hung main loop (no keep-alive for 5 min) is killed and restarted.
+WatchdogSec=5min
+TimeoutStartSec=30s
+# SIGTERM triggers a graceful shutdown (state is persisted); allow in-flight notifications to finish.
+TimeoutStopSec=20s
+# State files created by the daemon are private; no privilege escalation for child processes.
+UMask=0077
+NoNewPrivileges=yes
+# Guard rail (ignored when the memory controller is not delegated to the user manager).
+MemoryMax=128M
+
+[Install]
+# default.target, not graphical-session.target: some desktops (e.g. XFCE) never activate the latter.
+# notify-send reaches the session bus via DBUS_SESSION_BUS_ADDRESS from the user manager.
+WantedBy=default.target
