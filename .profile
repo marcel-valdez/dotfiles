@@ -26,15 +26,33 @@ else
     export PATH="${PATH}:${HOME}/bin"
   fi
 
+  if [ -d "${HOME}/.local/bin" ]; then
+    export PATH="${PATH}:${HOME}/.local/bin"
+  fi
+
+  if [ -d "${HOME}/.cargo/bin" ]; then
+    export PATH="${PATH}:${HOME}/.cargo/bin"
+  fi
+
   # NOTE: I am uncertain if NVM can be run like this in a non-interactive
   # shell session.
   [ -s "${NVM_DIR}/nvm.sh" ] && . "${NVM_DIR}/nvm.sh"
   [ -s "${HOME}/.rvm/scripts/rvm" ] && . "${HOME}/.rvm/scripts/rvm"
-  export PATH="${PATH}:${HOME}/.rvm/bin" # Add RVM to PATH for scripting
+  if [ -d "${HOME}/.rvm/bin" ]; then
+    export PATH="${PATH}:${HOME}/.rvm/bin" # Add RVM to PATH for scripting
+  fi
 fi
 
 [ -s "${HOME}/.cargo/env" ] && . "${HOME}/.cargo/env"
 
+if [ -d "${HOME}/.local/bin" ]; then
+  case ":${PATH}:" in
+    *":${HOME}/.local/bin:"*) ;;
+    *) export PATH="${HOME}/.local/bin:${PATH}" ;;
+  esac
+fi
 
-# Added by Antigravity CLI installer
-export PATH="/home/marcel/.local/bin:$PATH"
+# Finish with a successful command: the prompt's [Exit: ...] shows PIPESTATUS,
+# which at the first prompt still holds the last startup test above (1 when
+# ~/.cargo/env is absent).
+true

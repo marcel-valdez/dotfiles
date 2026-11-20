@@ -5,6 +5,12 @@
 export EMACS_TTY_SERVER="tty-server"
 # enable 24-bit colors
 export COLORTERM=truecolor
+# PROMPT_COMMAND names shell functions, which child processes never inherit, so
+# it must never be exported.
+export -n PROMPT_COMMAND 2>/dev/null || true
+if [[ -n "${TMUX:-}" ]] && command -v tmux &>/dev/null; then
+  tmux set-environment -gu PROMPT_COMMAND 2>/dev/null || true
+fi
 # If not running interactively, don't do anything
 case $- in
     *i*) ;;
@@ -71,7 +77,8 @@ export HISTFILESIZE=200000
 # history -a: append this session's new history elements to the history file
 # history -c: clear this session's history list
 # history -r: read the history file's entries and make them the current history list
-export PROMPT_COMMAND="${PROMPT_COMMAND:+$PROMPT_COMMAND$'\n'}history -a"
+# (Not exported: PROMPT_COMMAND must stay local to this shell; see top of file.)
+PROMPT_COMMAND="${PROMPT_COMMAND:+$PROMPT_COMMAND$'\n'}history -a"
 
 # If set, the pattern "**" used in a pathname expansion context will
 # match all files and zero or more directories and subdirectories.
@@ -220,8 +227,8 @@ if [ -d "${HOME}/.cargo/bin" ]; then
     export PATH="${PATH}:${HOME}/.cargo/bin"
 fi
 
-if [ -d "${HOME}/.local/bin" ]; then
-  export PATH="${PATH}:${HOME}/.local/bin"
+if [[ -d "${HOME}/.local/bin" && ":${PATH}:" != *":${HOME}/.local/bin:"* ]]; then
+  export PATH="${HOME}/.local/bin:${PATH}"
 fi
 
 if [ -d "${HOME}/modules/buck/bin" ]; then
@@ -385,7 +392,3 @@ fi
 export BAT_CONFIG_PATH="${HOME}/.bat.conf"
 export OPENAI_API_KEY="$(cat "${HOME}/.openaikey")"
 export ANTHROPIC_API_KEY="$(cat "${HOME}/.anthropic_api_key")"
-
-
-# Added by Antigravity CLI installer
-export PATH="/home/marcel/.local/bin:$PATH"

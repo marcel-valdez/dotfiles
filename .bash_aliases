@@ -8,6 +8,10 @@ alias now='date "+%H:%M:%S  %d/%m/%y"'
 alias nano-crypto=crypto-file
 alias rm-secure='shred -u -z'
 
+if type batcat &>/dev/null; then
+  alias cat='batcat -p'
+fi
+
 # start git commands
 
 alias g='git'
