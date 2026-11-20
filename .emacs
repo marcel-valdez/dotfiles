@@ -781,13 +781,31 @@
  ;; If there is more than one, they won't work right.
  '(blink-cursor-mode nil)
  '(column-number-mode t)
+ '(custom-enabled-themes '(modus-vivendi-tinted))
  '(display-time-mode t)
  '(elpy-formatter 'black)
  '(elpy-rpc-virtualenv-path 'current)
  '(global-display-line-numbers-mode t)
  '(menu-bar-mode nil)
  '(package-selected-packages
-   '(format-all dap-mode eglot-java fzf flymake-shellcheck el-get company-jedi web-beautify company-lua lua-mode js-auto-format-mode pylint javascript-mode omnisharp csharp-mode erc-status-sidebar markdown-mode flyspell-correct flycheck helm-descbinds helm-dash company-ctags ggtags helm-gtags telephone-line use-ttf use-package use-package-ensure-system-package zeal-at-point flycheck-checkbashisms graphviz-dot-mode flyspell-correct-helm helm-flycheck better-defaults company xclip helm git helm-grepint helm-helm-commands helm-ispell helm-ls-git helm-proc helm-pydoc helm-rubygems-org helm-themes helm-wordnet helm-xref hgignore-mode undo-tree rotate rjsx-mode multiple-cursors multi-term markdownfmt markdown-toc markdown-preview-mode helm-git gtags flycheck-tip flycheck-package cycle-resize auto-complete))
+   '(auto-complete beframe better-defaults company company-ctags
+                   company-jedi company-lua csharp-mode cycle-resize
+                   dap-mode eglot-java el-get erc-status-sidebar
+                   flycheck flycheck-checkbashisms flycheck-package
+                   flycheck-tip flymake-shellcheck flyspell-correct
+                   flyspell-correct-helm format-all fzf ggtags git
+                   gptel graphviz-dot-mode gtags helm helm-dash
+                   helm-descbinds helm-flycheck helm-git helm-grepint
+                   helm-gtags helm-helm-commands helm-ispell
+                   helm-ls-git helm-proc helm-pydoc helm-rubygems-org
+                   helm-themes helm-wordnet helm-xref hgignore-mode
+                   javascript-mode js-auto-format-mode lua-mode
+                   markdown-mode markdown-preview-mode markdown-toc
+                   markdownfmt multi-term multiple-cursors omnisharp
+                   pylint rjsx-mode rotate telephone-line undo-tree
+                   use-package use-package-ensure-system-package
+                   use-ttf web-beautify xclip xterm-color
+                   zeal-at-point zoom-window))
  '(safe-local-variable-values '((xref-etags-mode . t)))
  '(tool-bar-mode nil))
 (custom-set-faces

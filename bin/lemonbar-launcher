@@ -2,7 +2,7 @@
 
 BAR="/usr/bin/lemonbar"
 if [ ! -e "${BAR}" ]; then
-  BAR="${HOME}/repositories/bar/lemonbar"
+  BAR="${HOME}/modules/bar/lemonbar"
 fi
 
 FIFO="${HOME}/tmp/lemonbar-fifo"

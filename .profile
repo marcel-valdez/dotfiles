@@ -34,3 +34,7 @@ else
 fi
 
 [ -s "${HOME}/.cargo/env" ] && . "${HOME}/.cargo/env"
+
+
+# Added by Antigravity CLI installer
+export PATH="/home/marcel/.local/bin:$PATH"

@@ -21,40 +21,20 @@ function random() {
 function alert() {
   msg="Terminal"
   [ $? -eq 0 ] && msg="Error"
-  prevous_cmd="$(history | tail -n2 | head -n1 | sed -e 's/  */ /g' | cut -d' ' -f3-)"
+  prev_cmd="$(history | tail -n2 | head -n1 | sed -e 's/  */ /g' | cut -d' ' -f3-)"
   notify-send --urgency=low\
               -i "${msg}"\
-              "${previous_cmd}"
+              "${prev_cmd}"
 }
 
 function now() {
   date "+%H:%M:%S"
 }
 
-function diff-lines() {
-  local path=
-  local line=
-  while read; do
-    esc=$'\033'
-    if [[ "${REPLY}" =~ ---\ (a/)?.* ]]; then
-      continue
-    elif [[ "${REPLY}" =~ \+\+\+\ (b/)?([^[:blank:]$esc]+).* ]]; then
-      path="${BASH_REMATCH[2]}"
-    elif [[ "${REPLY}" =~ @@\ -[0-9]+(,[0-9]+)?\ \+([0-9]+)(,[0-9]+)?\ @@.* ]]; then
-      line="${BASH_REMATCH[2]}"
-    elif [[ "${REPLY}" =~ ^(${esc}\[[0-9;]+m)*([\ +-]) ]]; then
-      echo "${path}:${line}:${REPLY}"
-      if [[ "${BASH_REMATCH[2]}" != - ]]; then
-        ((line++))
-      fi
-    fi
-  done
-}
-
 function open-bg() {
-  filename=$(basename $1)
+  filename=$(basename "$1")
   logfile="/tmp/$USER-$filename.log"
-  $1 >&${logfile} &
+  $1 >&"${logfile}" &
 }
 
 function compress-pdf() {
@@ -71,7 +51,7 @@ function compress-pdf() {
   input_file=$1
   output_file=$2
   if [ "$output_file" == "" ]; then
-    output_file="compressed-$(basename $input_file)"
+    output_file="compressed-$(basename "${input_file}")"
   fi
 
   compression_level="/ebook"
@@ -83,8 +63,8 @@ function compress-pdf() {
   gs -dNOPAUSE -dQUIET -dBATCH \
      -sDEVICE=pdfwrite \
      -dCompatibilityLevel=1.4 \
-     -dPDFSETTINGS=$compression_level \
-     -sOutputFile=$output_file $input_file
+     -dPDFSETTINGS="${compression_level}" \
+     -sOutputFile="${output_file}" "${input_file}"
   # other compression options for pdfwrite
   # -dr[resolution] -> default setting is 720dpi
   # -dDetectDuplicateImages -> defaults to true, will reuse a image used more than once
@@ -96,12 +76,12 @@ function compress-pdf() {
 
 # executes a command without any output
 function succeeds() {
-  $@ >&/dev/null
+  "$@" >&/dev/null
 }
 
 # executes a command with output
 function fails() {
-  $@ >&/dev/null
+  "$@" >&/dev/null
 }
 
 
@@ -130,7 +110,7 @@ function top-n() {
   | cut -d']' -f2- \
   | awk '{ count[$0]++ } END { for (i in count) print count[i], i }' \
   | sort -rn \
-  | head -$1
+  | head "-$1"
 }
 
 function top-ten() {
@@ -155,11 +135,11 @@ function get-arg-or-stdin() {
 }
 
 function tmux-to-clip() {
-  tmux show-buffer | copy-to-clip
+  tmux show-buffer | copy-to-clip "$@"
 }
 
 function copy-to-tmux() {
-  tmux set-buffer "$(get-arg-or-stdin $@)"
+  tmux set-buffer "$(get-arg-or-stdin "$@")"
 }
 
 function history-cmd-only() {
@@ -175,10 +155,11 @@ function tmux-session-name() {
 }
 
 function tmux-window-set-name() {
+  local short_name
   if [[ "$2" == "-n" ]]; then
-    local short_name="$1"
+    short_name="$1"
   else
-    local short_name=$(echo "$1" | cut -c 1-30)
+    short_name="$(echo "$1" | cut -c 1-30)"
   fi
   tmux rename-window "${short_name}"
 }
@@ -223,7 +204,7 @@ function __process-ps-lines() {
     else
       byte_size=$(echo "${kb_size} * 1024" | bc)
       elements=("${elements[@]/$kb_size}")
-      human_size="$(numfmt --to=si ${byte_size})"
+      human_size="$(numfmt --to=si "${byte_size}")"
       if [[ "${byte_size}" -gt "${byte_limit}"  ]] || [[ -z "${byte_limit}" ]]; then
         echo "${human_size} ${elements[@]}"
       fi
@@ -233,7 +214,7 @@ function __process-ps-lines() {
 
 function ps-show-memory-hogs() {
   procs=25
-  command_format=comm
+  command_format="comm"
   while [[ $# -gt 0 ]]; do
     case $1 in
       -n|--number)
@@ -315,7 +296,8 @@ function ps-nice() {
 }
 
 function emacs() {
-    local emacs_bin="$(which emacs)"
+    local emacs_bin
+    emacs_bin="$(which emacs)"
     # prioritize the snap installation of emacs
     if [[ -x "/snap/bin/emacs" ]]; then
         emacs_bin="/snap/bin/emacs"
@@ -446,19 +428,19 @@ function node-lts-version() {
 }
 
 function node-check-use() {
-  local node_version=$(node --version 2>/dev/null)
+  local node_version
+  local node_version_installed
+  node_version="$(node --version 2>/dev/null)"
   if [[ "${NODE_VERSION}" == "lts" ]] || [[ "${NODE_VERSION}" == "LTS" ]]; then
-    NODE_VERSION="$(node-lts-version)"
-    export NODE_VERSION
+      NODE_VERSION="$(node-lts-version)"
+      export NODE_VERSION
   fi
-
   if [ "${node_version}" != "v${NODE_VERSION}" ]; then
-    local node_version_installed=$(nvm ls 2>/dev/null | grep "${NODE_VERSION}")
+    node_version_installed="$(nvm ls 2>/dev/null | grep "${NODE_VERSION}")"
     if [ "${node_version_installed}" == "" ]; then
-      echo Node v$NODE_VERSION is not installed, installing now.
+      echo "Node v$NODE_VERSION is not installed, installing now."
       nvm install "v${NODE_VERSION}"
     fi
-
     if [ "$1" == "--silent" ]; then
       nvm use "${NODE_VERSION}" >/dev/null 2>&1
     else
@@ -499,15 +481,15 @@ function diff-lines() {
   local line=
   while read; do
     esc=$'\033'
-    if [[ $REPLY =~ ---\ (a/)?.* ]]; then
+    if [[ "${REPLY}" =~ ---\ (a/)?.* ]]; then
       continue
-    elif [[ $REPLY =~ \+\+\+\ (b/)?([^[:blank:]$esc]+).* ]]; then
-      path=${BASH_REMATCH[2]}
-    elif [[ $REPLY =~ @@\ -[0-9]+(,[0-9]+)?\ \+([0-9]+)(,[0-9]+)?\ @@.* ]]; then
-      line=${BASH_REMATCH[2]}
-    elif [[ $REPLY =~ ^($esc\[[0-9;]+m)*([\ +-]) ]]; then
-      echo "$path:$line:$REPLY"
-      if [[ ${BASH_REMATCH[2]} != - ]]; then
+    elif [[ "${REPLY}" =~ \+\+\+\ (b/)?([^[:blank:]$esc]+).* ]]; then
+      path="${BASH_REMATCH[2]}"
+    elif [[ "${REPLY}" =~ @@\ -[0-9]+(,[0-9]+)?\ \+([0-9]+)(,[0-9]+)?\ @@.* ]]; then
+      line="${BASH_REMATCH[2]}"
+    elif [[ "${REPLY}" =~ ^(${esc}\[[0-9;]+m)*([\ +-]) ]]; then
+      echo "${path}:${line}:${REPLY}"
+      if [[ "${BASH_REMATCH[2]}" != - ]]; then
         ((line++))
       fi
     fi
@@ -523,13 +505,13 @@ function g-diff-lines() {
 }
 
 function git-branch-out() {
-  new_branch_name=$1
-  treeish=$2
-  git checkout -b $1 $2
+  local new_branch_name="$1"
+  local treeish="$2"
+  git checkout -b "${new_branch_name}" "${treeish}"
 }
 
 function g-branch-out() {
-  git-branch-out $1 $2
+  git-branch-out "$1" "$2"
 }
 
 function git-rm-forever() {
@@ -549,11 +531,11 @@ function g-rm-forever() {
 }
 
 function git-push-marcel() {
-  git push marcel $(git-current-branch):$(git-current-branch)
+  git push marcel "$(git-current-branch):$(git-current-branch)"
 }
 
 function git-push-f-marcel() {
-  git push -f marcel $(git-current-branch):$(git-current-branch)
+  git push -f marcel "$(git-current-branch):$(git-current-branch)"
 }
 
 # end git functions
@@ -569,17 +551,17 @@ function set-env-java8() {
 
 function java() {
   if [[ ! -z ${JAVA_HOME} ]]; then
-    ${JAVA_HOME}/bin/java $@
+    "${JAVA_HOME}/bin/java" "$@"
   else
-    /usr/bin/java $@
+    /usr/bin/java "$@"
   fi
 }
 
 function javac() {
   if [[ ! -z ${JAVA_HOME} ]]; then
-    "${JAVA_HOME}/bin/java" $@
+    "${JAVA_HOME}/bin/java" "$@"
   else
-    /usr/bin/javac $@
+    /usr/bin/javac "$@"
   fi
 }
 
