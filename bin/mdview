@@ -1,8 +1,17 @@
 #!/usr/bin/env bash
 # ==============================================================================
-# mdview: HiDPI Kitty Markdown + Mermaid Viewer & Jetski Review Commenter
+# mdview: Dotfiles wrapper delegating to standalone ~/projects/mdview_tui repo
 # ==============================================================================
 
 set -euo pipefail
 
-exec python3 -P "${HOME}/scripts/mdview.py" "$@"
+MDVIEW_REPO="${MDVIEW_TUI_DIR:-${HOME}/projects/mdview_tui}"
+TARGET_BIN="${MDVIEW_REPO}/bin/mdview"
+
+if [[ ! -x "${TARGET_BIN}" ]]; then
+  echo "mdview_tui not found at ${MDVIEW_REPO}." >&2
+  echo "Clone it via: git clone git@github.com:marcel-valdez/mdview_tui.git \"${MDVIEW_REPO}\"" >&2
+  exit 1
+fi
+
+exec "${TARGET_BIN}" "$@"
