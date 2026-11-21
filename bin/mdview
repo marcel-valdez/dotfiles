@@ -1,0 +1,8 @@
+#!/usr/bin/env bash
+# ==============================================================================
+# mdview: HiDPI Kitty Markdown + Mermaid Viewer & Jetski Review Commenter
+# ==============================================================================
+
+set -euo pipefail
+
+exec python3 -P "${HOME}/scripts/mdview.py" "$@"

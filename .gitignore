@@ -148,6 +148,8 @@ scripts/tests/test_monitor_supermixer_asrf_cutover.py
 !.config/launchd/*.plist
 !.config/airgradient-monitor/
 !.config/airgradient-monitor/config.macos.json
+!.config/glow/
+!.config/glow/glow.yml
 !.hammerspoon/
 !.hammerspoon/init.lua
 

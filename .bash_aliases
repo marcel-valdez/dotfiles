@@ -15,6 +15,8 @@ alias less-lineno='less -N'
 alias nano-crypto=crypto-file
 # refreshed kitty environment
 alias rk='refresh_kitty'
+alias mdv='mdview'
+alias mdq='mdview --queue'
 
 if type batcat &>/dev/null; then
   alias cat='batcat -p'
