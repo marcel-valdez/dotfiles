@@ -7,6 +7,7 @@ import shutil
 import sys
 import tempfile
 import unittest
+from unittest import mock
 
 sys.path.insert(0, os.path.expanduser("~/scripts"))
 
@@ -120,6 +121,71 @@ class CandidateRankingTests(unittest.TestCase):
     )
     self.assertTrue(mdview_picker.is_citc_path("/cloud/user/ws/google3"))
     self.assertFalse(mdview_picker.is_citc_path(self.workspace_dir))
+
+  def test_active_jetski_session_sets_default_query_and_shows_full_paths(
+      self,
+  ) -> None:
+    session_dir = os.path.join(self.temp_dir, "brain", "conv-active")
+    empty_dir = os.path.join(self.temp_dir, "brain", "conv-empty")
+    os.makedirs(session_dir, exist_ok=True)
+    os.makedirs(empty_dir, exist_ok=True)
+    plan_md = os.path.join(session_dir, "plan.md")
+    with open(plan_md, "w", encoding="utf-8") as f:
+      f.write("# Active Plan\n")
+
+    candidates = mdview_picker.collect_markdown_candidates(
+        reviews_dir=self.reviews_dir,
+        jetski_brain_root=os.path.join(self.temp_dir, "brain"),
+        clipboard_text="",
+        workspace_cwd=self.workspace_dir,
+        notes_dir=self.notes_dir,
+        active_jetski_dir=session_dir,
+    )
+    self.assertTrue(any(c.realpath == os.path.realpath(plan_md) for c in candidates))
+    plan_entry = next(c for c in candidates if c.realpath == os.path.realpath(plan_md))
+    self.assertIn("conv-active/plan.md", plan_entry.label)
+
+    query = mdview_picker.resolve_default_picker_query(candidates, session_dir)
+    self.assertTrue(query.endswith("conv-active/"), repr(query))
+    self.assertEqual(
+        mdview_picker.resolve_default_picker_query(candidates, empty_dir), ""
+    )
+
+  def test_build_fzf_picker_cmd_includes_wrap_ctrl_slash_and_initial_query(
+      self,
+  ) -> None:
+    cmd = mdview_picker.build_fzf_picker_cmd(
+        fzf_bin="/usr/bin/fzf",
+        preview_cmd="cat {3}",
+        initial_query="~/.gemini/jetski/brain/conv-1/",
+    )
+    self.assertIn("--wrap=word", cmd)
+    self.assertIn("--bind=ctrl-/:toggle-preview", cmd)
+    self.assertIn("--bind=alt-w:toggle-wrap", cmd)
+    self.assertIn("--query=~/.gemini/jetski/brain/conv-1/", cmd)
+
+  def test_detect_jetski_conversation_from_tty_prioritizes_active_lock(
+      self,
+  ) -> None:
+    fake_ps = mock.Mock(returncode=0, stdout="1001\n")
+    uuid_db = "11111111-2222-3333-4444-555555555555"
+    uuid_lock = "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"
+
+    def fake_readlink(path: str) -> str:
+      if path.endswith("/3"):
+        return f"/home/u/.gemini/jetski/conversations/{uuid_db}.db"
+      if path.endswith("/4"):
+        return f"/home/u/.gemini/jetski/presence/{uuid_lock}.lock"
+      return "/dev/null"
+
+    with (
+        mock.patch("subprocess.run", return_value=fake_ps),
+        mock.patch("os.listdir", return_value=["3", "4"]),
+        mock.patch("os.readlink", side_effect=fake_readlink),
+        mock.patch("os.stat", return_value=mock.Mock(st_mtime=100.0)),
+    ):
+      conv_id = mdview_picker.detect_jetski_conversation_from_tty("/dev/pts/21")
+    self.assertEqual(conv_id, uuid_lock)
 
 
 if __name__ == "__main__":

@@ -221,6 +221,44 @@ class KittyStreamTests(unittest.TestCase):
     self.assertEqual(len(grid), 1)
     self.assertIn("\U0010eeee", grid[0])
 
+  def test_propagates_image_id_sgr_color_to_every_placeholder_row(self) -> None:
+    # Real kitten icat only emits \x1b[38:2:R:G:Bm on row 0 and \x1b[39m on the
+    # final row; gutters resetting SGR on every row would erase image_id on
+    # rows 1..N-1 unless each row is made self-contained.
+    raw_icat = (
+        "\x1b_Ga=T,q=2,f=100,U=1,c=2,r=3,i=9558744;AAAA\x1b\\"
+        "\x1b[38:2:145:218:216m\U0010eeee\u0305\u0305\U0010eeee\u0305\u030d\n"
+        "\U0010eeee\u030d\u0305\U0010eeee\u030d\u030d\n"
+        "\U0010eeee\u030e\u0305\U0010eeee\u030e\u030d\x1b[39m\n"
+    )
+    _, grid = mdview_kitty.split_kitten_icat_output(raw_icat)
+    self.assertEqual(len(grid), 3)
+    for row in grid:
+      self.assertTrue(row.startswith("\x1b[38:2:145:218:216m"), repr(row))
+      self.assertTrue(row.endswith("\x1b[39m"), repr(row))
+
+  def test_rechunks_large_kitty_upload_into_4096_byte_m1_m0_chunks(
+      self,
+  ) -> None:
+    payload = "A" * 10000
+    raw_icat = (
+        f"\x1b_Ga=T,q=2,f=100,U=1,c=2,r=1,i=42;{payload}\x1b\\"
+        "\x1b[38:2:0:0:42m\U0010eeee\u0305\u0305\x1b[39m\n"
+    )
+    upload, _ = mdview_kitty.split_kitten_icat_output(raw_icat)
+    chunks = [seg for seg in upload.split("\x1b_G") if seg]
+    self.assertEqual(len(chunks), 3)
+    first_hdr, first_data = chunks[0][:-2].split(";", 1)
+    mid_hdr, mid_data = chunks[1][:-2].split(";", 1)
+    last_hdr, last_data = chunks[2][:-2].split(";", 1)
+    self.assertIn("m=1", first_hdr)
+    self.assertEqual(len(first_data), 4096)
+    self.assertEqual(mid_hdr, "m=1,q=2")
+    self.assertEqual(len(mid_data), 4096)
+    self.assertEqual(last_hdr, "m=0,q=2")
+    self.assertEqual(len(last_data), 10000 - 8192)
+    self.assertEqual(first_data + mid_data + last_data, payload)
+
   def test_cache_hit_skips_playwright_node_subprocess(self) -> None:
     code = 'flowchart TD\n  A["Cached"] --> B["Node"]'
     png_path = mdview_kitty.cache_png_path(self.temp_dir, code)
@@ -233,6 +271,57 @@ class KittyStreamTests(unittest.TestCase):
       )
       mock_run.assert_not_called()
     self.assertEqual(rendered_map[0], png_path)
+
+  def test_renders_wide_horizontal_mermaid_above_1000px_without_300px_cap(
+      self,
+  ) -> None:
+    wide_lr = (
+        "flowchart LR\n"
+        '  A["Stage 1: Upstream Baseline v0 (Initial synced config)"] --> '
+        '  B["Stage 2: Upstream lands CL A (adds FeatureBanner)"] --> '
+        '  C["Stage 3: Run --ack_only: move baseline; downstream untouched"]\n'
+    )
+    rendered_map = mdview_kitty.render_mermaid_blocks_to_png(
+        blocks=(wide_lr,), cache_dir=self.temp_dir
+    )
+    png_path = rendered_map[0]
+    png_w, png_h = mdview_kitty.read_png_dimensions(png_path)
+    self.assertGreaterEqual(png_w, 1000, f"Expected full-width PNG, got {png_w}x{png_h}")
+    self.assertGreater(png_h, 150)
+
+  def test_build_kitty_placement_scales_cols_with_zoom_and_uses_scale_up(
+      self,
+  ) -> None:
+    fake_png = os.path.join(self.temp_dir, "wide.png")
+    # Write a minimal valid 24-byte PNG header with dimensions 1600x400 px.
+    with open(fake_png, "wb") as f:
+      f.write(
+          b"\x89PNG\r\n\x1a\n"
+          b"\x00\x00\x00\rIHDR"
+          + (1600).to_bytes(4, "big")
+          + (400).to_bytes(4, "big")
+      )
+    fake_stdout = (
+        b"\x1b_Ga=T,q=2,f=100,U=1,c=100,r=12,i=42;AAAA\x1b\\"
+        b"\x1b[38:2:0:0:42m\xf4\x8e\xbb\xae\xcc\x85\xcc\x85\x1b[39m\n"
+    )
+    geom = mdview_kitty.TerminalGeometry(
+        cols=200, rows=50, width_px=3600, height_px=1800
+    )
+    fake_proc = mock.Mock(returncode=0, stdout=fake_stdout, stderr=b"")
+    with mock.patch("subprocess.run", return_value=fake_proc) as mock_run:
+      mdview_kitty.build_kitty_placement(
+          png_path=fake_png,
+          max_cols=180,
+          geometry=geom,
+          diagram_zoom=1.5,
+      )
+    cmd = mock_run.call_args.args[0]
+    self.assertIn("--scale-up=yes", cmd)
+    win_arg = next(arg for arg in cmd if arg.startswith("--use-window-size="))
+    target_cols = int(win_arg.split("=", 1)[1].split(",")[0])
+    # 1600 / 16.0 * 1.5 = 150 cols (scaled up cleanly, capped <= 180).
+    self.assertEqual(target_cols, 150)
 
 
 class EndToEndRenderIntegrationTests(unittest.TestCase):

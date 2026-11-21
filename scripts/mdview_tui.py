@@ -33,7 +33,49 @@ import mdview_source_map
 
 
 _SGR_MOUSE_RE = re.compile(r"^\x1b\[<(\d+);(\d+);(\d+)([Mm])$")
-_CSI_U_RE = re.compile(r"^\x1b\[(\d+)(?:;(\d+))?u$")
+_CSI_U_RE = re.compile(r"^\x1b\[(\d+)(?::\d+)*(?:;(\d+)(?::\d+)*)?u$")
+
+_HELP_SECTIONS: tuple[tuple[str, tuple[tuple[str, str], ...]], ...] = (
+    (
+        "Navigation",
+        (
+            ("j / k, Up / Down, C-n / C-p", "Move caret down / up one row"),
+            ("d / u, C-d / C-u", "Scroll half-page down / up"),
+            ("Space / b, PgDn / PgUp", "Scroll full page down / up"),
+            ("g / G, Home / End", "Jump to top / bottom of document"),
+            ("/ , n / N", "Search text, next / previous match"),
+            ("Mouse wheel / click", "Scroll viewport / move caret to row"),
+        ),
+    ),
+    (
+        "Commenting & Review",
+        (
+            ("c / Enter", "Add or edit inline comment at caret line"),
+            ("E / C-g", "Edit comment in emacs-client.sh (also in inline prompt)"),
+            ("x / D", "Delete comment on current line"),
+            ("X", "Clear ALL saved draft comments for this file"),
+            ("Tab / ] , Shift+Tab / [", "Jump to next / previous comment"),
+            ("C", "Open Comments Drawer (Enter:jump e:edit E:emacs r:raw x:del)"),
+        ),
+    ),
+    (
+        "View & Diagrams",
+        (
+            ("+ / = , - , 0", "Zoom diagrams +25% / -25% / reset 100% (or Kitty Ctrl+Shift+=)"),
+            ("r / R", "Toggle Raw Markdown vs Rendered / reload file from disk"),
+            ("o", "Open another file via ranked fzf picker"),
+            ("? / h", "Toggle this Keyboard Shortcuts help overlay"),
+        ),
+    ),
+    (
+        "Finish & Export",
+        (
+            ("q", "Copy [file.md] comments to clipboard & exit (keeps draft)"),
+            ("A", "Copy [Approved] file.md to clipboard & exit (clears draft)"),
+            ("Q", "Quit without copying to clipboard (keeps draft)"),
+        ),
+    ),
+)
 
 
 class InputMode(enum.StrEnum):
@@ -43,6 +85,7 @@ class InputMode(enum.StrEnum):
   COMMENT = "comment"
   SEARCH = "search"
   DRAWER = "drawer"
+  HELP = "help"
 
 
 @dataclasses.dataclass(frozen=True)
@@ -62,20 +105,100 @@ class ExitOutcome:
   switch_to_picker: bool = False
 
 
+def write_all_fd(fd: int, data: bytes) -> None:
+  """Writes every byte in `data` to `fd`, looping across partial PTY writes.
+
+  Args:
+    fd: Open writable file descriptor (e.g., `/dev/tty`).
+    data: Byte payload to transmit completely.
+
+  Usage Example:
+    write_all_fd(tty_fd, b"\\x1b[?2026h...\\x1b[?2026l")
+  """
+  view = memoryview(data)
+  while view:
+    try:
+      written = os.write(fd, view)
+    except InterruptedError:
+      continue
+    except BlockingIOError:
+      select.select([], [fd], [], 0.05)
+      continue
+    if written <= 0:
+      break
+    view = view[written:]
+
+
+def resolve_comment_editor_cmd(
+    emacs_client_script: str | None = None,
+) -> list[str]:
+  """Resolves the external TTY editor command for multi-line review comments.
+
+  Prefers `MDVIEW_COMMENT_EDITOR`, then `~/scripts/emacs-client.sh` (fast
+  `tty-server` Emacs daemon client), falling back to standalone `emacs -nw` or
+  `vi`.
+
+  Args:
+    emacs_client_script: Optional override path for `emacs-client.sh`.
+
+  Returns:
+    Command argv prefix list to which the temporary comment file path is
+    appended.
+
+  Usage Example:
+    cmd = resolve_comment_editor_cmd()
+  """
+  if editor_override := os.environ.get("MDVIEW_COMMENT_EDITOR"):
+    return editor_override.split()
+
+  client_script = (
+      os.path.expanduser("~/scripts/emacs-client.sh")
+      if emacs_client_script is None
+      else emacs_client_script
+  )
+  if os.path.isfile(client_script) and os.access(client_script, os.X_OK):
+    return [client_script]
+
+  emacs_bin = shutil.which("emacs")
+  if not emacs_bin and os.access(
+      "/Applications/Emacs.app/Contents/MacOS/Emacs", os.X_OK
+  ):
+    emacs_bin = "/Applications/Emacs.app/Contents/MacOS/Emacs"
+  editor_cmd = [emacs_bin or "vi"]
+  if editor_cmd[0].endswith(("emacs", "Emacs")):
+    editor_cmd.append("--no-window-system")
+  return editor_cmd
+
+
+def resolve_real_tty_path() -> str:
+  """Resolves the concrete PTY device path (e.g. `/dev/pts/42`) for child TUIs.
+
+  `emacsclient --create-frame --tty` calls `ttyname(0)` and sends that path to
+  the background `emacs --daemon` server. Passing a descriptor opened directly
+  on `/dev/tty` makes `ttyname(0)` return `"/dev/tty"`, which the detached
+  daemon cannot open (`ENXIO`: `Could not open file: /dev/tty`). Opening the
+  underlying `/dev/pts/<N>` device instead lets the daemon attach cleanly.
+
+  Returns:
+    Concrete TTY device path if available on stdio FDs, else `"/dev/tty"`.
+
+  Usage Example:
+    tty_path = resolve_real_tty_path()
+  """
+  for fd in (0, 1, 2):
+    try:
+      if os.isatty(fd):
+        name = os.ttyname(fd)
+        if name and name != "/dev/tty":
+          return name
+    except OSError:
+      continue
+  return "/dev/tty"
+
+
 def _default_external_editor(initial_text: str, source_line: int) -> str | None:
-  """Opens `emacs --no-window-system` on a temp buffer for multi-line comments."""
-  editor_override = os.environ.get("MDVIEW_COMMENT_EDITOR")
-  if editor_override:
-    editor_cmd = editor_override.split()
-  else:
-    emacs_bin = shutil.which("emacs")
-    if not emacs_bin and os.access(
-        "/Applications/Emacs.app/Contents/MacOS/Emacs", os.X_OK
-    ):
-      emacs_bin = "/Applications/Emacs.app/Contents/MacOS/Emacs"
-    editor_cmd = [emacs_bin or "vi"]
-    if editor_cmd[0].endswith(("emacs", "Emacs")):
-      editor_cmd.append("--no-window-system")
+  """Opens `~/scripts/emacs-client.sh` (or fallback editor) on a temp buffer."""
+  editor_cmd = resolve_comment_editor_cmd()
 
   with tempfile.NamedTemporaryFile(
       mode="w",
@@ -88,7 +211,8 @@ def _default_external_editor(initial_text: str, source_line: int) -> str | None:
     tmp_path = tmp_f.name
 
   try:
-    with open("/dev/tty", "rb+", buffering=0) as tty_io:
+    tty_path = resolve_real_tty_path()
+    with open(tty_path, "rb+", buffering=0) as tty_io:
       proc = subprocess.run(
           [*editor_cmd, tmp_path],
           stdin=tty_io,
@@ -118,7 +242,7 @@ class ViewerController:
       term_cols: int = 120,
       term_rows: int = 40,
       external_editor_fn: Callable[[str, int], str | None] | None = None,
-      reload_fn: Callable[[int], mdview.RenderedDocument] | None = None,
+      reload_fn: Callable[[int, int, float], mdview.RenderedDocument] | None = None,
   ) -> None:
     """Initializes the viewer state and restores any saved draft comments.
 
@@ -130,8 +254,8 @@ class ViewerController:
       term_rows: Initial terminal height in character cells.
       external_editor_fn: Optional callback `(initial_text, line_num) -> edited`
         invoked on `Ctrl+G` / `E`.
-      reload_fn: Optional callback `(content_cols) -> RenderedDocument` invoked
-        upon terminal resize or `R` reload.
+      reload_fn: Optional callback `(prose_cols, diagram_cols, zoom) ->
+        RenderedDocument` invoked upon terminal resize, zoom, or `R` reload.
     """
     self.filepath = filepath
     self.document = document
@@ -140,6 +264,7 @@ class ViewerController:
     self.term_rows = max(8, term_rows)
     self.external_editor_fn = external_editor_fn or _default_external_editor
     self.reload_fn = reload_fn
+    self.diagram_zoom: float = 1.0
 
     self.state, self.file_changed_since_draft = (
         mdview_review_store.load_review_state(filepath, reviews_dir=reviews_dir)
@@ -185,6 +310,36 @@ class ViewerController:
     idx = max(0, min(len(self.document.source_lines) - 1, self.state.cursor_row))
     return self.document.source_lines[idx]
 
+  def _collapse_span_for_row(
+      self, row_idx: int
+  ) -> mdview_source_map.CollapseSpan | None:
+    """Returns the diagram `CollapseSpan` covering `row_idx` in rendered mode."""
+    if self.raw_mode:
+      return None
+    for span in self.document.collapse_spans:
+      if span.start_row <= row_idx < span.end_row:
+        return span
+    return None
+
+  def _comments_for_row(
+      self, row_idx: int, src_line: int
+  ) -> list[tuple[int, str]]:
+    """Returns sorted `(line_no, comment)` pairs covering `row_idx`."""
+    if (span := self._collapse_span_for_row(row_idx)) is not None:
+      hi = (
+          span.end_source_line
+          if span.end_source_line >= span.source_line
+          else span.source_line
+      )
+      return sorted(
+          (ln, txt)
+          for ln, txt in self.state.comments.items()
+          if span.source_line <= ln <= hi
+      )
+    if (txt := self.state.comments.get(src_line)) is not None:
+      return [(src_line, txt)]
+    return []
+
   def viewport_height(self) -> int:
     """Calculates available document viewport rows above the bottom bars."""
     if self.mode == InputMode.DRAWER:
@@ -193,7 +348,7 @@ class ViewerController:
     src_line = self.current_source_line()
     has_preview = (
         self.mode in (InputMode.COMMENT, InputMode.SEARCH)
-        or src_line in self.state.comments
+        or bool(self._comments_for_row(self.state.cursor_row, src_line))
         or bool(self.flash_message)
     )
     footer_rows = 3 if has_preview else 2
@@ -218,8 +373,31 @@ class ViewerController:
         self.state, reviews_dir=self.reviews_dir
     )
 
+  def _layout_column_budgets(self) -> tuple[int, int]:
+    """Computes `(prose_cols, diagram_cols)` for current terminal dimensions."""
+    avail_cols = max(
+        mdview_constants.MIN_COLUMNS,
+        self.term_cols - mdview_constants.GUTTER_WIDTH,
+    )
+    prose_cols = min(mdview_constants.DEFAULT_MAX_COLUMNS, avail_cols)
+    diagram_cols = max(mdview_constants.MIN_COLUMNS, avail_cols - 2)
+    return prose_cols, diagram_cols
+
+  def _reload_document(self) -> None:
+    """Re-renders the document at current layout budgets and diagram zoom."""
+    if self.reload_fn is None:
+      return
+    target_src = self.current_source_line()
+    prose_cols, diagram_cols = self._layout_column_budgets()
+    self.document = self.reload_fn(prose_cols, diagram_cols, self.diagram_zoom)
+    self._jump_to_source_line(target_src)
+    self.needs_image_reupload = True
+
   def resize(self, new_cols: int, new_rows: int) -> None:
-    """Updates terminal dimensions and optionally re-renders content width.
+    """Updates terminal dimensions and re-renders prose and diagram sizing.
+
+    Triggers reload on either column or row changes so Kitty font-size zoom
+    (`Ctrl+Shift+=` / `Ctrl+Shift+-`) rescales HiDPI diagrams smoothly.
 
     Args:
       new_cols: Updated terminal column count.
@@ -229,17 +407,13 @@ class ViewerController:
       ctrl.resize(140, 50)
     """
     prev_cols = self.term_cols
+    prev_rows = self.term_rows
     self.term_cols = max(mdview_constants.MIN_COLUMNS, new_cols)
     self.term_rows = max(8, new_rows)
-    if self.reload_fn is not None and self.term_cols != prev_cols:
-      target_src = self.current_source_line()
-      content_cols = max(
-          mdview_constants.MIN_COLUMNS,
-          self.term_cols - mdview_constants.GUTTER_WIDTH,
-      )
-      self.document = self.reload_fn(content_cols)
-      self._jump_to_source_line(target_src)
-      self.needs_image_reupload = True
+    if self.reload_fn is not None and (
+        self.term_cols != prev_cols or self.term_rows != prev_rows
+    ):
+      self._reload_document()
     self._clamp_positions()
 
   def _jump_to_source_line(self, target_line: int) -> None:
@@ -248,6 +422,16 @@ class ViewerController:
       self.state.cursor_row = max(0, target_line - 1)
       self._clamp_positions()
       return
+    for span in self.document.collapse_spans:
+      hi = (
+          span.end_source_line
+          if span.end_source_line >= span.source_line
+          else span.source_line
+      )
+      if span.source_line <= target_line <= hi:
+        self.state.cursor_row = span.start_row
+        self._clamp_positions()
+        return
     for idx, src_line in enumerate(self.document.source_lines):
       if src_line >= target_line:
         self.state.cursor_row = idx
@@ -263,15 +447,24 @@ class ViewerController:
       return
     sorted_lines = sorted(self.state.comments)
     cur = self.current_source_line()
+    cur_lo = cur
+    cur_hi = cur
+    if (span := self._collapse_span_for_row(self.state.cursor_row)) is not None:
+      cur_lo = span.source_line
+      cur_hi = (
+          span.end_source_line
+          if span.end_source_line >= span.source_line
+          else span.source_line
+      )
     if forward:
       for line_no in sorted_lines:
-        if line_no > cur:
+        if line_no > cur_hi:
           self._jump_to_source_line(line_no)
           return
       self._jump_to_source_line(sorted_lines[0])
     else:
       for line_no in reversed(sorted_lines):
-        if line_no < cur:
+        if line_no < cur_lo:
           self._jump_to_source_line(line_no)
           return
       self._jump_to_source_line(sorted_lines[-1])
@@ -435,6 +628,12 @@ class ViewerController:
         self.mode = InputMode.NORMAL
       return None
 
+    if self.mode == InputMode.HELP:
+      if key in ("?", "h", "q", "ESC", "\x07", "\r", "\n", " "):
+        self.mode = InputMode.NORMAL
+        self.needs_image_reupload = True
+      return None
+
     if self.mode == InputMode.DRAWER:
       sorted_lines = sorted(self.state.comments)
       if key in ("ESC", "C", "q", "\x07"):
@@ -447,6 +646,25 @@ class ViewerController:
         target = sorted_lines[min(self.drawer_index, len(sorted_lines) - 1)]
         self.mode = InputMode.NORMAL
         self._jump_to_source_line(target)
+      elif key in ("e", "c") and sorted_lines:
+        target = sorted_lines[min(self.drawer_index, len(sorted_lines) - 1)]
+        self._jump_to_source_line(target)
+        self.comment_target_line = target
+        existing = self.state.comments.get(target, "")
+        self.input_buffer = existing
+        self.input_cursor = len(existing)
+        self.mode = InputMode.COMMENT
+      elif key == "E" and sorted_lines:
+        target = sorted_lines[min(self.drawer_index, len(sorted_lines) - 1)]
+        self._jump_to_source_line(target)
+        existing = self.state.comments.get(target, "")
+        self._open_external_comment_editor(existing, target)
+      elif key == "r" and sorted_lines:
+        target = sorted_lines[min(self.drawer_index, len(sorted_lines) - 1)]
+        self.mode = InputMode.NORMAL
+        self.raw_mode = True
+        self._jump_to_source_line(target)
+        self.flash_message = f"Raw Markdown view (L{target})"
       elif key in ("x", "D") and sorted_lines:
         target = sorted_lines[min(self.drawer_index, len(sorted_lines) - 1)]
         self.state.comments.pop(target, None)
@@ -496,7 +714,7 @@ class ViewerController:
       self.input_buffer = existing
       self.input_cursor = len(existing)
       self.mode = InputMode.COMMENT
-    elif key == "E":
+    elif key in ("E", "\x07"):
       line_no = self.current_source_line()
       existing = self.state.comments.get(line_no, "")
       self._open_external_comment_editor(existing, line_no)
@@ -541,15 +759,30 @@ class ViewerController:
         self.needs_image_reupload = True
       self.flash_message = "Raw Markdown view" if self.raw_mode else "Rendered view"
     elif key == "R" and self.reload_fn is not None:
-      target_src = self.current_source_line()
-      content_cols = max(
-          mdview_constants.MIN_COLUMNS,
-          self.term_cols - mdview_constants.GUTTER_WIDTH,
-      )
-      self.document = self.reload_fn(content_cols)
-      self._jump_to_source_line(target_src)
-      self.needs_image_reupload = True
+      self._reload_document()
       self.flash_message = "Reloaded from disk"
+    elif key in ("+", "="):
+      new_zoom = min(
+          mdview_constants.MAX_DIAGRAM_ZOOM,
+          round(self.diagram_zoom + mdview_constants.DIAGRAM_ZOOM_STEP, 2),
+      )
+      self.diagram_zoom = new_zoom
+      self._reload_document()
+      self.flash_message = f"Diagram zoom: {round(self.diagram_zoom * 100)}%"
+    elif key in ("-", "_"):
+      new_zoom = max(
+          mdview_constants.MIN_DIAGRAM_ZOOM,
+          round(self.diagram_zoom - mdview_constants.DIAGRAM_ZOOM_STEP, 2),
+      )
+      self.diagram_zoom = new_zoom
+      self._reload_document()
+      self.flash_message = f"Diagram zoom: {round(self.diagram_zoom * 100)}%"
+    elif key == "0":
+      self.diagram_zoom = 1.0
+      self._reload_document()
+      self.flash_message = "Diagram zoom: 100%"
+    elif key in ("?", "h"):
+      self.mode = InputMode.HELP
     elif key == "o":
       self._persist()
       return ExitOutcome(
@@ -596,16 +829,97 @@ class ViewerController:
     return None
 
   def _format_gutter(self, row_idx: int, src_line: int, is_caret: bool) -> str:
-    """Renders the 7-column gutter (`●▸ 34┃ `) without touching content SGR."""
-    del row_idx
+    """Renders the 7-column gutter (`●▸ 34┃ ` or `2▸ 45┃ `) cleanly."""
     sgr = mdview_constants.DRACULA_SGR
-    has_cmt = src_line in self.state.comments
-    badge = f"{sgr['cyan']}●" if has_cmt else " "
+    row_cmts = self._comments_for_row(row_idx, src_line)
+    count = len(row_cmts)
+    if count == 1:
+      badge = f"{sgr['cyan']}●"
+    elif count >= 2:
+      count_char = str(count) if count < 10 else "+"
+      badge = f"{sgr['yellow']}{count_char}"
+    else:
+      badge = " "
     if is_caret:
       return (
           f"{badge}{sgr['bold_purple']}▸{src_line:>3d}┃{sgr['reset']} "
       )
     return f"{badge}{sgr['comment']} {src_line:>3d}│{sgr['reset']} "
+
+  def consume_pending_image_uploads(self) -> tuple[str, ...]:
+    """Returns pending Kitty upload escapes once so they run outside `?2026h`.
+
+    Returns:
+      Tuple of Kitty APC/DCS upload strings to transmit before drawing the
+      synchronized screen frame, or an empty tuple if already uploaded.
+
+    Usage Example:
+      uploads = ctrl.consume_pending_image_uploads()
+    """
+    if self.needs_image_reupload and not self.raw_mode:
+      self.needs_image_reupload = False
+      return self.document.upload_escapes
+    return ()
+
+  def _render_help_frame(self) -> str:
+    """Renders the centered Keyboard Shortcuts help overlay frame."""
+    sgr = mdview_constants.DRACULA_SGR
+    box_w = min(max(50, self.term_cols - 4), 96)
+    inner_w = box_w - 4
+    key_col = min(28, max(16, inner_w // 3))
+    desc_col = max(10, inner_w - key_col - 2)
+    left_pad = " " * max(0, (self.term_cols - box_w) // 2)
+
+    body_rows: list[str] = []
+    title = " mdview Keyboard Shortcuts "
+    top_rule = "─" * max(0, box_w - 2 - len(title))
+    body_rows.append(
+        f"{left_pad}{sgr['purple']}╭─{sgr['bold_purple']}{title}"
+        f"{sgr['purple']}{top_rule[:-1] if len(top_rule) > 0 else ''}╮{sgr['reset']}"
+    )
+    for sec_idx, (sec_name, bindings) in enumerate(_HELP_SECTIONS):
+      if sec_idx > 0:
+        body_rows.append(
+            f"{left_pad}{sgr['purple']}│{' ' * (box_w - 2)}│{sgr['reset']}"
+        )
+      sec_pad = " " * max(0, inner_w - len(sec_name))
+      body_rows.append(
+          f"{left_pad}{sgr['purple']}│ {sgr['yellow']}{sec_name}{sec_pad}"
+          f"{sgr['purple']} │{sgr['reset']}"
+      )
+      for keys_label, desc in bindings:
+        k_txt = keys_label[:key_col].ljust(key_col)
+        d_txt = desc[:desc_col].ljust(desc_col)
+        body_rows.append(
+            f"{left_pad}{sgr['purple']}│ {sgr['cyan']}{k_txt}  "
+            f"{sgr['fg']}{d_txt}{sgr['purple']} │{sgr['reset']}"
+        )
+    body_rows.append(
+        f"{left_pad}{sgr['purple']}╰{'─' * (box_w - 2)}╯{sgr['reset']}"
+    )
+
+    out: list[str] = ["\x1b[?2026h\x1b[H"]
+    avail_rows = max(3, self.term_rows - 1)
+    if len(body_rows) > avail_rows and avail_rows >= 3:
+      # Preserve top and bottom borders on compact terminal heights.
+      visible_body = body_rows[: avail_rows - 1] + [body_rows[-1]]
+    else:
+      visible_body = body_rows
+    top_margin = max(0, (avail_rows - len(visible_body)) // 2)
+    for r_idx in range(avail_rows):
+      out.append("\x1b[2K")
+      content_idx = r_idx - top_margin
+      if 0 <= content_idx < len(visible_body):
+        out.append(visible_body[content_idx])
+      out.append("\r\n")
+
+    footer = " Help — press ?, h, Esc, Enter, or q to return to document "
+    pad_len = max(0, self.term_cols - len(footer))
+    out.append(
+        f"\x1b[2K{sgr['bar_bg']}{sgr['bold_purple']}{footer}"
+        f"{' ' * pad_len}{sgr['reset']}\x1b[?25l\x1b[?2026l"
+    )
+    return "".join(out)
 
   def render_frame(self) -> str:
     """Renders a complete synchronized-update ANSI terminal screen frame.
@@ -620,6 +934,9 @@ class ViewerController:
       ansi_frame = ctrl.render_frame()
     """
     sgr = mdview_constants.DRACULA_SGR
+    if self.mode == InputMode.HELP:
+      return self._render_help_frame()
+
     lines = self.active_lines()
     vis = self.viewport_height()
     out: list[str] = ["\x1b[?2026h\x1b[H"]
@@ -664,12 +981,16 @@ class ViewerController:
     total_src = max(1, len(self.document.raw_lines))
     num_cmts = len(self.state.comments)
 
+    cur_row_cmts = self._comments_for_row(self.state.cursor_row, cur_src)
+    cur_span = self._collapse_span_for_row(self.state.cursor_row)
+
     if self.mode == InputMode.DRAWER:
       sorted_cmts = sorted(self.state.comments.items())
       drawer_rows = min(8, max(3, len(sorted_cmts) + 1))
       out.append(
           f"\x1b[2K{sgr['bold_purple']} Comments ({num_cmts}) — "
-          f"j/k:select  Enter:jump  x:delete  C/Esc:close{sgr['reset']}\r\n"
+          f"j/k:select  Enter:jump  e:edit  E:emacs  r:raw  x:del  Esc:close"
+          f"{sgr['reset']}\r\n"
       )
       for d_idx in range(drawer_rows - 1):
         out.append("\x1b[2K")
@@ -698,12 +1019,33 @@ class ViewerController:
           f"\x1b[2K{sgr['prompt_bg']}{sgr['yellow']}{prefix}"
           f"{sgr['fg']}{visible_in}{sgr['reset']}\r\n"
       )
-    elif cur_src in self.state.comments:
-      flat = self.state.comments[cur_src].replace("\n", " ↵ ")
-      limit = max(12, self.term_cols - 12)
+    elif len(cur_row_cmts) == 1:
+      c_line, c_text = cur_row_cmts[0]
+      flat = c_text.replace("\n", " ↵ ")
+      action_hint = " [c:edit E/C-g:emacs x:del]"
+      prefix = f" 💬 L{c_line}: "
+      limit = max(12, self.term_cols - len(prefix) - len(action_hint) - 2)
       clipped = flat[:limit] + ("…" if len(flat) > limit else "")
       out.append(
-          f"\x1b[2K{sgr['cyan']} 💬 L{cur_src}: "
+          f"\x1b[2K{sgr['cyan']}{prefix}"
+          f"{sgr['yellow']}{clipped}{sgr['comment']}{action_hint}"
+          f"{sgr['reset']}\r\n"
+      )
+    elif len(cur_row_cmts) > 1:
+      span_hi = (
+          cur_span.end_source_line
+          if cur_span and cur_span.end_source_line >= cur_span.source_line
+          else cur_row_cmts[-1][0]
+      )
+      span_lo = cur_span.source_line if cur_span else cur_row_cmts[0][0]
+      joined = " | ".join(
+          f"L{ln}: {txt.replace(chr(10), ' ↵ ')}" for ln, txt in cur_row_cmts
+      )
+      header = f" 💬 L{span_lo}–{span_hi} ({len(cur_row_cmts)} cmts, C:edit): "
+      limit = max(12, self.term_cols - len(header) - 2)
+      clipped = joined[:limit] + ("…" if len(joined) > limit else "")
+      out.append(
+          f"\x1b[2K{sgr['cyan']}{header}"
           f"{sgr['yellow']}{clipped}{sgr['reset']}\r\n"
       )
     elif self.flash_message:
@@ -716,8 +1058,8 @@ class ViewerController:
     cmt_label = f"{num_cmts} cmt" if num_cmts == 1 else f"{num_cmts} cmts"
     left_stat = f" {self.state.filename} · L{cur_src}/{total_src} ({cmt_label}) "
     hints = (
-        "j/k:move c:comment E/C-g:emacs x:del C:list TAB:next r:raw o:open "
-        "A:approve q:finish"
+        "j/k:move c:cmt E/C-g:emacs x:del C:list +/-:zoom r:raw o:open "
+        "?:help A:approve q:done"
     )
     max_hints = max(0, self.term_cols - len(left_stat) - 1)
     status_line = f"{sgr['bar_bg']}{sgr['bold_purple']}{left_stat}{sgr['comment']}{hints[:max_hints]}"
@@ -862,26 +1204,30 @@ def run_interactive_tui(
     nonlocal resize_pending
     resize_pending = True
 
-  def _load_and_render(content_cols: int) -> mdview.RenderedDocument:
+  def _load_and_render(
+      prose_cols: int, diagram_cols: int, diagram_zoom: float
+  ) -> mdview.RenderedDocument:
     with open(filepath, encoding="utf-8") as f:
       raw_md = f.read()
     return mdview.render_document(
         markdown_text=raw_md,
-        columns=content_cols,
+        columns=prose_cols,
         diagram_mode=diagram_mode,
         tmux_passthrough=tmux_passthrough,
         cache_dir=cache_dir,
+        diagram_columns=diagram_cols,
+        diagram_zoom=diagram_zoom,
     )
 
   def _enter_raw() -> None:
     tty.setraw(tty_fd)
-    os.write(
+    write_all_fd(
         tty_fd,
         b"\x1b[?1049h\x1b[?25l\x1b[?1000h\x1b[?1006h",
     )
 
   def _leave_raw() -> None:
-    os.write(
+    write_all_fd(
         tty_fd,
         b"\x1b[?1006l\x1b[?1000l\x1b[?25h\x1b[?1049l",
     )
@@ -895,22 +1241,25 @@ def run_interactive_tui(
       _enter_raw()
 
   prev_handler = signal.signal(signal.SIGWINCH, _on_sigwinch)
+  wakeup_r, wakeup_w = os.pipe()
+  os.set_blocking(wakeup_r, False)
+  os.set_blocking(wakeup_w, False)
+  prev_wakeup_fd = signal.set_wakeup_fd(wakeup_w, warn_on_full_buffer=False)
   try:
     geom = mdview_kitty.query_terminal_geometry()
-    content_cols = min(
-        mdview_constants.DEFAULT_MAX_COLUMNS,
-        max(mdview_constants.MIN_COLUMNS, geom.cols - mdview_constants.GUTTER_WIDTH),
+    avail_cols = max(
+        mdview_constants.MIN_COLUMNS, geom.cols - mdview_constants.GUTTER_WIDTH
     )
-    initial_doc = _load_and_render(content_cols)
+    prose_cols = min(mdview_constants.DEFAULT_MAX_COLUMNS, avail_cols)
+    diagram_cols = max(mdview_constants.MIN_COLUMNS, avail_cols - 2)
+    initial_doc = _load_and_render(prose_cols, diagram_cols, 1.0)
     ctrl = ViewerController(
         filepath=filepath,
         document=initial_doc,
         term_cols=geom.cols,
         term_rows=geom.rows,
         external_editor_fn=_suspended_editor,
-        reload_fn=lambda cols: _load_and_render(
-            min(mdview_constants.DEFAULT_MAX_COLUMNS, cols)
-        ),
+        reload_fn=_load_and_render,
     )
     _enter_raw()
     try:
@@ -919,8 +1268,23 @@ def run_interactive_tui(
           resize_pending = False
           new_geom = mdview_kitty.query_terminal_geometry()
           ctrl.resize(new_geom.cols, new_geom.rows)
+        # Transmit chunked Kitty image uploads BEFORE entering synchronized
+        # update (`?2026h`) using write-all so SSH PTY buffers never truncate.
+        for upload_seq in ctrl.consume_pending_image_uploads():
+          write_all_fd(tty_fd, upload_seq.encode("utf-8"))
         frame_bytes = ctrl.render_frame().encode("utf-8")
-        os.write(tty_fd, frame_bytes)
+        write_all_fd(tty_fd, frame_bytes)
+        try:
+          readable, _, _ = select.select([tty_fd, wakeup_r], [], [])
+        except InterruptedError:
+          continue
+        if wakeup_r in readable:
+          try:
+            os.read(wakeup_r, 1024)
+          except BlockingIOError:
+            pass
+          if tty_fd not in readable:
+            continue
         try:
           token = read_key_token(tty_fd)
         except InterruptedError:
@@ -931,5 +1295,8 @@ def run_interactive_tui(
     finally:
       _leave_raw()
   finally:
+    signal.set_wakeup_fd(prev_wakeup_fd)
     signal.signal(signal.SIGWINCH, prev_handler)
+    os.close(wakeup_r)
+    os.close(wakeup_w)
     os.close(tty_fd)

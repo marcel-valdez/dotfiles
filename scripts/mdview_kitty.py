@@ -34,6 +34,11 @@ _UPLOAD_PREFIX_RE = re.compile(
     r"^\r?((?:\x1bPtmux;.*?\x1b\\|\x1b_G.*?\x1b\\)+)",
     re.DOTALL,
 )
+_TMUX_DCS_RE = re.compile(r"\x1bPtmux;(.*?)\x1b\\", re.DOTALL)
+_KITTY_APC_RE = re.compile(r"\x1b_G([^;]*);([^\x1b]*)\x1b\\")
+_LEADING_SGR_RE = re.compile(r"^((?:\x1b\[[0-9;:]*m)+)")
+_TRAILING_SGR_RE = re.compile(r"((?:\x1b\[[0-9;:]*m)+)$")
+_MAX_KITTY_CHUNK_BYTES: int = 4096
 
 
 class MermaidRenderError(RuntimeError):
@@ -535,16 +540,88 @@ def render_mermaid_blocks_to_png(
   return rendered_paths
 
 
+def rechunk_kitty_upload(
+    upload_escape: str,
+    chunk_size: int = _MAX_KITTY_CHUNK_BYTES,
+) -> str:
+  """Splits a Kitty graphics APC upload into <=4096-byte `m=1`/`m=0` chunks.
+
+  Conforms strictly to Kitty's Remote Client streaming protocol so every
+  version of Kitty (`>= 0.28.0`) and `tmux` passthrough accepts large PNGs
+  without overflowing APC parser buffers.
+
+  Args:
+    upload_escape: Raw Kitty APC (or `tmux` DCS-wrapped APC) upload sequence.
+    chunk_size: Maximum base64 bytes per chunk (rounded down to multiple of 4).
+
+  Returns:
+    Re-chunked escape sequence ready to transmit to the terminal.
+
+  Usage Example:
+    chunked = rechunk_kitty_upload("\\x1b_Ga=T,f=100,U=1,i=42;AAAA...\\x1b\\\\")
+  """
+  is_tmux = upload_escape.startswith("\x1bPtmux;")
+  if is_tmux:
+    unwrapped_parts = [
+        m.group(1).replace("\x1b\x1b", "\x1b")
+        for m in _TMUX_DCS_RE.finditer(upload_escape)
+    ]
+    apc_stream = "".join(unwrapped_parts)
+  else:
+    apc_stream = upload_escape
+
+  matches = list(_KITTY_APC_RE.finditer(apc_stream))
+  if not matches:
+    return upload_escape
+
+  first_header_raw = matches[0].group(1)
+  header_fields = [
+      kv
+      for kv in first_header_raw.split(",")
+      if kv and not kv.startswith("m=")
+  ]
+  base_header = ",".join(header_fields)
+  combined_payload = "".join(m.group(2) for m in matches)
+
+  step = max(4, (chunk_size // 4) * 4)
+  if len(combined_payload) <= step:
+    apc_chunks = [f"\x1b_G{base_header};{combined_payload}\x1b\\"]
+  else:
+    apc_chunks: list[str] = []
+    total_len = len(combined_payload)
+    for offset in range(0, total_len, step):
+      piece = combined_payload[offset : offset + step]
+      is_first = offset == 0
+      is_last = offset + step >= total_len
+      if is_first:
+        apc_chunks.append(f"\x1b_G{base_header},m=1;{piece}\x1b\\")
+      elif is_last:
+        apc_chunks.append(f"\x1b_Gm=0,q=2;{piece}\x1b\\")
+      else:
+        apc_chunks.append(f"\x1b_Gm=1,q=2;{piece}\x1b\\")
+
+  if not is_tmux:
+    return "".join(apc_chunks)
+  return "".join(
+      f"\x1bPtmux;{chunk.replace(chr(27), chr(27) + chr(27))}\x1b\\"
+      for chunk in apc_chunks
+  )
+
+
 def split_kitten_icat_output(raw_output: str) -> tuple[str, tuple[str, ...]]:
   """Splits `kitten icat --unicode-placeholder` output into upload + cell rows.
+
+  Re-chunks uploads to `<= 4096` bytes (`m=1`/`m=0`) and propagates the 24-bit
+  `image_id` foreground SGR color from row 0 onto every `U+10EEEE` row so each
+  row remains self-contained across left-gutter SGR resets and scrolling.
 
   Args:
     raw_output: Raw stdout captured from `kitten icat`.
 
   Returns:
-    Tuple `(upload_escape, grid_lines)` where `upload_escape` holds the virtual
-    placement APC/DCS upload sequences and `grid_lines` holds the `U+10EEEE`
-    character lines without trailing carriage returns.
+    Tuple `(upload_escape, grid_lines)` where `upload_escape` holds the chunked
+    virtual placement APC/DCS upload sequences and `grid_lines` holds the
+    self-contained SGR-colored `U+10EEEE` character lines.
 
   Raises:
     MermaidRenderError: If `raw_output` lacks an upload sequence or placeholder
@@ -565,16 +642,56 @@ def split_kitten_icat_output(raw_output: str) -> tuple[str, tuple[str, ...]]:
         "kitten icat output missing SGR foreground color for U+10EEEE grid."
     )
 
-  upload_escape = trimmed[:sgr_idx]
+  upload_escape = rechunk_kitty_upload(trimmed[:sgr_idx])
   remainder = trimmed[sgr_idx:].replace("\r", "")
-  lines = tuple(line for line in remainder.split("\n") if line)
-  if not lines or not all(
-      mdview_constants.UNICODE_PLACEHOLDER_CHAR in line for line in lines
+  raw_lines = [line for line in remainder.split("\n") if line]
+  if not raw_lines or not all(
+      mdview_constants.UNICODE_PLACEHOLDER_CHAR in line for line in raw_lines
   ):
     raise MermaidRenderError(
         "kitten icat output did not produce valid U+10EEEE placeholder rows."
     )
-  return upload_escape, lines
+
+  # Propagate the image-ID foreground (and optional placement underline) SGR
+  # from row 0 onto every row so per-row gutter `\x1b[0m` resets never erase
+  # image IDs on rows 1..N-1.
+  lead_match = _LEADING_SGR_RE.match(raw_lines[0])
+  leading_sgr = lead_match.group(1) if lead_match else ""
+  reset_suffix = (
+      "\x1b[39m\x1b[59m"
+      if ("58:" in leading_sgr or "58;" in leading_sgr)
+      else "\x1b[39m"
+  )
+  normalized_lines: list[str] = []
+  for row in raw_lines:
+    core = _LEADING_SGR_RE.sub("", row)
+    core = _TRAILING_SGR_RE.sub("", core)
+    normalized_lines.append(f"{leading_sgr}{core}{reset_suffix}")
+
+  return upload_escape, tuple(normalized_lines)
+
+
+def read_png_dimensions(png_path: str) -> tuple[int, int]:
+  """Reads `(width_px, height_px)` from a PNG file's 24-byte IHDR header.
+
+  Args:
+    png_path: Path to a PNG image file on disk.
+
+  Returns:
+    `(width, height)` pixel tuple, or `(0, 0)` if unreadable or invalid PNG.
+
+  Usage Example:
+    width_px, height_px = read_png_dimensions("/tmp/diagram.png")
+  """
+  try:
+    with open(png_path, "rb") as f:
+      header = f.read(24)
+  except OSError:
+    return 0, 0
+  if len(header) < 24 or header[:8] != b"\x89PNG\r\n\x1a\n":
+    return 0, 0
+  width_px, height_px = struct.unpack(">II", header[16:24])
+  return int(width_px), int(height_px)
 
 
 def deterministic_image_id(png_path: str, salt: int = 0) -> int:
@@ -600,8 +717,14 @@ def build_kitty_placement(
     tmux_passthrough: bool = False,
     salt: int = 0,
     geometry: TerminalGeometry | None = None,
+    diagram_zoom: float = 1.0,
 ) -> KittyPlacement:
   """Invokes `kitten icat` to produce a virtual placement and `U+10EEEE` grid.
+
+  Computes a readable column budget proportional to the PNG's natural width
+  and `diagram_zoom` (capped at `max_cols`) and passes `--scale-up=yes` so
+  diagrams scale in lockstep with both Kitty font zoom (`Ctrl+Shift+=`) and
+  in-viewer `+`/`-` zoom.
 
   Args:
     png_path: Path to rendered PNG file.
@@ -609,6 +732,7 @@ def build_kitty_placement(
     tmux_passthrough: Whether to wrap upload chunks in `tmux` DCS passthrough.
     salt: Disambiguator index so duplicate diagrams get distinct placement IDs.
     geometry: Optional pre-queried terminal cell/pixel geometry.
+    diagram_zoom: Multiplier applied to the diagram's natural column width.
 
   Returns:
     `KittyPlacement` ready for TTY upload and viewport splicing.
@@ -617,7 +741,7 @@ def build_kitty_placement(
     MermaidRenderError: If `kitten` is missing or exits non-zero.
 
   Usage Example:
-    placement = build_kitty_placement("/tmp/d.png", max_cols=100)
+    placement = build_kitty_placement("/tmp/d.png", max_cols=160, diagram_zoom=1.25)
   """
   kitten_bin = find_kitten_binary()
   if not kitten_bin:
@@ -626,11 +750,21 @@ def build_kitty_placement(
   geom = geometry or query_terminal_geometry(fallback_cols=max_cols)
   cell_px_w = max(4, geom.width_px // max(1, geom.cols))
   cell_px_h = max(8, geom.height_px // max(1, geom.rows))
-  bounded_cols = max(16, max_cols)
+  max_avail_cols = max(16, max_cols)
+  png_w, _ = read_png_dimensions(png_path)
+  if png_w > 0:
+    natural_cols = max(
+        16,
+        round((png_w / mdview_constants.MERMAID_PNG_PX_PER_COL) * diagram_zoom),
+    )
+    target_cols = max(16, min(max_avail_cols, natural_cols))
+  else:
+    target_cols = max_avail_cols
+
   bounded_rows = max(20, geom.rows)
   win_size_arg = (
-      f"{bounded_cols},{bounded_rows},"
-      f"{bounded_cols * cell_px_w},{bounded_rows * cell_px_h}"
+      f"{target_cols},{bounded_rows},"
+      f"{target_cols * cell_px_w},{bounded_rows * cell_px_h}"
   )
 
   image_id = deterministic_image_id(png_path, salt=salt)
@@ -642,7 +776,7 @@ def build_kitty_placement(
       f"--passthrough={passthrough_mode}",
       "--unicode-placeholder",
       "--align=left",
-      "--scale-up=no",
+      "--scale-up=yes",
       "--fit=width",
       f"--image-id={image_id}",
       f"--use-window-size={win_size_arg}",

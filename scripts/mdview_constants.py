@@ -37,7 +37,11 @@ DEFAULT_MDCAT_THEME: str = "dracula"
 DEFAULT_BAT_THEME: str = "Dracula"
 DRACULA_BG_HEX: str = "#282a36"
 
-MERMAID_RENDER_VERSION: str = "v1_dracula_hidpi_2x"
+MERMAID_RENDER_VERSION: str = "v2_dracula_hidpi_fullwidth"
+MERMAID_PNG_PX_PER_COL: float = 16.0
+MIN_DIAGRAM_ZOOM: float = 0.5
+MAX_DIAGRAM_ZOOM: float = 2.5
+DIAGRAM_ZOOM_STEP: float = 0.25
 DEFAULT_CELL_PX_WIDTH: int = 10
 DEFAULT_CELL_PX_HEIGHT: int = 20
 DEFAULT_VIEWPORT_ROWS: int = 45

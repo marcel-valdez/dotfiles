@@ -20,6 +20,7 @@ from collections.abc import Sequence
 import dataclasses
 import json
 import os
+import re
 import shutil
 import subprocess
 import tempfile
@@ -29,6 +30,14 @@ from urllib import parse as urllib_parse
 import mdview
 import mdview_constants
 import mdview_review_store
+
+
+_JETSKI_LOCK_RE = re.compile(
+    r"presence/([a-f0-9-]{36})\.lock(?:\s+\(deleted\))?", re.IGNORECASE
+)
+_JETSKI_DB_RE = re.compile(
+    r"conversations/([a-f0-9-]{36})\.db(?:\s+\(deleted\))?", re.IGNORECASE
+)
 
 
 @dataclasses.dataclass(frozen=True)
@@ -247,6 +256,200 @@ def query_active_tmux_cwd() -> str:
     return ""
 
 
+def query_active_tmux_pane_tty() -> str:
+  """Returns the TTY device path of the active `tmux` pane or client.
+
+  Uses `tmux display-message -p '#{pane_tty}'` when invoked inside `tmux`, or
+  falls back to the most recently active `tmux` client's pane TTY when invoked
+  over direct SSH from Kitty.
+
+  Returns:
+    TTY path string (e.g. `"/dev/pts/21"`), or `""` if unavailable.
+
+  Usage Example:
+    tty_path = query_active_tmux_pane_tty()
+  """
+  if not shutil.which("tmux"):
+    return ""
+  try:
+    if os.environ.get("TMUX"):
+      cur = subprocess.run(
+          ["tmux", "display-message", "-p", "#{pane_tty}"],
+          capture_output=True,
+          text=True,
+          check=False,
+          timeout=1,
+      )
+      if cur.returncode == 0 and cur.stdout.strip():
+        return cur.stdout.strip()
+    proc = subprocess.run(
+        [
+            "tmux",
+            "list-clients",
+            "-F",
+            "#{client_activity}\t#{pane_tty}",
+        ],
+        capture_output=True,
+        text=True,
+        check=False,
+        timeout=1,
+    )
+    if proc.returncode != 0 or not proc.stdout.strip():
+      return ""
+    best_act = -1
+    best_tty = ""
+    for line in proc.stdout.splitlines():
+      parts = line.split("\t", 1)
+      if len(parts) == 2 and parts[0].isdigit():
+        act = int(parts[0])
+        if act > best_act:
+          best_act = act
+          best_tty = parts[1].strip()
+    return best_tty
+  except (OSError, subprocess.SubprocessError):
+    return ""
+
+
+def detect_jetski_conversation_from_tty(pane_tty: str) -> str | None:
+  """Detects an active Jetski conversation UUID running on `pane_tty`.
+
+  Inspects open file descriptors under `/proc/<pid>/fd` for processes attached
+  to `pane_tty`, prioritizing active presence `.lock` files over SQLite `.db`
+  handles and newer mtimes (matching `jetski-search`).
+
+  Args:
+    pane_tty: Terminal device path such as `"/dev/pts/21"` or `"pts/21"`.
+
+  Returns:
+    Conversation UUID string if a Jetski session is active on `pane_tty`, else
+    `None`.
+
+  Usage Example:
+    conv_id = detect_jetski_conversation_from_tty("/dev/pts/21")
+  """
+  clean_tty = pane_tty.strip()
+  if clean_tty.startswith("/dev/"):
+    clean_tty = clean_tty[5:]
+  if not clean_tty:
+    return None
+
+  try:
+    res = subprocess.run(
+        ["ps", "-t", clean_tty, "-o", "pid="],
+        capture_output=True,
+        text=True,
+        check=False,
+        timeout=1,
+    )
+    if res.returncode != 0 or not res.stdout.strip():
+      return None
+    pids = [int(p.strip()) for p in res.stdout.split() if p.strip().isdigit()]
+  except (OSError, subprocess.SubprocessError):
+    return None
+
+  ranked: list[tuple[bool, bool, float, int, str]] = []
+  for pid in pids:
+    fd_dir = f"/proc/{pid}/fd"
+    try:
+      fd_names = os.listdir(fd_dir)
+    except OSError:
+      continue
+    for fd_name in fd_names:
+      fd_path = f"{fd_dir}/{fd_name}"
+      try:
+        target = os.readlink(fd_path)
+      except OSError:
+        continue
+      lock_match = _JETSKI_LOCK_RE.search(target)
+      db_match = _JETSKI_DB_RE.search(target) if not lock_match else None
+      if not lock_match and not db_match:
+        continue
+      conv_id = lock_match.group(1) if lock_match else db_match.group(1)
+      is_lock = bool(lock_match)
+      not_deleted = not target.endswith("(deleted)")
+      mtime = 0.0
+      try:
+        mtime = os.stat(fd_path).st_mtime
+      except OSError:
+        pass
+      fd_int = int(fd_name) if fd_name.isdigit() else 0
+      ranked.append((is_lock, not_deleted, mtime, fd_int, conv_id))
+
+  if not ranked:
+    return None
+  ranked.sort(reverse=True)
+  return ranked[0][4]
+
+
+def detect_active_jetski_artifact_dir(
+    jetski_brain_root: str | None = None,
+    pane_tty: str | None = None,
+) -> str | None:
+  """Resolves the artifact folder (`~/.gemini/jetski/brain/<uuid>`) for an active session.
+
+  Args:
+    jetski_brain_root: Optional override for `~/.gemini/jetski/brain`.
+    pane_tty: Optional explicit pane TTY path (auto-detected via `tmux` / stdio
+      if `None`).
+
+  Returns:
+    Canonical path to the active Jetski session's artifact directory if found
+    on disk, else `None`.
+
+  Usage Example:
+    artifact_dir = detect_active_jetski_artifact_dir()
+  """
+  resolved_tty = query_active_tmux_pane_tty() if pane_tty is None else pane_tty
+  if not resolved_tty:
+    try:
+      if os.isatty(0):
+        resolved_tty = os.ttyname(0)
+    except OSError:
+      resolved_tty = ""
+  if not resolved_tty:
+    return None
+
+  conv_id = detect_jetski_conversation_from_tty(resolved_tty)
+  if not conv_id:
+    return None
+  brain_root = (
+      os.path.expanduser("~/.gemini/jetski/brain")
+      if jetski_brain_root is None
+      else jetski_brain_root
+  )
+  artifact_dir = os.path.join(brain_root, conv_id)
+  return os.path.realpath(artifact_dir) if os.path.isdir(artifact_dir) else None
+
+
+def resolve_default_picker_query(
+    candidates: Sequence[CandidateEntry],
+    active_jetski_dir: str | None,
+) -> str:
+  """Returns the default `fzf` filter query for an active Jetski artifact dir.
+
+  Only pre-fills the artifact folder path when at least one `.md` candidate
+  exists inside `active_jetski_dir`, avoiding an empty filtered picker view.
+
+  Args:
+    candidates: Ranked Markdown candidates passed to `fzf`.
+    active_jetski_dir: Active session artifact directory, or `None`.
+
+  Returns:
+    Shortened directory prefix ending in `/` (e.g.
+    `"~/.gemini/jetski/brain/<uuid>/"`) or `""`.
+
+  Usage Example:
+    query = resolve_default_picker_query(candidates, artifact_dir)
+  """
+  if not active_jetski_dir:
+    return ""
+  real_dir = os.path.realpath(active_jetski_dir)
+  prefix = real_dir.rstrip(os.sep) + os.sep
+  if not any(c.realpath.startswith(prefix) for c in candidates):
+    return ""
+  return _shorten_display_path(real_dir).rstrip("/") + "/"
+
+
 def _scan_bounded_md_files(
     root_dir: str,
     max_depth: int = 3,
@@ -335,6 +538,7 @@ def collect_markdown_candidates(
     clipboard_text: str | None = None,
     workspace_cwd: str | None = None,
     notes_dir: str | None = None,
+    active_jetski_dir: str | None = None,
 ) -> tuple[CandidateEntry, ...]:
   """Builds a deduplicated, 4-tier ranked tuple of Markdown file candidates.
 
@@ -344,6 +548,8 @@ def collect_markdown_candidates(
     clipboard_text: Optional explicit clipboard string (queries `tmux` if `None`).
     workspace_cwd: Optional active workspace directory (queries `tmux` if `None`).
     notes_dir: Optional override for `~/notes`.
+    active_jetski_dir: Optional active Jetski conversation artifact directory
+      whose Markdown files are guaranteed to be included and prioritized.
 
   Returns:
     Ordered tuple of `CandidateEntry` items ready for `fzf`.
@@ -358,13 +564,12 @@ def collect_markdown_candidates(
     if realpath in seen:
       return
     seen.add(realpath)
-    base = os.path.basename(realpath)
     short = _shorten_display_path(realpath)
     entries.append(
         CandidateEntry(
             realpath=realpath,
             category=category,
-            label=f"{tag:<20s}  {base}  ({short})",
+            label=f"{tag:<16s}  {short}",
             sort_score=score,
         )
     )
@@ -387,7 +592,17 @@ def collect_markdown_candidates(
   if clip_path := _parse_clipboard_md_path(raw_clip):
     _add(clip_path, "CLIPBOARD", "[CLIPBOARD]", 3_000_000_000.0)
 
-  # Tier 3: Recent Jetski artifacts and scratch/plans/*.md files.
+  # Tier 3a: Active Jetski session artifacts (guaranteed unfiltered by top-30 cap).
+  if active_jetski_dir and os.path.isdir(active_jetski_dir):
+    session_hits = _scan_bounded_md_files(
+        active_jetski_dir,
+        max_depth=4,
+        extra_excluded=frozenset({".system_generated", "media", "logs"}),
+    )
+    for mtime, rpath in session_hits:
+      _add(rpath, "JETSKI", "[SESSION]", 2_500_000_000.0 + mtime)
+
+  # Tier 3b: Recent Jetski artifacts and scratch/plans/*.md files.
   brain_root = (
       os.path.expanduser("~/.gemini/jetski/brain")
       if jetski_brain_root is None
@@ -428,15 +643,55 @@ def collect_markdown_candidates(
   return tuple(entries)
 
 
+def build_fzf_picker_cmd(
+    fzf_bin: str,
+    preview_cmd: str,
+    initial_query: str = "",
+) -> list[str]:
+  """Constructs the `fzf` argv list with word-wrap, `C-/` toggle, and query.
+
+  Args:
+    fzf_bin: Path to the `fzf` executable.
+    preview_cmd: Shell preview command referencing `{3}` for full file path.
+    initial_query: Optional pre-filled filter query (e.g. active Jetski dir).
+
+  Returns:
+    Complete argv list ready for `subprocess.run`.
+
+  Usage Example:
+    cmd = build_fzf_picker_cmd("/usr/bin/fzf", "cat {3}", initial_query="~/notes/")
+  """
+  cmd = [
+      fzf_bin,
+      "--ansi",
+      "--no-sort",
+      "--layout=reverse",
+      "--wrap=word",
+      "--delimiter=\t",
+      "--with-nth=2",
+      "--header=Enter: open | C-u: clear filter | C-/: toggle preview | M-w: toggle wrap | Esc: cancel",
+      f"--preview={preview_cmd}",
+      "--preview-window=right,55%,border-left,wrap",
+      "--bind=ctrl-/:toggle-preview",
+      "--bind=alt-w:toggle-wrap",
+  ]
+  if initial_query:
+    cmd.append(f"--query={initial_query}")
+  return cmd
+
+
 def run_fzf_picker(
     candidates: Sequence[CandidateEntry],
     fzf_bin: str | None = None,
+    initial_query: str = "",
 ) -> str | None:
   """Runs interactive `fzf` over `candidates` with live `mdcat` Dracula preview.
 
   Args:
     candidates: Ranked sequence of `CandidateEntry` items.
     fzf_bin: Optional explicit path to `fzf` binary.
+    initial_query: Optional initial `fzf` prompt query (e.g. active Jetski
+      artifact directory prefix).
 
   Returns:
     Selected canonical file path, or `None` if cancelled (`Esc` / `Ctrl+C`).
@@ -456,30 +711,26 @@ def run_fzf_picker(
   mdcat_bin = mdview.find_mdcat_binary()
   if mdcat_bin:
     preview_cmd = (
+        "printf '\\033[1;35m%s\\033[0m\\n\\n' {3} && "
         f"BAT_THEME=Dracula {mdcat_bin} --no-pager --ansi "
         "--theme=dracula --columns=80 {3}"
     )
   else:
-    preview_cmd = "head -n 120 {3}"
+    preview_cmd = "printf '\\033[1;35m%s\\033[0m\\n\\n' {3} && head -n 120 {3}"
 
   lines_in = "\n".join(
       f"{idx}\t{entry.label}\t{entry.realpath}"
       for idx, entry in enumerate(candidates)
   )
+  fzf_cmd = build_fzf_picker_cmd(
+      fzf_bin=resolved_fzf,
+      preview_cmd=preview_cmd,
+      initial_query=initial_query,
+  )
 
   with open("/dev/tty", "rb+", buffering=0) as tty_io:
     proc = subprocess.run(
-        [
-            resolved_fzf,
-            "--ansi",
-            "--no-sort",
-            "--layout=reverse",
-            "--delimiter=\t",
-            "--with-nth=2",
-            "--header=Enter: open in mdview  |  Esc: cancel",
-            f"--preview={preview_cmd}",
-            "--preview-window=right,55%,border-left",
-        ],
+        fzf_cmd,
         input=lines_in.encode("utf-8"),
         stdout=subprocess.PIPE,
         stderr=tty_io,

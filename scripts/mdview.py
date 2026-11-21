@@ -46,6 +46,7 @@ class RenderedDocument:
     upload_escapes: Kitty `U=1` virtual placement uploads to send to TTY.
     diagram_row_flags: Boolean per row indicating `U+10EEEE` image cells.
     raw_lines: Original raw Markdown lines for raw-source toggle.
+    collapse_spans: Rendered row spans covering multi-line fenced diagrams.
   """
 
   lines: tuple[str, ...]
@@ -53,6 +54,7 @@ class RenderedDocument:
   upload_escapes: tuple[str, ...]
   diagram_row_flags: tuple[bool, ...]
   raw_lines: tuple[str, ...]
+  collapse_spans: tuple[mdview_source_map.CollapseSpan, ...] = ()
 
 
 def find_mdcat_binary() -> str | None:
@@ -148,23 +150,28 @@ def render_document(
     diagram_mode: mdview_constants.DiagramMode = mdview_constants.DiagramMode.AUTO,
     tmux_passthrough: bool = False,
     cache_dir: str | None = None,
+    diagram_columns: int | None = None,
+    diagram_zoom: float = 1.0,
 ) -> RenderedDocument:
   """Renders a Markdown document and its Mermaid diagrams into viewport lines.
 
   Args:
     markdown_text: Full raw Markdown source text.
-    columns: Maximum width in terminal cells for prose, tables, and diagrams.
+    columns: Maximum width in terminal cells for prose and tables.
     diagram_mode: Desired Mermaid rendering strategy (`auto`, `kitty`,
       `unicode`, or `raw`).
     tmux_passthrough: Whether Kitty uploads require `tmux` DCS wrapping.
     cache_dir: Optional directory path for cached Mermaid PNGs.
+    diagram_columns: Optional wider column ceiling for diagrams (defaults to
+      `columns - 2` so wide horizontal diagrams can span the full terminal).
+    diagram_zoom: Multiplier applied to natural Kitty diagram column width.
 
   Returns:
     `RenderedDocument` containing rendered lines, Kitty upload sequences, and
     1-based source line numbers.
 
   Usage Example:
-    rendered = render_document("# Title\\n", columns=100)
+    rendered = render_document("# Title\\n", columns=100, diagram_columns=180)
   """
   bounded_cols = max(mdview_constants.MIN_COLUMNS, columns)
   extracted = mdview_source_map.extract_mermaid_fences(markdown_text)
@@ -196,7 +203,11 @@ def render_document(
       block.sentinel: block for block in extracted.blocks
   }
   upload_escapes: list[str] = []
-  diag_max_width = max(20, bounded_cols - 2)
+  diag_max_width = (
+      max(20, diagram_columns)
+      if diagram_columns is not None
+      else max(20, bounded_cols - 2)
+  )
 
   if extracted.blocks:
     if effective_mode == mdview_constants.DiagramMode.KITTY:
@@ -205,7 +216,7 @@ def render_document(
             blocks=tuple(b.source_text for b in extracted.blocks),
             cache_dir=cache_dir,
         )
-        geom = mdview_kitty.query_terminal_geometry(fallback_cols=bounded_cols)
+        geom = mdview_kitty.query_terminal_geometry(fallback_cols=diag_max_width)
         for block in extracted.blocks:
           if png_path := png_map.get(block.index):
             placement = mdview_kitty.build_kitty_placement(
@@ -214,6 +225,7 @@ def render_document(
                 tmux_passthrough=tmux_passthrough,
                 salt=block.index,
                 geometry=geom,
+                diagram_zoom=diagram_zoom,
             )
             upload_escapes.append(placement.upload_escape)
             placements_by_sentinel[block.sentinel] = placement.grid_lines
@@ -298,6 +310,7 @@ def render_document(
       upload_escapes=tuple(upload_escapes),
       diagram_row_flags=tuple(diagram_flags),
       raw_lines=extracted.raw_lines,
+      collapse_spans=tuple(collapse_spans),
   )
 
 
@@ -313,7 +326,15 @@ def _write_uploads_to_tty(upload_escapes: Sequence[str]) -> None:
     sys.stdout.buffer.flush()
     return
   try:
-    os.write(tty_fd, payload)
+    view = memoryview(payload)
+    while view:
+      try:
+        written = os.write(tty_fd, view)
+      except InterruptedError:
+        continue
+      if written <= 0:
+        break
+      view = view[written:]
   finally:
     os.close(tty_fd)
 
@@ -444,11 +465,19 @@ def main(argv: Sequence[str] | None = None) -> int:
         first_pass = False
         selected = mdview_picker.consume_queued_target()
       if selected is None:
-        candidates = mdview_picker.collect_markdown_candidates()
+        active_dir = mdview_picker.detect_active_jetski_artifact_dir()
+        candidates = mdview_picker.collect_markdown_candidates(
+            active_jetski_dir=active_dir
+        )
         if not candidates:
           logging.error("No Markdown documents found to display.")
           return 1
-        selected = mdview_picker.run_fzf_picker(candidates)
+        default_query = mdview_picker.resolve_default_picker_query(
+            candidates, active_dir
+        )
+        selected = mdview_picker.run_fzf_picker(
+            candidates, initial_query=default_query
+        )
       if not selected:
         return 0
       outcome = mdview_tui.run_interactive_tui(
@@ -478,8 +507,16 @@ def main(argv: Sequence[str] | None = None) -> int:
           cache_dir=args.cache_dir,
       )
       if outcome.switch_to_picker:
-        candidates = mdview_picker.collect_markdown_candidates()
-        current_file = mdview_picker.run_fzf_picker(candidates)
+        active_dir = mdview_picker.detect_active_jetski_artifact_dir()
+        candidates = mdview_picker.collect_markdown_candidates(
+            active_jetski_dir=active_dir
+        )
+        default_query = mdview_picker.resolve_default_picker_query(
+            candidates, active_dir
+        )
+        current_file = mdview_picker.run_fzf_picker(
+            candidates, initial_query=default_query
+        )
         continue
       _export_outcome(outcome, args.ephemeral_ssh)
       return 0
@@ -500,12 +537,16 @@ def main(argv: Sequence[str] | None = None) -> int:
       if args.columns > 0
       else min(geom.cols, mdview_constants.DEFAULT_MAX_COLUMNS)
   )
+  diag_cols = (
+      max(20, args.columns - 2) if args.columns > 0 else max(20, geom.cols - 2)
+  )
   rendered = render_document(
       markdown_text=markdown_text,
       columns=target_cols,
       diagram_mode=mode,
       tmux_passthrough=in_tmux,
       cache_dir=args.cache_dir,
+      diagram_columns=diag_cols,
   )
 
   _write_uploads_to_tty(rendered.upload_escapes)

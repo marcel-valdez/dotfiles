@@ -55,7 +55,7 @@ const mermaidJsPath = manifest.mermaid_js_path;
   try {
     const page = await browser.newPage({
       deviceScaleFactor: scale,
-      viewport: { width: 2200, height: 1400 },
+      viewport: { width: 3200, height: 2400 },
     });
 
     const containersHtml = jobs
@@ -102,9 +102,26 @@ ${containersHtml}
         startOnLoad: false,
         securityLevel: "strict",
         theme: "dark",
+        fontSize: 16,
         fontFamily: '"JetBrains Mono", "DejaVu Sans Mono", monospace',
-        flowchart: { htmlLabels: true, curve: "basis", padding: 12 },
+        flowchart: {
+          htmlLabels: true,
+          useMaxWidth: false,
+          curve: "basis",
+          padding: 14,
+        },
         sequence: { useMaxWidth: false },
+        state: { useMaxWidth: false },
+        class: { useMaxWidth: false },
+        er: { useMaxWidth: false },
+        gantt: { useMaxWidth: false },
+        journey: { useMaxWidth: false },
+        gitGraph: { useMaxWidth: false },
+        mindmap: { useMaxWidth: false },
+        timeline: { useMaxWidth: false },
+        quadrantChart: { useMaxWidth: false },
+        requirement: { useMaxWidth: false },
+        c4: { useMaxWidth: false },
         themeVariables: {
           darkMode: true,
           background: "#282a36",
@@ -132,6 +149,25 @@ ${containersHtml}
         try {
           const rendered = await mermaid.render(`mermaid_svg_${idx}`, job.code);
           target.innerHTML = rendered.svg;
+          const svgEl = target.querySelector("svg");
+          if (svgEl) {
+            const vb = (svgEl.getAttribute("viewBox") || "")
+              .trim()
+              .split(/[\s,]+/)
+              .map(Number);
+            const attrW = svgEl.getAttribute("width") || "";
+            if (
+              vb.length === 4 &&
+              vb[2] > 0 &&
+              vb[3] > 0 &&
+              (!attrW || attrW.includes("%"))
+            ) {
+              svgEl.setAttribute("width", String(Math.ceil(vb[2])));
+              svgEl.setAttribute("height", String(Math.ceil(vb[3])));
+              svgEl.style.width = `${Math.ceil(vb[2])}px`;
+              svgEl.style.height = `${Math.ceil(vb[3])}px`;
+            }
+          }
           statuses.push({ id: job.id, ok: true, error: "" });
         } catch (err) {
           statuses.push({
