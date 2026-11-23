@@ -2655,6 +2655,10 @@ local function resolveSwitcherWindow(winId)
   return hs.window.get(winId)
 end
 
+-- Global cross-Space window lookup helper used by kitty-jetski-sidebar when
+-- hs.window.get(winId) returns nil for a Kitty window on a non-visible Space.
+_G.jetskiResolveWindow = resolveSwitcherWindow
+
 -- Focuses exactly this window. Never hs.application:activate() first: it brings
 -- the app's *own* focused window forward (app:focusedWindow():becomeMain() +
 -- _bringtofront()), and when that window is on another Space macOS follows it

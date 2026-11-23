@@ -17,12 +17,73 @@ if [[ -z "${USE_GMOSH:-}" ]]; then
 fi
 
 use_gmosh=0
-if [[ "$1" == "--gmosh" ]]; then
-  use_gmosh=1
-  shift
-elif [[ "${USE_GMOSH:-0}" == "1" ]]; then
+if [[ "${USE_GMOSH:-0}" == "1" ]]; then
   use_gmosh=1
 fi
+
+# Order-independent Bash 3.2-safe option parser extracting --gmosh,
+# --remote-sh <cmd>, SSH flags (including value-taking flags), <target_host>,
+# and any trailing positional remote command arguments.
+remote_sh_cmd=""
+ssh_flags=()
+target_host=""
+positional_cmd_args=()
+parsing_done=0
+
+while [[ $# -gt 0 ]]; do
+  if [[ ${parsing_done} -eq 1 ]]; then
+    if [[ -z "${target_host}" ]]; then
+      target_host="$1"
+    else
+      positional_cmd_args+=("$1")
+    fi
+    shift
+    continue
+  fi
+
+  case "$1" in
+    --gmosh)
+      use_gmosh=1
+      shift
+      ;;
+    --remote-sh)
+      if [[ $# -lt 2 ]]; then
+        log::error "--remote-sh requires a command argument."
+        exit ${UNRETRIABLE_ERROR}
+      fi
+      remote_sh_cmd="$2"
+      shift 2
+      ;;
+    --remote-sh=*)
+      remote_sh_cmd="${1#*=}"
+      shift
+      ;;
+    --)
+      parsing_done=1
+      shift
+      ;;
+    -o|-i|-p|-l|-F|-J|-b|-c|-D|-L|-R|-W|-S)
+      if [[ $# -lt 2 ]]; then
+        log::error "SSH option $1 requires an argument."
+        exit ${UNRETRIABLE_ERROR}
+      fi
+      ssh_flags+=("$1" "$2")
+      shift 2
+      ;;
+    -*)
+      ssh_flags+=("$1")
+      shift
+      ;;
+    *)
+      if [[ -z "${target_host}" ]]; then
+        target_host="$1"
+      else
+        positional_cmd_args+=("$1")
+      fi
+      shift
+      ;;
+  esac
+done
 
 if [[ ${use_gmosh} -eq 1 ]] && ! command -v gmosh &>/dev/null; then
   log::warn "gmosh not found in PATH, falling back to ssh."
@@ -279,18 +340,6 @@ while true; do
     monitor_pid=""
 
     if [[ ${use_gmosh} -eq 1 ]]; then
-        # Parse arguments, filtering out ssh-specific flags (-t, -Y, -tY)
-        target_args=()
-        for arg in "$@"; do
-            if [[ "$arg" =~ ^-[tY]+$ ]]; then
-                continue
-            fi
-            target_args+=("$arg")
-        done
-
-        target_host="${target_args[0]}"
-        cmd_args=("${target_args[@]:1}")
-
         wait_for_valid_credentials
 
         log::info "[$(date +%H:%M:%S)] Attempting to connect via gmosh to ${target_host} (idle server timeout: ${MOSH_NET_TMOUT}s)..."
@@ -300,12 +349,16 @@ while true; do
         monitor_gmosh_session "$$" "${timeline_file}" "${expired_flag_file}" </dev/null >/dev/null 2>&1 &
         monitor_pid="$!"
 
-        # mosh requires remote command tokens passed separately so mosh-server can execvp correctly
-        if [[ ${#cmd_args[@]} -eq 1 ]]; then
-            read -r -a split_cmd <<< "${cmd_args[0]}"
+        # mosh requires remote command tokens passed separately so mosh-server can execvp correctly.
+        # When --remote-sh is provided, invoke remote `bash -lc <cmd>` as 3 distinct argv tokens
+        # so remote `${HOME}` and shell builtins expand cleanly on the target host.
+        if [[ -n "${remote_sh_cmd}" ]]; then
+            gmosh --server="${GMOSH_SERVER_CMD}" --ssh="ssh -o ConnectTimeout=5 -ttY" "${target_host}" -- bash -lc "${remote_sh_cmd}"
+        elif [[ ${#positional_cmd_args[@]} -eq 1 ]]; then
+            read -r -a split_cmd <<< "${positional_cmd_args[0]}"
             gmosh --server="${GMOSH_SERVER_CMD}" --ssh="ssh -o ConnectTimeout=5 -ttY" "${target_host}" -- "${split_cmd[@]}"
-        elif [[ ${#cmd_args[@]} -gt 1 ]]; then
-            gmosh --server="${GMOSH_SERVER_CMD}" --ssh="ssh -o ConnectTimeout=5 -ttY" "${target_host}" -- "${cmd_args[@]}"
+        elif [[ ${#positional_cmd_args[@]} -gt 1 ]]; then
+            gmosh --server="${GMOSH_SERVER_CMD}" --ssh="ssh -o ConnectTimeout=5 -ttY" "${target_host}" -- "${positional_cmd_args[@]}"
         else
             gmosh --server="${GMOSH_SERVER_CMD}" --ssh="ssh -o ConnectTimeout=5 -ttY" "${target_host}"
         fi
@@ -326,12 +379,18 @@ while true; do
         fi
         rm -f "${timeline_file}" "${expired_flag_file}" 2>/dev/null || true
     else
-        if [[ "${USE_GCERT_GATE:-0}" == "1" ]] || [[ "$*" =~ (gcloud|\.corp\.google\.com|\.c\.googlers\.com) ]]; then
+        if [[ "${USE_GCERT_GATE:-0}" == "1" ]] || [[ "${target_host}" =~ (gcloud|\.corp\.google\.com|\.c\.googlers\.com) ]]; then
             wait_for_valid_credentials
         fi
         log::info "[$(date +%H:%M:%S)] Attempting to connect via ssh..."
         # -o ConnectTimeout=5 prevents the script from hanging if the network is still waking up
-        ssh -o ConnectTimeout=5 "$@"
+        if [[ -n "${remote_sh_cmd}" ]]; then
+            ssh -o ConnectTimeout=5 ${ssh_flags[@]+"${ssh_flags[@]}"} "${target_host}" "${remote_sh_cmd}"
+        elif [[ ${#positional_cmd_args[@]} -gt 0 ]]; then
+            ssh -o ConnectTimeout=5 ${ssh_flags[@]+"${ssh_flags[@]}"} "${target_host}" "${positional_cmd_args[@]}"
+        else
+            ssh -o ConnectTimeout=5 ${ssh_flags[@]+"${ssh_flags[@]}"} "${target_host}"
+        fi
         exit_code=$?
     fi
 
