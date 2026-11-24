@@ -18,6 +18,10 @@ Usage Example:
   #   kitten @ launch --watcher="~/.config/kitty/jetski_sidebar_watcher.py" ...
 """
 
+# Lazy annotations: keeps this module importable by macOS /usr/bin/python3
+# (3.9) for the hermetic unit tests; a no-op under Kitty's bundled Python.
+from __future__ import annotations
+
 from collections.abc import Mapping
 import os
 import pathlib
