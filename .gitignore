@@ -76,6 +76,7 @@ bin/fzf-xl-select
 bin/gtd-report
 bin/hg
 bin/jetski-emacs-bridge
+bin/jetski_sidebar.par
 bin/jetski_tmux.par
 bin/pt
 bin/sync_notes
@@ -135,6 +136,7 @@ scripts/tests/test_monitor_supermixer_asrf_cutover.py
 !.config/kitty/tab_bar.py
 !.config/kitty/macos_session.conf
 !.config/kitty/os-macos.conf
+!.config/kitty/jetski_sidebar_watcher.py
 # Machine-local kitty overrides: only the commented template is tracked (added
 # with `git add -f`); local edits stay out of commits via --skip-worktree.
 .config/kitty/local.conf
