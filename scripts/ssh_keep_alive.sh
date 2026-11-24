@@ -213,7 +213,10 @@ monitor_gmosh_session() {
   local timeline_file="$2"
   local expired_flag_file="$3"
   local watch_interval="${GMOSH_WATCH_INTERVAL:-2}"
-  local self_pid="${BASHPID:-$(sh -c 'echo $PPID')}"
+  # Bash 3.2 has no BASHPID. exec makes sh the command substitution's own
+  # process, so its $PPID is this subshell; a plain `sh -c` reports the
+  # intermediate fork instead.
+  local self_pid="${BASHPID:-$(exec sh -c 'echo $PPID')}"
   local last_state=""
 
   while kill -0 "${parent_pid}" 2>/dev/null; do
