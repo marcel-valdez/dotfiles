@@ -1,4 +1,11 @@
 #!/usr/bin/env bash
+# Kitty started by LaunchServices resolves `#!/usr/bin/env bash` to macOS
+# /bin/bash 3.2: re-exec under Homebrew's Bash, as setup_work_environment.sh
+# does.
+if (( BASH_VERSINFO[0] < 4 )) && [[ -x "/opt/homebrew/bin/bash" ]]; then
+  exec /opt/homebrew/bin/bash "$0" "$@"
+fi
+
 UNRETRIABLE_SUCCESS=129
 UNRETRIABLE_ERROR=128
 
