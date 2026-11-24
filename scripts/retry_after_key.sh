@@ -26,7 +26,7 @@ trap ctrl_c_handler SIGINT
 while true; do
   "$@"
   exit_code=$?
-  log::info "Command '$*' finished with exit code: $?"
+  log::info "Command '$*' finished with exit code: ${exit_code}"
   if [[ ${exit_code} -eq ${UNRETRIABLE_SUCCESS} ]]; then
     log::info "Code ${exit_code} is UNRETRIABLE_SUCCESS, not retrying."
     break
