@@ -19,8 +19,13 @@ preview_height=\$((popup_height-4));\
 windows=\$(tmux display-message -t{1} -p '#{W:1}' | wc -m);\
 height=\$((preview_height-windows-2));\
 window_selection_state=\$(cat "${preview_index_file}");\
-window_selection_delta=\$(printf '%+d' "\${window_selection_state}");\
-preview_window_index=\$(tmux display-message -t {1}:\${window_selection_delta} -p "#{window_index}");\
+if [ "\${window_selection_state:-0}" -eq 0 ]; then \
+preview_target={1}; \
+else \
+window_selection_delta=\$(printf '%+d' "\${window_selection_state}"); \
+preview_target={1}:\${window_selection_delta}; \
+fi;\
+preview_window_index=\$(tmux display-message -t "\${preview_target}" -p "#{window_index}");\
 tmux display-message -t{1} -p \
   "#{W:#{window_index}. #{window_name} [#{window_panes} panes] #{?#{==:#{window_index},\${preview_window_index}},<-,} !,#{window_index}. <#{window_name}> [#{window_panes} panes] #{?#{==:#{window_index},\${preview_window_index}},<-,} !}" |\
 sed -e 's/[ ]+/ /g' | tr '!' '\n';\
@@ -43,8 +48,13 @@ EOF
 )
 enter_script=$(cat<<EOF
 window_selection_state=\$(cat "${preview_index_file}");\
-window_selection_delta=\$(printf '%+d' "\${window_selection_state}");\
-tmux switch-client -t {1}:\${window_selection_delta}
+if [ "\${window_selection_state:-0}" -eq 0 ]; then \
+target={1}; \
+else \
+window_selection_delta=\$(printf '%+d' "\${window_selection_state}"); \
+target={1}:\${window_selection_delta}; \
+fi;\
+tmux switch-client -t "\${target}"
 EOF
 )
 current_session_name="$(tmux display-message -p "#{session_name}")"
